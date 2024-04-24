@@ -1,6 +1,6 @@
-# Financial Checkup Project - Created By Blake Vieyra
+# Financial Checkup Application - Created By Blake Vieyra
 
-This Flask application is designed to help users manage and analyze their personal finances, providing tools for tracking income, expenses, and generating visual financial analyses.
+This Flask Full Stack application is designed to help users manage and analyze their personal finances, providing tools for tracking income, expenses, and generating visual financial analyses.
 Project structure ensures that the application is robust, scalable, and secure, facilitating easy maintenance and scalability.
 
 ## Features
@@ -77,7 +77,7 @@ To run this project locally, follow these steps:
 3. Install dependencies:
   ```
   pip install -r requirements.txt
-4, Set environment variables for FLASK_SECRET_KEY and WTF_CSRF_SECRET_KEY:
+4. Set environment variables for FLASK_SECRET_KEY and WTF_CSRF_SECRET_KEY:
 5. Start the server:
   ```flask run
   
