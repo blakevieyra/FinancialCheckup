@@ -62,7 +62,7 @@ To run this project locally, follow these steps:
    ```cd budget-analysis-project
 3. Install dependencies:
   ```pip install -r requirements.txt
-4. Set environment variables for FLASK_SECRET_KEY and WTF_CSRF_SECRET_KEY.
+4. Set environment variables for FLASK_SECRET_KEY and WTF_CSRF_SECRET_KEY:
 5. Start the server:
   ```flask run
 
