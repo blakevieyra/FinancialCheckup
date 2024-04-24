@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register</title>
+</head>
+<body>
+    <h1>Register</h1>
+    <form method="post">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required><br>
+        <label for="password">Password:</label>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="password" id="password" name="password" required><br>
+        <button type="submit">Register</button>
+    </form>
+    <a href="/login">Login</a>
+</body>
+</html>
