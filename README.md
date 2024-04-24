@@ -62,7 +62,7 @@ The database schema for this application is designed to efficiently handle user 
 
 ## Deployment
 
-The application is deployed on Heroku and can be accessed at https://your-heroku-app-link.com](https://financialcheckup-9beed77add2e.herokuapp.com/.
+The application is deployed on Heroku and can be accessed at https://financialcheckup-9beed77add2e.herokuapp.com/.
 
 ## Local Setup
 
