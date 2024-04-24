@@ -29,7 +29,10 @@ logging.basicConfig(level=logging.INFO)
 matplotlib.use('Agg')  
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(16))
+app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(16))  # Use environment variable or generate a random secret key
+app.config['WTF_CSRF_SECRET_KEY'] = secrets.token_hex(16)  # CSRF secret key
+app.config['SESSION_COOKIE_SECURE'] = True  # Ensure session cookies are only sent over HTTPS
+app.config['REMEMBER_COOKIE_SECURE'] = True  # Ensure remember cookies are only sent over HTTPS
 csrf = CSRFProtect(app)
 
  
@@ -103,7 +106,7 @@ def view_budget():
     user_id = session.get('user_id')
     if not user_id:
         flash('User not logged in. Please login to continue.')
-        return redirect(url_for('login'))
+        return redirect(url_for('index'))
 
     db = get_db()
     cursor = db.cursor()
