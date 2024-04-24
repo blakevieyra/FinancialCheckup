@@ -28,32 +28,11 @@ logging.basicConfig(level=logging.INFO)
 matplotlib.use('Agg')  
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(16))  # Fallback to a new random key if the environment variable is not set
-app.config['WTF_CSRF_SECRET_KEY'] = os.getenv('WTF_CSRF_SECRET_KEY', secrets.token_hex(16))  # Fallback to a new random key if not set
+app.secret_key = os.getenv('FLASK_SECRET_KEY', '8d90f64d7767be7b730e3105be9324d8')  # Fallback to a new random key if the environment variable is not set
+app.config['WTF_CSRF_SECRET_KEY'] = '8d90f64d7767be7b730e3105be9324d8'
 app.config['SESSION_COOKIE_SECURE'] = True  # Ensure session cookies are only sent over HTTPS
 app.config['REMEMBER_COOKIE_SECURE'] = True  # Ensure remember cookies are only sent over HTTPS
 csrf = CSRFProtect(app)
-
- 
-def generate_csrf_token():
-    if 'csrf_token' not in session:
-        session['csrf_token'] = secrets.token_hex(16)
-    print("Generated CSRF Token:", session['csrf_token'])  # Debug output
-    return session['csrf_token']
-
-def validate_csrf_token():
-    token_in_session = session.get('csrf_token', None)
-    token_in_form = request.form.get('csrf_token', None)
-    print("Session Token:", token_in_session, "Form Token:", token_in_form)  # Debug output
-    if not token_in_session or not token_in_form:
-        return False
-    return token_in_session == token_in_form
-
-
-@app.route('/get_csrf_token', methods=['GET'])
-def get_csrf_token():
-    csrf_token = generate_csrf_token()
-    return jsonify({'csrf_token': csrf_token}), 200
 
 
 def get_db():
@@ -604,8 +583,6 @@ def manage_expenses():
 
 @app.route('/save_expenses', methods=['POST'])
 def save_expenses():
-    if not validate_csrf_token():
-        return "CSRF Token Validation Failed!", 403
     user_id = session.get('user_id')
     if not user_id:
         flash('User not logged in. Please login to continue.', 'error')
