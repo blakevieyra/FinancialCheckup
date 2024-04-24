@@ -6,6 +6,8 @@ import bcrypt
 import secrets
 import io
 from matplotlib import pyplot as plt
+from ExpenseForm import ExpenseForm
+from LoginForm import LoginForm
 from histogram import Histogram
 from linechart import LineChart
 from main import Main
@@ -18,6 +20,9 @@ from flask_wtf.csrf import CSRFProtect
 from flask_wtf.csrf import generate_csrf
 from werkzeug.security import check_password_hash, generate_password_hash
 from scatterplot import ScatterPlot
+from RegisterForm import RegisterForm
+from IncomeForm import IncomeForm
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,6 +31,28 @@ matplotlib.use('Agg')
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(16))
 csrf = CSRFProtect(app)
+
+ 
+def generate_csrf_token():
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_hex(16)
+    print("Generated CSRF Token:", session['csrf_token'])  # Debug output
+    return session['csrf_token']
+
+def validate_csrf_token():
+    token_in_session = session.get('csrf_token', None)
+    token_in_form = request.form.get('csrf_token', None)
+    print("Session Token:", token_in_session, "Form Token:", token_in_form)  # Debug output
+    if not token_in_session or not token_in_form:
+        return False
+    return token_in_session == token_in_form
+
+
+@app.route('/get_csrf_token', methods=['GET'])
+def get_csrf_token():
+    csrf_token = generate_csrf_token()
+    return jsonify({'csrf_token': csrf_token}), 200
+
 
 def get_db():
     """Get a database connection. If none exists in the global context, create a new one."""
@@ -43,22 +70,6 @@ def close_db(exception=None):
         db.close()
 
 
-# @app.context_processor
-# def inject_user():
-#     user_id = session.get('user_id')
-#     if user_id:
-#         try:
-#             db = get_db()
-#             cursor = db.cursor()
-#             cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
-#             user = cursor.fetchone()
-#             if user:
-#                 return {'user': user['username']}  # Passing username or any other required user details
-#         except sqlite3.Error as e:
-#             # Log the error and handle it appropriately
-#             app.logger.error('Database error: %s', e)
-#     return {}
-
 @app.errorhandler(404)
 def page_not_found(e):
     user_id = session.get('user_id')  # Fetch the user ID from the session
@@ -71,15 +82,24 @@ def page_not_found(e):
 
 @app.route('/')
 def index():
-    user_id = session.get('user_id')
-    if user_id:
-        user = session.get('username')  # Assume you store username in session upon login
-        return render_template('index.html', csrf_token=generate_csrf(), user=user)
-    else:
-        return render_template('index.html', csrf_token=generate_csrf(), user=None)
+    login_form = LoginForm()  # Create an instance of LoginForm to pass to the template
+    form = RegisterForm() 
+    user = session.get('user_id')# Assuming RegisterForm is the expected form
+    return render_template('index.html', login_form=login_form, form=form, user=user)
+
+
+def parse_date(date_str):
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return None  # or raise an error if necessary
+
 
 @app.route('/view_budget')
 def view_budget():
+    income_form = IncomeForm()
     user_id = session.get('user_id')
     if not user_id:
         flash('User not logged in. Please login to continue.')
@@ -91,7 +111,7 @@ def view_budget():
         cursor.execute('SELECT amount, date FROM income WHERE user_id = ? ORDER BY date DESC LIMIT 1', (user_id,))
         income_row = cursor.fetchone()
         income = income_row['amount'] if income_row else 0.0
-        income_date = datetime.strptime(income_row['date'], '%Y-%m-%d %H:%M:%S') if income_row else None
+        income_date = parse_date(income_row['date']) if income_row and income_row['date'] else None
         formatted_income_date = income_date.strftime('%Y-%m-%d %H:%M:%S') if income_date else None
 
         cursor.execute('SELECT SUM(amount) AS total_expenses FROM expenses WHERE user_id = ?', (user_id,))
@@ -117,41 +137,52 @@ def view_budget():
         if income == 0:
             message = "No income data available. Please update your income to see detailed analysis."
 
-        return render_template('view_budget.html', budget=budget_data, message=message, date=formatted_income_date, csrf_token=generate_csrf(), user=user_id)
+        return render_template('view_budget.html', budget=budget_data, message=message, date=formatted_income_date, user=user_id, income_form=income_form)
     except sqlite3.Error as e:
         flash(f"An error occurred while fetching budget data: {e}")
         return redirect(url_for('index'))  # Ensure there is always a redirect or render in case of error
     finally:
         cursor.close()
         
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+    login_form = LoginForm()
+    user = None  # Initialize user variable
+
+    if login_form.validate_on_submit():
+        username = login_form.username.data
+        password = login_form.password.data
         db = get_db()
         cursor = db.cursor()
         cursor.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
         user = cursor.fetchone()
-        if user and check_password_hash(user['password_hash'], password):   
+
+        if user and check_password_hash(user['password_hash'], password):
             session['user_id'] = user['id']
-            session['username'] = username  # Optionally store more user details in session
-            return redirect(url_for('view_budget'))
+            session['username'] = username
+            flash('Login successful', 'success')
+            return redirect(url_for('view_budget'))  # Assuming 'view_budget' is the correct redirect target
         else:
-            flash('Invalid username or password.', 'error')
-    return render_template('index.html', csrf_token=generate_csrf())
+            flash('Invalid username or password.', 'danger')
+
+    # If not a POST request or if login fails, render the login form again
+    return render_template('login.html', login_form=login_form, user=user)
+
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+    form = RegisterForm()
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
 
         db = get_db()
         cursor = db.cursor()
 
-        # Ensure the users table exists
+        # Create users table if it doesn't exist
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
@@ -160,67 +191,52 @@ def register():
             )
         """)
 
-        # Check if username already exists
-        cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
-        if cursor.fetchone():
-            db.close()
-            flash('Username already exists. Please choose another username.')
-            return redirect(url_for('index'))
-
         # Insert the new user
         cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, hashed_password))
         user_id = cursor.lastrowid  # Get the last inserted id
 
-        # Initialize the income table with default value of 0 for new users
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS income (
-                income_id INTEGER PRIMARY KEY,
-                user_id INTEGER,
-                date TEXT,
-                amount REAL,
-                FOREIGN KEY(user_id) REFERENCES users(id)
-            )
-        """)
-        cursor.execute("INSERT INTO income (user_id, date, amount) VALUES (?, ?, ?)", (user_id, datetime.now().strftime("%Y-%m-%d"), 0.0))
-
-        # Ensure the expenses table exists and initialize default categories
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS expenses (
-                expense_id INTEGER PRIMARY KEY,
-                user_id INTEGER,
-                date TEXT,
-                category TEXT,
-                amount REAL,
-                FOREIGN KEY(user_id) REFERENCES users(id)
-            )
-        """)
-        default_categories = [
-    "🏠 Housing",
-    "💡 Electricity",
-    "💧 Water",
-    "🌐 Internet",
-    "📱 Phone",
-    "⛽ Gas",
-    "📺 Cable",
-    "🚗 Car",
-    "🛡️ Insurance",
-    "💳 Credit Cards",
-    "🛒 Groceries",
-    "🍽️ Dining Out",
-    "🎬 Entertainment",
-    "💰 Savings",
-    "📉 Loan Payments",
-    "📦 Etc",
-]
-        default_expenses = [(user_id, datetime.now().strftime("%Y-%m-%d"), category, 0.0) for category in default_categories]
-        cursor.executemany("INSERT INTO expenses (user_id, date, category, amount) VALUES (?, ?, ?, ?)", default_expenses)
+        # Initialize related tables for the user
+        setup_user_tables(cursor, user_id)
 
         db.commit()
         db.close()
-        flash('Account created successfully! Please login.')
-        return redirect(url_for('index'))
+        flash('Account created successfully! Please login.', 'success')
+        return redirect(url_for('login'))
 
-    return render_template('index.html', csrf_token=generate_csrf())
+    return render_template('register.html', form=form)
+
+def setup_user_tables(cursor, user_id):
+    # Initialize income and expenses tables
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS income (
+            income_id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            date TEXT,
+            amount REAL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+    cursor.execute("INSERT INTO income (user_id, date, amount) VALUES (?, ?, ?)", (user_id, datetime.now().strftime("%Y-%m-%d"), 0.0))
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS expenses (
+            expense_id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            date TEXT,
+            category TEXT,
+            amount REAL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+    default_categories = [
+        "🏠 Housing", "💡 Electricity", "💧 Water", "🌐 Internet",
+        "📱 Phone", "⛽ Gas", "📺 Cable", "🚗 Car", "🛡️ Insurance",
+        "💳 Credit Cards", "🛒 Groceries", "🍽️ Dining Out",
+        "🎬 Entertainment", "💰 Savings", "📉 Loan Payments", "📦 Etc",
+    ]
+    default_expenses = [(user_id, datetime.now().strftime("%Y-%m-%d"), category, 0.0) for category in default_categories]
+    cursor.executemany("INSERT INTO expenses (user_id, date, category, amount) VALUES (?, ?, ?, ?)", default_expenses)
+
 
 @app.route('/logout', methods=['POST'])
 def logout():
@@ -453,7 +469,7 @@ def budget_analysis():
         cursor.close()
         db.close()
 
-    return render_template('budget_analysis.html', last_updated_date=last_updated_date, budget=budget_data, expenses=expenses, analysis=analysis, max_expense=max_expense, user=user_id, csrf_token=generate_csrf())
+    return render_template('budget_analysis.html', last_updated_date=last_updated_date, budget=budget_data, expenses=expenses, analysis=analysis, max_expense=max_expense, user=user_id)
 
 
 @app.route('/histogram')
@@ -532,6 +548,7 @@ def calculate_grade(ratio):
 
 @app.route('/manage_expenses', methods=['GET', 'POST'])
 def manage_expenses():
+    expense_form = ExpenseForm();
     user_id = session.get('user_id')
     if not user_id:
         flash('User not logged in.')
@@ -580,11 +597,13 @@ def manage_expenses():
         cursor.close()
         db.close()
 
-    return render_template('manage_expenses.html', categories=categories_with_amounts, total_expenses=total_expenses, last_updated_date=last_updated_date, user=user_id, csrf_token=generate_csrf())
+    return render_template('manage_expenses.html', categories=categories_with_amounts, total_expenses=total_expenses, last_updated_date=last_updated_date, user=user_id, expense_form=expense_form)
 
 
 @app.route('/save_expenses', methods=['POST'])
 def save_expenses():
+    if not validate_csrf_token():
+        return "CSRF Token Validation Failed!", 403
     user_id = session.get('user_id')
     if not user_id:
         flash('User not logged in. Please login to continue.', 'error')
@@ -800,6 +819,8 @@ def expenses_line_chart():
     finally:
         cursor.close()
         db.close()
-        
+
+ 
 if __name__ == '__main__':
-    app.run(debug=True)
+     port = int(os.environ.get('PORT', 5000))
+     app.run(host='0.0.0.0', port=port)
