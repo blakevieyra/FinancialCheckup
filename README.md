@@ -31,25 +31,38 @@ Below are the key API endpoints included in this application:
 
 ## Technologies Used
 
-- **Python**: The primary programming language used for building the application. Python's extensive ecosystem of libraries makes it ideal for both web development and data processing.
-- **Flask**: A lightweight WSGI web application framework. It is designed to make getting started quick and easy, with the ability to scale up to complex applications.
-- **SQLite**: Embedded SQL database engine that requires zero configuration and stores all data in a single disk file. Used for storing user data, income, and expenses.
-- **Matplotlib**: A plotting library for the Python programming language and its numerical mathematics extension NumPy. Used for generating a variety of static, interactive, and animated visualizations.
-- **bcrypt**: Library to help hash passwords. Used for securing user passwords before storing them in the database.
-- **Heroku**: Cloud platform service that enables developers to build, run, and operate applications entirely in the cloud.
-  
-### Libraries and Tools
-- **Flask-WTF**: Provides simple integration with WTForms for handling form data and validation.
-- **Flask-Login**: Used for managing user sessions.
-- **Jinja2**: Templating engine for rendering views.
-  
+This project leverages a range of technologies for web development, secure data handling, and user interface design:
+
+- **Python**: The primary programming language used, known for its readability and broad ecosystem of libraries.
+- **Flask**: A lightweight WSGI web application framework used for building the core application.
+- **Django**: Utilized for complex data-driven operations (specify if Django is used alongside Flask or for different aspects of the project).
+- **JavaScript**: Employs interactive elements on the web application's frontend.
+- **jQuery**: A JavaScript library that simplifies HTML DOM tree traversal and manipulation, event handling, and animation.
+- **SQLite**: An embedded SQL database engine used for storing all user data and transactions.
+- **NumPy**: Critical for processing large, multi-dimensional arrays and matrices, enhancing numerical computations.
+- **Matplotlib**: A plotting library used for creating a variety of static, interactive, and animated visualizations in Python.
+- **bcrypt**: Helps hash passwords, enhancing the security for user authentication.
+- **Heroku**: Cloud platform service for deploying and managing the application.
+
+### Security and Communication
+
+- **HTTPS (Hypertext Transfer Protocol Secure)**: Ensures secure communication over the network through encryption. This application enforces HTTPS to protect data integrity and privacy between the user's browser and the server, crucial for preventing eavesdropping and tampering with the transmitted data.
+- **Flask-WTF**: Provides CSRF protection and integrates with WTForms for secure form handling and validation.
+
+### Additional Libraries and Tools
+
+- **Flask-Login**: Manages user sessions, making it easier to handle logins, logouts, and session management.
+- **Jinja2**: A templating engine for Python, utilized within Flask to render views, providing a clean separation between the backend logic and the frontend presentation.
+
+The combination of these technologies ensures that the application is robust, secure, and capable of supporting complex data processing and dynamic web functionality.
+
 ### Database Design
 
 The database schema for this application is designed to efficiently handle user data financial transactions.
 
 ## Deployment
 
-The application is deployed on Heroku and can be accessed at [Budget Analysis Live]([https://your-heroku-app-link.com](https://financialcheckup-9beed77add2e.herokuapp.com/)).
+The application is deployed on Heroku and can be accessed at https://your-heroku-app-link.com](https://financialcheckup-9beed77add2e.herokuapp.com/.
 
 ## Local Setup
 
