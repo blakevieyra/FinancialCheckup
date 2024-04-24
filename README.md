@@ -35,7 +35,7 @@ This project leverages a range of technologies for web development, secure data 
 
 - **Python**: The primary programming language used, known for its readability and broad ecosystem of libraries.
 - **Flask**: A lightweight WSGI web application framework used for building the core application.
-- **Django**: Utilized for complex data-driven operations (specify if Django is used alongside Flask or for different aspects of the project).
+- **Django**: Utilized for complex data-driven operations, used alongside Flask.
 - **JavaScript**: Employs interactive elements on the web application's frontend.
 - **jQuery**: A JavaScript library that simplifies HTML DOM tree traversal and manipulation, event handling, and animation.
 - **SQLite**: An embedded SQL database engine used for storing all user data and transactions.
@@ -77,7 +77,8 @@ To run this project locally, follow these steps:
 3. Install dependencies:
   ```
   pip install -r requirements.txt
-4. Set environment variables for FLASK_SECRET_KEY and WTF_CSRF_SECRET_KEY:
+4. Set environment variables for FLASK_SECRET_KEY and WTF_CSRF_SECRET_KEY
+
 5. Start the server:
   ```flask run
   
