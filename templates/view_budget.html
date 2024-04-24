@@ -190,17 +190,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-    $(document).ready(function() {
-    // Send a GET request to fetch the CSRF token
-    $.get('/get_csrf_token', function(data) {
-        // Store the CSRF token for login, register, and logout forms
-        var csrfToken = data.csrf_token;
-        $('#login_csrf_token').val(csrfToken);
-        $('#register_csrf_token').val(csrfToken);
-        $('#logout_csrf_token').val(csrfToken);
-        $('#income_csrf_token').val(csrfToken);
-    });
-});
 document.addEventListener("DOMContentLoaded", function() {
     updateIncome(); // Call updateIncome() when the page is loaded
 });

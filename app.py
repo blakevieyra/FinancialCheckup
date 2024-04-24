@@ -23,14 +23,13 @@ from scatterplot import ScatterPlot
 from RegisterForm import RegisterForm
 from IncomeForm import IncomeForm
 
-
 logging.basicConfig(level=logging.INFO)
 
 matplotlib.use('Agg')  
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(16))  # Use environment variable or generate a random secret key
-app.config['WTF_CSRF_SECRET_KEY'] = secrets.token_hex(16)  # CSRF secret key
+app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(16))  # Fallback to a new random key if the environment variable is not set
+app.config['WTF_CSRF_SECRET_KEY'] = os.getenv('WTF_CSRF_SECRET_KEY', secrets.token_hex(16))  # Fallback to a new random key if not set
 app.config['SESSION_COOKIE_SECURE'] = True  # Ensure session cookies are only sent over HTTPS
 app.config['REMEMBER_COOKIE_SECURE'] = True  # Ensure remember cookies are only sent over HTTPS
 csrf = CSRFProtect(app)
@@ -825,5 +824,4 @@ def expenses_line_chart():
 
  
 if __name__ == '__main__':
-     port = int(os.environ.get('PORT', 5000))
-     app.run(host='0.0.0.0', port=port)
+     app.run(host='0.0.0.0', port=5000)

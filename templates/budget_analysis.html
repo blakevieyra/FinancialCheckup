@@ -226,29 +226,6 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 
     <script>
-        $(document).ready(function() {
-    // Send a GET request to fetch the CSRF token for login
-    $.get('/get_csrf_token', function(data) {
-        // Store the CSRF token for login form
-        var loginCsrfToken = data.csrf_token;
-        // Set the CSRF token value in the hidden input field for login
-        $('#login_csrf_token').val(loginCsrfToken);
-    });
-
-    // Send a GET request to fetch the CSRF token for register
-    $.get('/get_csrf_token', function(data) {
-        // Store the CSRF token for register form
-        var registerCsrfToken = data.csrf_token;
-        // Set the CSRF token value in the hidden input field for register
-        $('#register_csrf_token').val(registerCsrfToken);
-    });
-    $.get('/get_csrf_token', function(data) {
-        // Store the CSRF token for register form
-        var logoutCsrfToken = data.csrf_token;
-        // Set the CSRF token value in the hidden input field for register
-        $('#logout_csrf_token').val(logoutCsrfToken);
-    });
-});
 function downloadReport() {
     // Fetch histogram image
     const histogramImg = document.querySelector('img[src="/histogram"]');
