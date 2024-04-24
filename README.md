@@ -56,15 +56,18 @@ The application is deployed on Heroku and can be accessed at [Budget Analysis Li
 To run this project locally, follow these steps:
 
 1. Clone the repository:
-   ```bash
+    ```
    git clone https://github.com/yourgithubusername/budget-analysis-project.git
 2. Navigate to the project directory:
-   ```cd budget-analysis-project
+   ```
+   cd budget-analysis-project
 3. Install dependencies:
-  ```pip install -r requirements.txt
-4. Set environment variables for FLASK_SECRET_KEY and WTF_CSRF_SECRET_KEY:
+  ```
+  pip install -r requirements.txt
+4, Set environment variables for FLASK_SECRET_KEY and WTF_CSRF_SECRET_KEY:
 5. Start the server:
   ```flask run
+  
 
 
 # Contributions
