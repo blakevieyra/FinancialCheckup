@@ -3,6 +3,12 @@
 This Flask Full Stack application is designed to help users manage and analyze their personal finances, providing tools for tracking income, expenses, and generating visual financial analyses.
 Project structure ensures that the application is robust, scalable, and secure, facilitating easy maintenance and scalability.
 
+![Screen Shot 2024-04-28 at 1 15 54 AM](https://github.com/blakevieyra/FinancialCheckup/assets/88246090/c29a552c-ca2f-4967-8853-0d53bddff767)
+
+## Deployment
+The application is deployed on Heroku and can be accessed at https://financialcheckup-9beed77add2e.herokuapp.com/.
+
+
 ## Features
 
 - **User Authentication**: Secure login and registration system for managing user-specific data.
@@ -60,9 +66,6 @@ The combination of these technologies ensures that the application is robust, se
 
 The database schema for this application is designed to efficiently handle user data financial transactions.
 
-## Deployment
-
-The application is deployed on Heroku and can be accessed at https://financialcheckup-9beed77add2e.herokuapp.com/.
 
 ## Local Setup
 
