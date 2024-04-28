@@ -1,4 +1,4 @@
-# Financial Checkup Application - Created By Blake Vieyra
+# Financial Checkup by Blake Vieyra
 
 This Flask Full Stack application is designed to help users manage and analyze their personal finances, providing tools for tracking income, expenses, and generating visual financial analyses.
 Project structure ensures that the application is robust, scalable, and secure, facilitating easy maintenance and scalability.
