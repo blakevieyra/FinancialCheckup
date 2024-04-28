@@ -4,6 +4,7 @@ This Flask Full Stack application is designed to help users manage and analyze t
 Project structure ensures that the application is robust, scalable, and secure, facilitating easy maintenance and scalability.
 
 ![Screen Shot 2024-04-28 at 1 15 54 AM](https://github.com/blakevieyra/FinancialCheckup/assets/88246090/c29a552c-ca2f-4967-8853-0d53bddff767)
+![image](https://github.com/blakevieyra/FinancialCheckup/assets/88246090/c748de2f-2f49-40fd-8ee3-83a31f137d94)
 
 ## Deployment
 The application is deployed on Heroku and can be accessed at https://financialcheckup-9beed77add2e.herokuapp.com/.
