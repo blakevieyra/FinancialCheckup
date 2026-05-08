@@ -2,8 +2,10 @@ databases:
   - name: financialcheckup-db
     databaseName: financialcheckup
     user: financialcheckup
-    # Starter ($7/mo) — required because this account already has a free Postgres slot in use.
-    plan: starter
+    # basic_256mb (~$6/mo, 256 MB RAM, 1 GB storage) — cheapest paid Postgres on Render's
+    # new plan lineup. Required because this account already has a free Postgres in use
+    # by another project, and Render allows only one free Postgres per workspace.
+    plan: basic_256mb
 
 services:
   - type: web
