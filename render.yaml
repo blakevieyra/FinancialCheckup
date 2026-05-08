@@ -5,7 +5,6 @@ services:
     rootDir: server
     buildCommand: npm install
     startCommand: npm start
-    plan: starter
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
@@ -41,7 +40,6 @@ services:
   - type: web
     env: static
     name: financialcheckup-web
-    plan: starter
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
