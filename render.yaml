@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: financialcheckup-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_PATH
+        value: /var/data/financialcheckup.db
+      - key: CLIENT_URL
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        sync: false
+      - key: FRED_API_KEY
+        sync: false
+      - key: WEEKLY_DIGEST_TZ
+        value: America/Los_Angeles
+      - key: ADMIN_DIGEST_SECRET
+        generateValue: true
+    disks:
+      - name: financialcheckup-data
+        mountPath: /var/data
+        sizeGB: 1
+
+  - type: static
+    name: financialcheckup-web
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: true
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
