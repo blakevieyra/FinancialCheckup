@@ -43,7 +43,8 @@ services:
         mountPath: /var/data
         sizeGB: 1
 
-  - type: static
+  - type: web
+    env: static
     name: financialcheckup-web
     rootDir: client
     buildCommand: npm install && npm run build
