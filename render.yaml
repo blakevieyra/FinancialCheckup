@@ -2,7 +2,8 @@ databases:
   - name: financialcheckup-db
     databaseName: financialcheckup
     user: financialcheckup
-    plan: free
+    # Starter ($7/mo) — required because this account already has a free Postgres slot in use.
+    plan: starter
 
 services:
   - type: web
