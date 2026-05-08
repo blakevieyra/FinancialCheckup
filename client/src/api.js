@@ -1,5 +1,37 @@
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
+/** Auth paths where a 401 is an expected user-input error (wrong creds), not a stale-session signal. */
+const AUTH_PATH_PREFIXES = ['/api/auth/login', '/api/auth/register'];
+
+function isAuthPath(path) {
+  return AUTH_PATH_PREFIXES.some((p) => path.startsWith(p));
+}
+
+/**
+ * Centralized stale-session cleanup.
+ * Called when the API returns 401 on a token-bearing request — the JWT is either expired,
+ * forged, or (most often after a database migration) signed for a user_id that no longer
+ * exists. Wipe local credentials and notify the React tree via a custom event so App.jsx
+ * can drop in-memory session state without a hard reload.
+ */
+function clearStaleSession() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+  } catch {
+    /** Private-mode browsers can throw on localStorage; ignore — the in-memory state still resets. */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('fc-unauthorized'));
+  } catch {
+    /** Older browsers that lack CustomEvent — fall back to a synthetic Event. */
+    const ev = document.createEvent('Event');
+    ev.initEvent('fc-unauthorized', false, false);
+    window.dispatchEvent(ev);
+  }
+}
+
 /** Production / split-host: set VITE_API_BASE_URL (no trailing slash), e.g. https://api.example.com */
 function apiUrl(path) {
   const base =
@@ -22,6 +54,11 @@ async function apiFetch(path, { method = 'GET', token, body } = {}) {
   const data = await res.json().catch(() => null);
 
   if (!res.ok) {
+    /** A 401 on an authed call (token present, non-auth route) means the session is dead.
+     *  Clear it before throwing so the next render shows the login screen. */
+    if (res.status === 401 && token && !isAuthPath(path)) {
+      clearStaleSession();
+    }
     const base = data?.error || data?.message || `Request failed (${res.status})`;
     const hint =
       res.status === 404

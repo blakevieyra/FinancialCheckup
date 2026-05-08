@@ -1,3 +1,9 @@
+databases:
+  - name: financialcheckup-db
+    databaseName: financialcheckup
+    user: financialcheckup
+    plan: free
+
 services:
   - type: web
     name: financialcheckup-api
@@ -13,8 +19,10 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: DB_PATH
-        value: /opt/render/project/src/server/financialcheckup.db
+      - key: DATABASE_URL
+        fromDatabase:
+          name: financialcheckup-db
+          property: connectionString
       - key: CLIENT_URL
         sync: false
       - key: SENDGRID_API_KEY

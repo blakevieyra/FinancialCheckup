@@ -5,16 +5,16 @@ function computeTotalExp(expensesRows) {
   return expensesRows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 }
 
-function digestForUserMonth(userId, month) {
-  const usernameRow = dbGet('SELECT username FROM users WHERE id = ?', [userId]);
+async function digestForUserMonth(userId, month) {
+  const usernameRow = await dbGet('SELECT username FROM users WHERE id = ?', [userId]);
   const username = usernameRow?.username ?? 'Subscriber';
 
-  const incRow = dbGet(
+  const incRow = await dbGet(
     'SELECT amount FROM income WHERE user_id = ? AND month = ? ORDER BY created_at DESC LIMIT 1',
     [userId, month],
   );
   const income = Number(incRow?.amount ?? 0);
-  const expRows = dbAll(
+  const expRows = await dbAll(
     'SELECT category, amount FROM expenses WHERE user_id = ? AND month = ? ORDER BY amount DESC',
     [userId, month],
   );

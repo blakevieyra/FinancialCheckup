@@ -1,13 +1,13 @@
 const { dbGet, dbAll } = require('./db');
 const { gradeFromExpenseRatio, buildBudgetBullets } = require('./analysis');
 
-function snapshotForUserMonth(userId, month) {
-  const incRow = dbGet(
+async function snapshotForUserMonth(userId, month) {
+  const incRow = await dbGet(
     'SELECT amount FROM income WHERE user_id = ? AND month = ? ORDER BY created_at DESC LIMIT 1',
     [userId, month],
   );
   const income = Number(incRow?.amount ?? 0);
-  const expRows = dbAll(
+  const expRows = await dbAll(
     'SELECT category, amount, month FROM expenses WHERE user_id = ? AND month = ? ORDER BY category',
     [userId, month],
   );

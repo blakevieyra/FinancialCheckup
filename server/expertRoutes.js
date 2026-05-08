@@ -23,7 +23,7 @@ router.post('/briefing', async (req, res) => {
 
   let snap;
   try {
-    snap = snapshotForUserMonth(req.user.id, month);
+    snap = await snapshotForUserMonth(req.user.id, month);
   } catch (e) {
     return res.status(500).json({ error: 'Could not load ledger data.' });
   }

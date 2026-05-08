@@ -1,127 +1,192 @@
-const initSqlJs = require('sql.js');
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 
-const DB_PATH = path.resolve(process.env.DB_PATH || path.join(__dirname, '..', 'budget.db'));
-let db;
+let pool;
+
+/** Tables whose primary key is `id`; INSERTs into these auto-RETURN id so callers
+ *  can keep using the legacy { lastInsertRowid } shape inherited from the SQLite era. */
+const TABLES_WITH_ID_PK = new Set(['users', 'income', 'expenses', 'expenses_log', 'goals']);
+
+/** Default ISO-8601 UTC timestamp expression used everywhere we used to call SQLite's datetime('now'). */
+const ISO_NOW_DEFAULT = `to_char((now() AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
+
+/** Translate legacy SQLite-style `?` placeholders into Postgres `$1`, `$2`, … */
+function translateParams(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => {
+    i += 1;
+    return `$${i}`;
+  });
+}
+
+function isInsertSql(sql) {
+  return /^\s*INSERT\s+/i.test(sql);
+}
+
+function alreadyHasReturning(sql) {
+  return /\sRETURNING\s/i.test(sql);
+}
+
+function tableNameFromInsert(sql) {
+  const m = sql.match(/^\s*INSERT\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
+async function rawQuery(sql, params = []) {
+  if (!pool) throw new Error('Database not initialized. Call initDb() first.');
+  return pool.query(translateParams(sql), params);
+}
+
+/** Returns first row or null. Mirrors the previous synchronous helper signature, now Promise-based. */
+async function dbGet(sql, params = []) {
+  const r = await rawQuery(sql, params);
+  return r.rows[0] ?? null;
+}
+
+/** Returns all rows. */
+async function dbAll(sql, params = []) {
+  const r = await rawQuery(sql, params);
+  return r.rows;
+}
+
+/**
+ * Run mutating SQL (INSERT/UPDATE/DELETE).
+ * For INSERTs into a known id-PK table we auto-append `RETURNING id` so the legacy
+ * `{ lastInsertRowid }` contract keeps working. For everything else lastInsertRowid is null.
+ */
+async function dbRun(sql, params = []) {
+  let finalSql = sql;
+  if (isInsertSql(sql) && !alreadyHasReturning(sql)) {
+    const t = tableNameFromInsert(sql);
+    if (t && TABLES_WITH_ID_PK.has(t)) {
+      finalSql = `${sql.replace(/;\s*$/, '')} RETURNING id`;
+    }
+  }
+  const r = await rawQuery(finalSql, params);
+  const lastInsertRowid = r.rows && r.rows.length > 0 ? r.rows[0].id ?? null : null;
+  return { lastInsertRowid, rowCount: r.rowCount };
+}
 
 async function initDb() {
-  const SQL = await initSqlJs();
-  db = fs.existsSync(DB_PATH)
-    ? new SQL.Database(fs.readFileSync(DB_PATH))
-    : new SQL.Database();
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      'DATABASE_URL is not set. Provision a Postgres database (Render Postgres or local) and export DATABASE_URL.',
+    );
+  }
 
-  db.save = () => fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
-  db.run(`PRAGMA foreign_keys = ON`);
+  /** Render-managed Postgres requires SSL; allow self-signed (Render uses an internal CA). */
+  const useSsl =
+    /sslmode=require/i.test(connectionString) ||
+    process.env.NODE_ENV === 'production' ||
+    process.env.PGSSL === '1';
 
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
-  )`);
+  pool = new Pool({
+    connectionString,
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
+    max: Number(process.env.PG_POOL_MAX) || 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
 
-  db.run(`CREATE TABLE IF NOT EXISTS income (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    amount REAL NOT NULL DEFAULT 0,
-    month TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`);
+  pool.on('error', (err) => {
+    console.error('[pg] idle client error:', err.message);
+  });
 
-  db.run(`CREATE TABLE IF NOT EXISTS expenses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    category TEXT NOT NULL,
-    amount REAL NOT NULL DEFAULT 0,
-    month TEXT NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`);
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
 
-  db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_unique ON expenses(user_id, category, month)`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_income_user ON income(user_id, month)`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id, month)`);
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS income (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+      month TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
 
-  db.run(`CREATE TABLE IF NOT EXISTS expenses_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    category TEXT NOT NULL,
-    amount REAL NOT NULL DEFAULT 0,
-    month TEXT NOT NULL,
-    logged_at TEXT DEFAULT (datetime('now')),
-    source TEXT DEFAULT 'manual',
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_expenses_log_user_month ON expenses_log(user_id, month)`);
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      category TEXT NOT NULL,
+      amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+      month TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
 
-  db.run(`CREATE TABLE IF NOT EXISTS user_preferences (
-    user_id INTEGER PRIMARY KEY,
-    digest_enabled INTEGER NOT NULL DEFAULT 0,
-    digest_channel TEXT NOT NULL DEFAULT 'none',
-    digest_email TEXT,
-    digest_phone TEXT,
-    digest_weekday INTEGER NOT NULL DEFAULT 1,
-    digest_last_sent_at TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`);
+  await rawQuery(`CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_unique ON expenses(user_id, category, month)`);
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_income_user ON income(user_id, month)`);
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id, month)`);
 
-  /** Older DBs may have user_preferences without digest columns (CREATE IF NOT EXISTS skips upgrades). */
-  const prefCols = new Set(dbAll(`PRAGMA table_info(user_preferences)`).map((c) => c.name));
-  const addCol = (name, sqlType) => {
-    if (!prefCols.has(name)) {
-      db.run(`ALTER TABLE user_preferences ADD COLUMN ${name} ${sqlType}`);
-      prefCols.add(name);
-    }
-  };
-  addCol('digest_enabled', 'INTEGER NOT NULL DEFAULT 0');
-  addCol('digest_channel', "TEXT NOT NULL DEFAULT 'none'");
-  addCol('digest_email', 'TEXT');
-  addCol('digest_phone', 'TEXT');
-  addCol('digest_weekday', 'INTEGER NOT NULL DEFAULT 1');
-  addCol('digest_last_sent_at', 'TEXT');
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS expenses_log (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      category TEXT NOT NULL,
+      amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+      month TEXT NOT NULL,
+      logged_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT},
+      source TEXT NOT NULL DEFAULT 'manual'
+    )
+  `);
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_expenses_log_user_month ON expenses_log(user_id, month)`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS goals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    goal_type TEXT NOT NULL DEFAULT 'custom',
-    target_amount REAL NOT NULL DEFAULT 0,
-    current_amount REAL NOT NULL DEFAULT 0,
-    target_month TEXT,
-    status TEXT NOT NULL DEFAULT 'active',
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id, status, updated_at)`);
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS user_preferences (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      digest_enabled INTEGER NOT NULL DEFAULT 0,
+      digest_channel TEXT NOT NULL DEFAULT 'none',
+      digest_email TEXT,
+      digest_phone TEXT,
+      digest_weekday INTEGER NOT NULL DEFAULT 1,
+      digest_last_sent_at TEXT,
+      created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
 
-  db.save();
-  console.log('✓ Database ready');
-  return db;
+  /** Older deployments may have user_preferences without these columns. Postgres 9.6+ supports IF NOT EXISTS. */
+  const prefMigrations = [
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_enabled INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_channel TEXT NOT NULL DEFAULT 'none'`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_email TEXT`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_phone TEXT`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_weekday INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_last_sent_at TEXT`,
+  ];
+  for (const stmt of prefMigrations) await rawQuery(stmt);
+
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS goals (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      goal_type TEXT NOT NULL DEFAULT 'custom',
+      target_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+      current_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+      target_month TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT},
+      updated_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id, status, updated_at)`);
+
+  console.log('✓ Postgres database ready');
 }
 
-function dbAll(sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) rows.push(stmt.getAsObject());
-  stmt.free();
-  return rows;
+async function closeDb() {
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
 }
 
-function dbGet(sql, params = []) {
-  return dbAll(sql, params)[0] || null;
-}
-
-function dbRun(sql, params = []) {
-  db.run(sql, params);
-  // Get last inserted rowid reliably
-  const row = dbAll('SELECT last_insert_rowid() as id')[0];
-  db.save();
-  return { lastInsertRowid: row?.id ?? null };
-}
-
-module.exports = { initDb, dbAll, dbGet, dbRun };
+module.exports = { initDb, closeDb, dbAll, dbGet, dbRun, rawQuery };

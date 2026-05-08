@@ -44,7 +44,7 @@ function digestAlreadySentForLocalCalendarDay(prefRow, timeZone, now = new Date(
 async function dispatchDigest(prefRow, options = {}) {
   const tz = options.tz || process.env.WEEKLY_DIGEST_TZ || 'America/Los_Angeles';
   const month = options.monthOverride || currentMonthUtc();
-  const digest = digestForUserMonth(prefRow.user_id, month);
+  const digest = await digestForUserMonth(prefRow.user_id, month);
 
   const channel = options.channelOverride || prefRow.digest_channel || 'none';
 
@@ -70,7 +70,10 @@ async function dispatchDigest(prefRow, options = {}) {
 
   if (options.recordSend !== false && options.isAutomation && !options.isTestSend) {
     const stamp = ymdInTz(tz);
-    dbRun('UPDATE user_preferences SET digest_last_sent_at = ? WHERE user_id = ?', [stamp, prefRow.user_id]);
+    await dbRun(
+      'UPDATE user_preferences SET digest_last_sent_at = ? WHERE user_id = ?',
+      [stamp, prefRow.user_id],
+    );
   }
 
   return { skipped: false, channelUsed: channel };
@@ -80,7 +83,7 @@ async function runScheduledDigestsForWeekday(now = new Date()) {
   const tz = process.env.WEEKLY_DIGEST_TZ || 'America/Los_Angeles';
   const todayWd = weekdayInTz(tz, now);
 
-  const rows = dbAll(
+  const rows = await dbAll(
     `SELECT * FROM user_preferences
      WHERE digest_enabled = 1
        AND digest_channel IN ('email','sms')

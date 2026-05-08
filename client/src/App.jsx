@@ -361,6 +361,28 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  /** Triggered by api.js whenever the server returns 401 on an authed request.
+   *  By the time we get here localStorage has already been wiped by api.js — we just
+   *  need to drop in-memory state so the auth screen renders on the next paint. */
+  useEffect(() => {
+    const onUnauth = () => {
+      setToken('');
+      setUser('');
+      setExpenses([]);
+      setIncome(0);
+      setInsights([]);
+      setExpertData(null);
+      setRankData(null);
+      setTrendsData(null);
+      setForecastData(null);
+      setBusinessDocs(null);
+      setGoals([]);
+      setAuthError('Your session expired. Please sign in again.');
+    };
+    window.addEventListener('fc-unauthorized', onUnauth);
+    return () => window.removeEventListener('fc-unauthorized', onUnauth);
+  }, []);
+
   useEffect(() => {
     api
       .health()

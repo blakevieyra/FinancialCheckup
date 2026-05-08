@@ -2,12 +2,13 @@
 
 const http = require('http');
 const { spawn } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
 
 const PORT = 30100 + (process.pid % 500);
-const tmpDb = path.join(os.tmpdir(), `financialcheckup-smoke-${process.pid}-${Date.now()}.db`);
+
+if (!process.env.DATABASE_URL) {
+  console.log('Smoke SKIPPED — set DATABASE_URL (a disposable Postgres) to run end-to-end smoke.');
+  process.exit(0);
+}
 
 function req(method, pathname, token, jsonBody) {
   return new Promise((resolve, reject) => {
@@ -77,9 +78,8 @@ async function waitForReady(child) {
     env: {
       ...process.env,
       PORT: String(PORT),
-      DB_PATH: tmpDb,
-      // Skip repo .env quirks for deterministic smoke paths
       NODE_ENV: process.env.NODE_ENV || 'development',
+      WEEKLY_DIGEST_CRON_DISABLED: '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -169,12 +169,6 @@ async function waitForReady(child) {
     child.kill('SIGTERM');
     await sleep(200);
     if (child.exitCode === null) child.kill('SIGKILL');
-
-    fs.promises.unlink(tmpDb).catch(() => {});
-    const wal = `${tmpDb}-wal`;
-    const shm = `${tmpDb}-shm`;
-    fs.promises.unlink(wal).catch(() => {});
-    fs.promises.unlink(shm).catch(() => {});
 
     process.exit(process.exitCode == null ? 0 : process.exitCode);
   }
