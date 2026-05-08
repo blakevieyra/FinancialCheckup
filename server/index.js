@@ -2,14 +2,35 @@ const pathEnv = require('path');
 require('dotenv').config({ path: pathEnv.join(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
-const { initDb } = require('./db');
+const { initDb, closeDb } = require('./db');
 const startDigestScheduler = require('./digestScheduler');
 const { runScheduledDigestsForWeekday } = require('./digestDeliver');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+/**
+ * CLIENT_URL accepts a comma-separated list of allowed browser origins.
+ * Apex + www of a custom domain count as DIFFERENT origins to the browser, so production
+ * typically needs both (e.g. "https://financialcheckup.app,https://www.financialcheckup.app").
+ * Localhost dev origin is always allowed so `npm run dev` keeps working.
+ */
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, cb) {
+      /** Same-origin / curl / server-to-server requests have no Origin header — allow them. */
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`Origin ${origin} is not in CLIENT_URL allow-list.`));
+    },
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 app.use('/api/auth',      require('./authRoutes'));
@@ -27,7 +48,7 @@ app.get('/api/health', (_, res) =>
   res.json({
     status: 'ok',
     /** Lets clients confirm this process includes weekly-digest routes (GET/PUT /api/me/digest). */
-    features: { weeklyDigest: true, trends: true, leaderboard: true },
+    features: { weeklyDigest: true, trends: true, leaderboard: true, postgres: true },
   }),
 );
 
@@ -49,7 +70,29 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error.' });
 });
 
-initDb().then(() => {
-  startDigestScheduler();
-  app.listen(PORT, () => console.log(`✓ FinancialCheckup API → http://localhost:${PORT}`));
-}).catch(err => { console.error('DB init failed:', err); process.exit(1); });
+initDb()
+  .then(() => {
+    startDigestScheduler();
+    const server = app.listen(PORT, () =>
+      console.log(`✓ FinancialCheckup API → http://localhost:${PORT}`),
+    );
+
+    /** Drain pool + close server cleanly on SIGTERM/SIGINT (Render restarts send SIGTERM). */
+    const shutdown = async (signal) => {
+      console.log(`Received ${signal}, shutting down...`);
+      server.close(() => console.log('HTTP server closed.'));
+      try {
+        await closeDb();
+        console.log('Postgres pool drained.');
+      } catch (e) {
+        console.error('Pool drain error:', e.message);
+      }
+      process.exit(0);
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+  })
+  .catch((err) => {
+    console.error('DB init failed:', err);
+    process.exit(1);
+  });
