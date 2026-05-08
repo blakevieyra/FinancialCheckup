@@ -25,7 +25,7 @@ async function apiFetch(path, { method = 'GET', token, body } = {}) {
     const base = data?.error || data?.message || `Request failed (${res.status})`;
     const hint =
       res.status === 404
-        ? ' Restart the API after updates (GET /api/health → features.weeklyDigest). Match VITE_PROXY_TARGET to your API port, or set VITE_API_BASE_URL for static hosting.'
+        ? ' Restart the API after updates and verify new routes exist (e.g. /api/reports/forecast, /api/me/financial-advice). Match VITE_PROXY_TARGET to your API port, or set VITE_API_BASE_URL for static hosting.'
         : '';
     throw new Error(base + hint);
   }
@@ -63,9 +63,10 @@ export async function setIncome(token, { amount, month }) {
   });
 }
 
-export async function getExpenses(token, month) {
+export async function getExpenses(token, month, profile) {
   const m = encodeURIComponent(month);
-  return apiFetch(`/api/expenses?month=${m}`, { token });
+  const p = profile ? `&profile=${encodeURIComponent(profile)}` : '';
+  return apiFetch(`/api/expenses?month=${m}${p}`, { token });
 }
 
 export async function updateExpenses(token, { month, expenses }) {
@@ -153,6 +154,11 @@ export async function getBusinessDocs(token, month, months = 12) {
   return apiFetch(`/api/reports/business-docs?month=${m}&months=${n}`, { token });
 }
 
+export async function getCategoryAverages(token, month) {
+  const m = encodeURIComponent(month);
+  return apiFetch(`/api/reports/category-averages?month=${m}`, { token });
+}
+
 export function saveBlobAsFile(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -178,5 +184,10 @@ export async function getLeaderboard(token, month, { mask = false, limit } = {})
 
 export async function getMyTrends(token, months = 12) {
   return apiFetch(`/api/me/trends?months=${encodeURIComponent(months)}`, { token });
+}
+
+export async function getFinancialAdvice(token, month) {
+  const m = encodeURIComponent(month);
+  return apiFetch(`/api/me/financial-advice?month=${m}`, { token });
 }
 

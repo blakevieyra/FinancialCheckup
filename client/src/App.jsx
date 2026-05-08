@@ -67,19 +67,76 @@ function PieChartSvg({ data, colors }) {
   }
 
   return (
-    <svg viewBox="0 0 220 220" width="100%" height="240" role="img" aria-label="Expenses pie chart">
-      {segments.map((s, idx) => (
-        <path key={`${s.name}-${idx}`} d={s.path} fill={s.color} stroke="rgba(255,255,255,0.25)" strokeWidth="1">
-          <title>{`${s.name}: $${s.value.toLocaleString()}`}</title>
-        </path>
-      ))}
-      <circle cx={cx} cy={cy} r={45} fill="#0b0f14" stroke="rgba(255,255,255,0.08)" />
-      <text x={cx} y={cy - 6} textAnchor="middle" fill="#e6edf3" fontSize="18" fontWeight="700">
-        {data.length ? data.length : ''}
-      </text>
-      <text x={cx} y={cy + 18} textAnchor="middle" fill="rgba(230,237,243,0.8)" fontSize="12">
-        categories
-      </text>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+      <svg viewBox="0 0 220 220" width="100%" height="240" role="img" aria-label="Expenses pie chart">
+        {segments.map((s, idx) => (
+          <path key={`${s.name}-${idx}`} d={s.path} fill={s.color} stroke="rgba(255,255,255,0.25)" strokeWidth="1">
+            <title>{`${s.name}: $${s.value.toLocaleString()} (${((s.value / total) * 100).toFixed(1)}%)`}</title>
+          </path>
+        ))}
+        <circle cx={cx} cy={cy} r={45} fill="#0b0f14" stroke="rgba(255,255,255,0.08)" />
+        <text x={cx} y={cy - 6} textAnchor="middle" fill="#e6edf3" fontSize="18" fontWeight="700">
+          {data.length ? data.length : ''}
+        </text>
+        <text x={cx} y={cy + 18} textAnchor="middle" fill="rgba(230,237,243,0.8)" fontSize="12">
+          categories
+        </text>
+      </svg>
+      <div style={{ display: 'grid', gap: 4 }}>
+        {segments.map((s) => (
+          <div key={`lbl-${s.name}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 999, background: s.color, display: 'inline-block' }} />
+              <span style={{ opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+            </div>
+            <div style={{ opacity: 0.86, whiteSpace: 'nowrap' }}>
+              ${Number(s.value).toLocaleString()} · {((s.value / total) * 100).toFixed(1)}%
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CategoryBarChartSvg({ data, avgByCategory = {} }) {
+  const rows = (data || []).filter((d) => Number(d.value) > 0).sort((a, b) => b.value - a.value);
+  if (!rows.length) return <div style={{ opacity: 0.85, padding: '0.75rem 0' }}>No categories with spending yet.</div>;
+
+  const width = 700;
+  const barH = 18;
+  const gap = 10;
+  const padL = 132;
+  const padR = 165;
+  const padT = 12;
+  const padB = 8;
+  const height = padT + padB + rows.length * (barH + gap);
+  const max = Math.max(...rows.map((r) => Number(r.value) || 0), 1);
+  const total = rows.reduce((s, r) => s + (Number(r.value) || 0), 0);
+  const plotW = width - padL - padR;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={Math.max(220, height)} role="img" aria-label="Descending expense categories bar chart">
+      {rows.map((r, i) => {
+        const y = padT + i * (barH + gap);
+        const w = ((Number(r.value) || 0) / max) * plotW;
+        const pct = total > 0 ? ((Number(r.value) || 0) / total) * 100 : 0;
+        const avg = Number(avgByCategory?.[r.name] || 0);
+        return (
+          <g key={`${r.name}-${i}`}>
+            <text x={padL - 8} y={y + barH - 4} textAnchor="end" fill="rgba(230,237,243,0.86)" fontSize="11">
+              {r.name.length > 19 ? `${r.name.slice(0, 19)}…` : r.name}
+            </text>
+            <rect x={padL} y={y} width={plotW} height={barH} fill="rgba(148,163,184,0.16)" rx="4" />
+            <rect x={padL} y={y} width={w} height={barH} fill="#60a5fa" rx="4">
+              <title>{`${r.name}: $${Number(r.value).toLocaleString()} (${pct.toFixed(1)}%)`}</title>
+            </rect>
+            <text x={padL + plotW + 6} y={y + barH - 4} fill="rgba(230,237,243,0.84)" fontSize="11">
+              ${Number(r.value).toLocaleString()} · {pct.toFixed(1)}% · avg ${avg.toLocaleString()}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
@@ -252,6 +309,7 @@ export default function App() {
   const [businessDocs, setBusinessDocs] = useState(null);
   const [forecastBusy, setForecastBusy] = useState(false);
   const [forecastErr, setForecastErr] = useState('');
+  const [categoryAverages, setCategoryAverages] = useState({});
 
   const [expensesHistory, setExpensesHistory] = useState([]);
   const [incomeHistory, setIncomeHistory] = useState([]);
@@ -275,6 +333,9 @@ export default function App() {
   const [digestMsg, setDigestMsg] = useState('');
   const [digestErr, setDigestErr] = useState('');
   const [digestPreview, setDigestPreview] = useState(null);
+  const [adviceData, setAdviceData] = useState(null);
+  const [adviceBusy, setAdviceBusy] = useState(false);
+  const [adviceErr, setAdviceErr] = useState('');
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -306,7 +367,7 @@ export default function App() {
     try {
       const [incomeRes, expensesRes] = await Promise.all([
         api.getIncome(token, month),
-        api.getExpenses(token, month),
+        api.getExpenses(token, month, profile),
       ]);
       setIncome(Number(incomeRes.amount) || 0);
       setExpenses(Array.isArray(expensesRes) ? expensesRes : []);
@@ -357,6 +418,21 @@ export default function App() {
       applyDigestPrefs(p);
     } catch (e) {
       setDigestErr(e.message);
+    }
+  }
+
+  async function loadFinancialAdvice() {
+    if (!token) return;
+    setAdviceErr('');
+    setAdviceBusy(true);
+    try {
+      const d = await api.getFinancialAdvice(token, month);
+      setAdviceData(d);
+    } catch (e) {
+      setAdviceErr(e.message);
+      setAdviceData(null);
+    } finally {
+      setAdviceBusy(false);
     }
   }
 
@@ -448,11 +524,25 @@ export default function App() {
     }
   }
 
+  async function loadCategoryAverages() {
+    if (!token) return;
+    try {
+      const data = await api.getCategoryAverages(token, month);
+      const map = Object.fromEntries(
+        (data?.categories || []).map((r) => [r.category, Number(r.avgAmount) || 0]),
+      );
+      setCategoryAverages(map);
+    } catch {
+      setCategoryAverages({});
+    }
+  }
+
   useEffect(() => {
     if (!token) return undefined;
-    loadDigestSettings();
+    loadFinancialAdvice();
     return undefined;
-  }, [token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, month]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -469,11 +559,18 @@ export default function App() {
   }, [token, month]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    loadCategoryAverages();
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, month]);
+
+  useEffect(() => {
     if (!isAuthed) return;
     loadMonthData();
     loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, isAuthed]);
+  }, [month, isAuthed, profile]);
 
   async function submitAuth(e) {
     e.preventDefault();
@@ -511,6 +608,44 @@ export default function App() {
       await loadHistory();
       await loadLeaderboardAndTrends();
       await loadForecastAndDocs();
+      await loadCategoryAverages();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveIncomeOnly() {
+    setError('');
+    setBusy(true);
+    try {
+      await api.setIncome(token, { amount: Number(income), month });
+      await loadMonthData();
+      await loadHistory();
+      await loadLeaderboardAndTrends();
+      await loadForecastAndDocs();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveExpensesOnly() {
+    setError('');
+    setBusy(true);
+    try {
+      const payloadExpenses = expenses.map((e) => ({
+        category: e.category,
+        amount: Number(e.amount) || 0,
+      }));
+      await api.updateExpenses(token, { month, expenses: payloadExpenses });
+      await loadMonthData();
+      await loadHistory();
+      await loadLeaderboardAndTrends();
+      await loadForecastAndDocs();
+      await loadCategoryAverages();
     } catch (e) {
       setError(e.message);
     } finally {
@@ -537,6 +672,33 @@ export default function App() {
       .sort((a, b) => b.value - a.value);
     return rows.slice(0, 6);
   }, [expenses]);
+
+  const monthBarData = useMemo(
+    () =>
+      (expenses || [])
+        .map((e) => ({ name: e.category, value: Number(e.amount) || 0 }))
+        .filter((r) => r.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10),
+    [expenses],
+  );
+
+  const categoryStats = useMemo(() => {
+    const rows = monthBarData || [];
+    const total = rows.reduce((s, r) => s + (Number(r.value) || 0), 0);
+    const nonZeroCount = rows.length;
+    const top = rows[0] || null;
+    const avgPerActive = nonZeroCount ? total / nonZeroCount : 0;
+    const aboveAvgCount = rows.filter((r) => (Number(r.value) || 0) > (Number(categoryAverages?.[r.name]) || 0)).length;
+    const topShare = total > 0 && top ? (Number(top.value) / total) * 100 : 0;
+    return {
+      nonZeroCount,
+      avgPerActive,
+      aboveAvgCount,
+      topCategory: top?.name || 'N/A',
+      topShare,
+    };
+  }, [monthBarData, categoryAverages]);
 
   const historySeries = useMemo(() => {
     const expMap = new Map((expensesHistory || []).map((e) => [e.month, Number(e.total) || 0]));
@@ -575,6 +737,26 @@ export default function App() {
     return {
       expenses: (Number(curr.expensesTotal) || 0) - (Number(prev.expensesTotal) || 0),
       income: (Number(curr.incomeAmount) || 0) - (Number(prev.incomeAmount) || 0),
+    };
+  }, [historySeries]);
+
+  const rudimentaryStats = useMemo(() => {
+    if (!historySeries.length) return null;
+    const vals = historySeries.map((r) => Number(r.expensesTotal) || 0);
+    const n = vals.length;
+    const mean = vals.reduce((s, v) => s + v, 0) / n;
+    const variance = vals.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+    const max = Math.max(...vals);
+    const min = Math.min(...vals);
+    const maxMonth = historySeries.find((r) => (Number(r.expensesTotal) || 0) === max)?.month;
+    const minMonth = historySeries.find((r) => (Number(r.expensesTotal) || 0) === min)?.month;
+    return {
+      mean,
+      variance,
+      max,
+      min,
+      maxMonth,
+      minMonth,
     };
   }, [historySeries]);
 
@@ -668,7 +850,7 @@ export default function App() {
       ? top.map((t) => `${t.category} $${t.amount.toLocaleString()} (${t.pct.toFixed(0)}%)`).join('; ')
       : 'No spending recorded yet.';
     return (
-      `Financial Checkup (${profile}) — ${month}\n` +
+      `FinancialCheckup (${profile}) — ${month}\n` +
       `Grade: ${grade} (Expense ratio ${expenseRatioText})\n` +
       `Income: $${Number(income || 0).toLocaleString()}\n` +
       `Expenses: $${Number(totalExpenses || 0).toLocaleString()}\n` +
@@ -699,7 +881,7 @@ export default function App() {
     // Try native share first (works on mobile + some desktop browsers)
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Financial Checkup', text: shareText });
+        await navigator.share({ title: 'FinancialCheckup', text: shareText });
         return;
       } catch {
         // fall through to clipboard
@@ -876,7 +1058,7 @@ export default function App() {
       <div style={containerStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h1 style={{ marginBottom: 4 }}>Financial Checkup</h1>
+          <h1 style={{ marginBottom: 4 }}>FinancialCheckup</h1>
           <div style={{ opacity: 0.85 }}>Signed in as <strong>{user}</strong></div>
         </div>
         <button
@@ -909,14 +1091,6 @@ export default function App() {
           </button>
           <button
             type="button"
-            disabled={busy}
-            onClick={saveAll}
-            style={btnPrimary}
-          >
-            {busy ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            type="button"
             disabled={exportBusy || busy}
             onClick={exportMonthCsv}
             style={btnNeutral}
@@ -937,123 +1111,50 @@ export default function App() {
 
         <details style={cardStyle}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
-            Weekly digest (email or SMS)
+            Financial advice feed (free API + your data)
           </summary>
-          <div style={{ marginTop: 12, display: 'grid', gap: 12, maxWidth: 520 }}>
+          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
             <p style={{ margin: 0, opacity: 0.88, lineHeight: 1.45, fontSize: 14 }}>
-              Get an automated check-in on your chosen weekday. The message summarizes your <strong>current ledger month</strong>{' '}
-              (same <code>YYYY-MM</code> as above), with income, expenses, grade, and quick tips — then nudges you to open the app.
+              This replaces weekly digest. Advice is pulled from a free external advice API and blended with your
+              current month financial health from this app.
             </p>
-            <label style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <input
-                type="checkbox"
-                checked={digestEnabled}
-                onChange={(e) => {
-                  const on = e.target.checked;
-                  setDigestEnabled(on);
-                  if (on && digestChannel === 'none') setDigestChannel('email');
-                  if (!on) setDigestChannel('none');
-                }}
-              />
-              <span>Enable weekly digest</span>
-            </label>
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ opacity: 0.85, fontSize: 14 }}>Delivery</span>
-              <select
-                value={digestChannel}
-                disabled={!digestEnabled}
-                onChange={(e) => setDigestChannel(e.target.value)}
-                style={{ padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-              >
-                {!digestEnabled ? <option value="none">Off</option> : null}
-                {digestEnabled ? <option value="email">Email</option> : null}
-                {digestEnabled ? <option value="sms">SMS (Twilio)</option> : null}
-              </select>
-            </label>
-            {digestChannel === 'email' ? (
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ opacity: 0.85, fontSize: 14 }}>Email address</span>
-                <input
-                  value={digestEmail}
-                  onChange={(e) => setDigestEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  style={{ padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-                />
-              </label>
-            ) : null}
-            {digestChannel === 'sms' ? (
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ opacity: 0.85, fontSize: 14 }}>Mobile (E.164)</span>
-                <input
-                  value={digestPhone}
-                  onChange={(e) => setDigestPhone(e.target.value)}
-                  placeholder="+14155552671"
-                  style={{ padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-                />
-              </label>
-            ) : null}
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={{ opacity: 0.85, fontSize: 14 }}>Send on (weekday in {digestCronTz})</span>
-              <select
-                value={digestWeekday}
-                disabled={!digestEnabled}
-                onChange={(e) => setDigestWeekday(Number(e.target.value))}
-                style={{ padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-              >
-                {WEEKDAY_LABELS.map((label, i) => (
-                  <option key={label} value={i}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div style={{ fontSize: 13, opacity: 0.78, lineHeight: 1.4 }}>
-              Server status: email ready = <strong>{digestSmtpReady ? 'yes' : 'no'}</strong>, SMS ready ={' '}
-              <strong>{digestSmsReady ? 'yes' : 'no'}</strong>. Configure <code>SENDGRID_API_KEY</code> + <code>MAIL_FROM</code>{' '}
-              and/or Twilio env vars on the server.
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={loadFinancialAdvice} disabled={adviceBusy} style={btnPrimary}>
+                {adviceBusy ? 'Refreshing advice…' : 'Refresh financial advice'}
+              </button>
             </div>
-            {digestPreview ? (
-              <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.7rem', fontSize: 13 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                  API digest preview ({digestPreview.month})
-                </div>
+            {adviceErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{adviceErr}</div> : null}
+            {adviceData?.metrics ? (
+              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem', fontSize: 14 }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Health snapshot ({adviceData.month})</div>
                 <div style={{ opacity: 0.9, lineHeight: 1.45 }}>
-                  Income <strong>${Number(digestPreview.income || 0).toLocaleString()}</strong> · Expenses{' '}
-                  <strong>${Number(digestPreview.totalExpenses || 0).toLocaleString()}</strong> · Balance{' '}
-                  <strong>${Number(digestPreview.balance || 0).toLocaleString()}</strong> · Ratio{' '}
-                  <strong>{Number(digestPreview.expenseRatio || 0).toFixed(1)}%</strong> · Grade{' '}
-                  <strong>{digestPreview.grade || 'N/A'}</strong>
+                  Score <strong>{Number(adviceData.metrics.healthScore || 0).toFixed(1)}</strong> · Grade{' '}
+                  <strong>{adviceData.metrics.grade || 'N/A'}</strong> · Ratio{' '}
+                  <strong>{Number(adviceData.metrics.expenseRatio || 0).toFixed(1)}%</strong> · Balance{' '}
+                  <strong>${Number(adviceData.metrics.balance || 0).toLocaleString()}</strong>
                 </div>
-                {Array.isArray(digestPreview.topLines) && digestPreview.topLines.length ? (
-                  <div style={{ marginTop: 6, opacity: 0.86 }}>
-                    Top lines:{' '}
-                    {digestPreview.topLines
-                      .map((x) => `${x.category} $${Number(x.amount || 0).toLocaleString()}`)
-                      .join(' · ')}
-                  </div>
-                ) : null}
               </div>
             ) : null}
-            {digestErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{digestErr}</div> : null}
-            {digestMsg ? <div style={{ color: '#86efac', fontSize: 14 }}>{digestMsg}</div> : null}
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                disabled={digestSaveBusy}
-                onClick={saveDigestSettings}
-                style={{ padding: '0.5rem 1rem', cursor: 'pointer', background: '#134', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
-              >
-                {digestSaveBusy ? 'Saving…' : 'Save digest settings'}
-              </button>
-              <button
-                type="button"
-                disabled={digestTestBusy || !digestEnabled}
-                onClick={sendWeeklyDigestTest}
-                style={{ padding: '0.5rem 1rem', cursor: 'pointer', background: '#111', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
-              >
-                {digestTestBusy ? 'Sending…' : 'Send test now'}
-              </button>
-            </div>
+            {Array.isArray(adviceData?.advice?.external) && adviceData.advice.external.length ? (
+              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>External advice (free API)</div>
+                <ul style={{ margin: '0 0 0 1.2rem', lineHeight: 1.45 }}>
+                  {adviceData.advice.external.map((x, i) => (
+                    <li key={`ext-${i}-${x.slice(0, 20)}`}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {Array.isArray(adviceData?.advice?.internal) && adviceData.advice.internal.length ? (
+              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Internal financial health recommendations</div>
+                <ul style={{ margin: '0 0 0 1.2rem', lineHeight: 1.45 }}>
+                  {adviceData.advice.internal.map((x, i) => (
+                    <li key={`int-${i}-${x.slice(0, 20)}`}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </details>
 
@@ -1439,6 +1540,30 @@ export default function App() {
                   <div style={{ opacity: 0.85, padding: '0.75rem 0' }}>No history yet.</div>
                 )}
               </div>
+
+              <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
+                <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Descending categories (your spend vs user average)</div>
+                <CategoryBarChartSvg data={monthBarData} avgByCategory={categoryAverages} />
+              </div>
+
+              <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
+                <div style={{ marginBottom: 8, opacity: 0.92, fontWeight: 700 }}>Category statistics</div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, fontSize: 13 }}>
+                  <div>Active categories: <strong>{categoryStats.nonZeroCount}</strong></div>
+                  <div>Avg per active category: <strong>${Number(categoryStats.avgPerActive).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
+                  <div>Above user average: <strong>{categoryStats.aboveAvgCount}</strong></div>
+                  <div>Top concentration: <strong>{categoryStats.topCategory} ({categoryStats.topShare.toFixed(1)}%)</strong></div>
+                </div>
+                {rudimentaryStats ? (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: 13, display: 'grid', gap: 6 }}>
+                    <div style={{ fontWeight: 700 }}>Rudimentary spend statistics (over time)</div>
+                    <div>Mean monthly spend: <strong>${Number(rudimentaryStats.mean).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
+                    <div>Most spend month: <strong>{rudimentaryStats.maxMonth || 'N/A'}</strong> (${Number(rudimentaryStats.max).toLocaleString(undefined, { maximumFractionDigits: 0 })})</div>
+                    <div>Least spend month: <strong>{rudimentaryStats.minMonth || 'N/A'}</strong> (${Number(rudimentaryStats.min).toLocaleString(undefined, { maximumFractionDigits: 0 })})</div>
+                    <div>Variance: <strong>{Number(rudimentaryStats.variance).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -1454,6 +1579,11 @@ export default function App() {
                 style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
               />
             </label>
+            <div style={{ marginTop: 10 }}>
+              <button type="button" onClick={saveIncomeOnly} disabled={busy} style={btnPrimary}>
+                {busy ? 'Saving…' : 'Save Income'}
+              </button>
+            </div>
           </div>
 
           <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
@@ -1527,6 +1657,11 @@ export default function App() {
                   ) : null}
                 </tbody>
               </table>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <button type="button" onClick={saveExpensesOnly} disabled={busy || catBusy} style={btnPrimary}>
+                {busy ? 'Saving…' : 'Save Expenses'}
+              </button>
             </div>
           </div>
         </div>

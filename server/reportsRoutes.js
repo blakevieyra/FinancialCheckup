@@ -12,6 +12,14 @@ function csvEscape(value) {
   return s;
 }
 
+function csvSafeLabel(value) {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function money(n) {
   const x = Number(n) || 0;
   return x.toFixed(2);
@@ -55,9 +63,10 @@ router.get('/csv', (req, res) => {
   const snap = snapshotForUserMonth(req.user.id, month);
 
   const lines = [
+    'sep=,',
     'FinancialCheckup export',
     `Generated,${csvEscape(new Date().toISOString())}`,
-    `Username,${csvEscape(user?.username)}`,
+    `Username,${csvEscape(csvSafeLabel(user?.username))}`,
     `Month,${csvEscape(month)}`,
     `Income,${money(snap.income)}`,
     `Total expenses,${money(snap.totalExpenses)}`,
@@ -67,14 +76,15 @@ router.get('/csv', (req, res) => {
     '',
     'Category,Amount,Month',
     ...snap.expenses.map(
-      (e) => `${csvEscape(e.category)},${money(e.amount)},${csvEscape(month)}`,
+      (e) => `${csvEscape(csvSafeLabel(e.category))},${money(e.amount)},${csvEscape(month)}`,
     ),
   ];
 
   const filename = `financialcheckup-${month}.csv`;
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.send(lines.join('\n'));
+  /** Excel on Windows expects BOM for UTF-8 emoji/category labels. */
+  res.send(`\uFEFF${lines.join('\r\n')}`);
 });
 
 /** GET /api/reports/summary?month= — JSON mirror of export (for integrations) */
@@ -304,6 +314,29 @@ router.get('/business-docs', (req, res) => {
       'For formal accounting, integrate with a full chart-of-accounts + accrual workflow.',
     ],
   });
+});
+
+/** GET /api/reports/category-averages?month=YYYY-MM */
+router.get('/category-averages', (req, res) => {
+  const month = req.query.month || new Date().toISOString().slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: 'month must be YYYY-MM.' });
+  }
+
+  const rows = dbAll(
+    `SELECT category, AVG(amount) AS avgAmount, COUNT(*) AS usersWithCategory
+     FROM expenses
+     WHERE month = ?
+     GROUP BY category
+     ORDER BY avgAmount DESC`,
+    [month],
+  ).map((r) => ({
+    category: r.category,
+    avgAmount: Number(Number(r.avgAmount || 0).toFixed(2)),
+    usersWithCategory: Number(r.usersWithCategory || 0),
+  }));
+
+  res.json({ month, categories: rows });
 });
 
 module.exports = router;

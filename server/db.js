@@ -44,6 +44,18 @@ async function initDb() {
   db.run(`CREATE INDEX IF NOT EXISTS idx_income_user ON income(user_id, month)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id, month)`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS expenses_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    amount REAL NOT NULL DEFAULT 0,
+    month TEXT NOT NULL,
+    logged_at TEXT DEFAULT (datetime('now')),
+    source TEXT DEFAULT 'manual',
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_expenses_log_user_month ON expenses_log(user_id, month)`);
+
   db.run(`CREATE TABLE IF NOT EXISTS user_preferences (
     user_id INTEGER PRIMARY KEY,
     digest_enabled INTEGER NOT NULL DEFAULT 0,
