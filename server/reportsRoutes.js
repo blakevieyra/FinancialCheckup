@@ -52,6 +52,65 @@ function monthSeries(rowsIncome, rowsExpense) {
   }));
 }
 
+function buildBusinessDocs(userId, month, windowMonths = 12) {
+  const current = snapshotForUserMonth(userId, month);
+  const incRows = dbAll(
+    'SELECT month, MAX(amount) AS amount FROM income WHERE user_id = ? GROUP BY month ORDER BY month ASC',
+    [userId],
+  );
+  const expRows = dbAll(
+    'SELECT month, SUM(amount) AS total FROM expenses WHERE user_id = ? GROUP BY month ORDER BY month ASC',
+    [userId],
+  );
+  const series = monthSeries(incRows, expRows).slice(-windowMonths);
+
+  const ttmIncome = series.reduce((s, r) => s + r.income, 0);
+  const ttmExpenses = series.reduce((s, r) => s + r.expenses, 0);
+  const ttmNet = ttmIncome - ttmExpenses;
+
+  const currentAssets = Math.max(0, current.balance);
+  const currentLiabilities = Math.max(0, -current.balance);
+  const equity = currentAssets - currentLiabilities;
+
+  return {
+    month,
+    monthsWindow: windowMonths,
+    balanceSheet: {
+      asOfMonth: month,
+      assets: {
+        currentAssets: Number(currentAssets.toFixed(2)),
+        estimatedCashFromOperations: Number(currentAssets.toFixed(2)),
+        totalAssets: Number(currentAssets.toFixed(2)),
+      },
+      liabilities: {
+        currentLiabilities: Number(currentLiabilities.toFixed(2)),
+        totalLiabilities: Number(currentLiabilities.toFixed(2)),
+      },
+      equity: {
+        retainedEarningsProxy: Number(equity.toFixed(2)),
+        totalEquity: Number(equity.toFixed(2)),
+      },
+    },
+    incomeStatement: {
+      periodStart: series[0]?.month || month,
+      periodEnd: series[series.length - 1]?.month || month,
+      revenue: Number(ttmIncome.toFixed(2)),
+      operatingExpenses: Number(ttmExpenses.toFixed(2)),
+      netIncome: Number(ttmNet.toFixed(2)),
+      marginPercent: Number((ttmIncome > 0 ? (ttmNet / ttmIncome) * 100 : 0).toFixed(2)),
+    },
+    cashFlowSummary: {
+      operatingCashFlowProxy: Number(ttmNet.toFixed(2)),
+      averageMonthlyNetCashFlow: Number((series.length ? ttmNet / series.length : 0).toFixed(2)),
+      trend: series.length >= 2 && series[series.length - 1].balance >= series[0].balance ? 'up' : 'down',
+    },
+    notes: [
+      'These business statements are generated from income/expense ledger entries.',
+      'For formal accounting, integrate with a full chart-of-accounts + accrual workflow.',
+    ],
+  };
+}
+
 /** GET /api/reports/csv?month=YYYY-MM */
 router.get('/csv', (req, res) => {
   const month = req.query.month || new Date().toISOString().slice(0, 7);
@@ -256,64 +315,51 @@ router.get('/business-docs', (req, res) => {
     return res.status(400).json({ error: 'month must be YYYY-MM.' });
   }
   const windowMonths = Math.min(24, Math.max(3, Number(req.query.months) || 12));
-  const uid = req.user.id;
+  res.json(buildBusinessDocs(req.user.id, month, windowMonths));
+});
 
-  const current = snapshotForUserMonth(uid, month);
-  const incRows = dbAll(
-    'SELECT month, MAX(amount) AS amount FROM income WHERE user_id = ? GROUP BY month ORDER BY month ASC',
-    [uid],
+/** GET /api/reports/business-docs-pdf?month=YYYY-MM&months=12 */
+router.get('/business-docs-pdf', (req, res) => {
+  const month = req.query.month || new Date().toISOString().slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: 'month must be YYYY-MM.' });
+  }
+  const windowMonths = Math.min(24, Math.max(3, Number(req.query.months) || 12));
+  const docs = buildBusinessDocs(req.user.id, month, windowMonths);
+
+  const filename = `financialcheckup-business-docs-${month}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+  const doc = new PDFDocument({ size: 'LETTER', margin: 42 });
+  doc.pipe(res);
+  doc.fontSize(20).fillColor('#111827').text('FinancialCheckup Business Documents');
+  doc.fontSize(11).fillColor('#4B5563').text(`As of ${month} · Window ${windowMonths} months`);
+  doc.moveDown(1);
+
+  doc.fontSize(13).fillColor('#111827').text('Balance Sheet', { underline: true });
+  doc.fontSize(11).fillColor('#111827').text(`Assets: $${docs.balanceSheet.assets.totalAssets.toLocaleString()}`);
+  doc.text(`Liabilities: $${docs.balanceSheet.liabilities.totalLiabilities.toLocaleString()}`);
+  doc.text(`Equity: $${docs.balanceSheet.equity.totalEquity.toLocaleString()}`);
+  doc.moveDown(0.8);
+
+  doc.fontSize(13).text('Income Statement', { underline: true });
+  doc.fontSize(11).text(`Revenue: $${docs.incomeStatement.revenue.toLocaleString()}`);
+  doc.text(`Operating Expenses: $${docs.incomeStatement.operatingExpenses.toLocaleString()}`);
+  doc.text(`Net Income: $${docs.incomeStatement.netIncome.toLocaleString()}`);
+  doc.text(`Margin: ${docs.incomeStatement.marginPercent.toFixed(2)}%`);
+  doc.moveDown(0.8);
+
+  doc.fontSize(13).text('Cash Flow Summary', { underline: true });
+  doc.fontSize(11).text(`Operating Cash Flow: $${docs.cashFlowSummary.operatingCashFlowProxy.toLocaleString()}`);
+  doc.text(`Average Monthly Net Cash Flow: $${docs.cashFlowSummary.averageMonthlyNetCashFlow.toLocaleString()}`);
+  doc.text(`Trend: ${docs.cashFlowSummary.trend}`);
+  doc.moveDown(1);
+
+  doc.fontSize(9).fillColor('#6B7280').text(
+    'Professional summary generated from ledger-based cash accounting proxies. For formal reporting, use full accrual accounting systems.',
   );
-  const expRows = dbAll(
-    'SELECT month, SUM(amount) AS total FROM expenses WHERE user_id = ? GROUP BY month ORDER BY month ASC',
-    [uid],
-  );
-  const series = monthSeries(incRows, expRows).slice(-windowMonths);
-
-  const ttmIncome = series.reduce((s, r) => s + r.income, 0);
-  const ttmExpenses = series.reduce((s, r) => s + r.expenses, 0);
-  const ttmNet = ttmIncome - ttmExpenses;
-
-  const currentAssets = Math.max(0, current.balance);
-  const currentLiabilities = Math.max(0, -current.balance);
-  const equity = currentAssets - currentLiabilities;
-
-  res.json({
-    month,
-    monthsWindow: windowMonths,
-    balanceSheet: {
-      asOfMonth: month,
-      assets: {
-        currentAssets: Number(currentAssets.toFixed(2)),
-        estimatedCashFromOperations: Number(currentAssets.toFixed(2)),
-        totalAssets: Number(currentAssets.toFixed(2)),
-      },
-      liabilities: {
-        currentLiabilities: Number(currentLiabilities.toFixed(2)),
-        totalLiabilities: Number(currentLiabilities.toFixed(2)),
-      },
-      equity: {
-        retainedEarningsProxy: Number(equity.toFixed(2)),
-        totalEquity: Number(equity.toFixed(2)),
-      },
-    },
-    incomeStatement: {
-      periodStart: series[0]?.month || month,
-      periodEnd: series[series.length - 1]?.month || month,
-      revenue: Number(ttmIncome.toFixed(2)),
-      operatingExpenses: Number(ttmExpenses.toFixed(2)),
-      netIncome: Number(ttmNet.toFixed(2)),
-      marginPercent: Number((ttmIncome > 0 ? (ttmNet / ttmIncome) * 100 : 0).toFixed(2)),
-    },
-    cashFlowSummary: {
-      operatingCashFlowProxy: Number(ttmNet.toFixed(2)),
-      averageMonthlyNetCashFlow: Number((series.length ? ttmNet / series.length : 0).toFixed(2)),
-      trend: series.length >= 2 && series[series.length - 1].balance >= series[0].balance ? 'up' : 'down',
-    },
-    notes: [
-      'These business statements are generated from income/expense ledger entries.',
-      'For formal accounting, integrate with a full chart-of-accounts + accrual workflow.',
-    ],
-  });
+  doc.end();
 });
 
 /** GET /api/reports/category-averages?month=YYYY-MM */

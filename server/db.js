@@ -83,6 +83,21 @@ async function initDb() {
   addCol('digest_weekday', 'INTEGER NOT NULL DEFAULT 1');
   addCol('digest_last_sent_at', 'TEXT');
 
+  db.run(`CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    goal_type TEXT NOT NULL DEFAULT 'custom',
+    target_amount REAL NOT NULL DEFAULT 0,
+    current_amount REAL NOT NULL DEFAULT 0,
+    target_month TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id, status, updated_at)`);
+
   db.save();
   console.log('✓ Database ready');
   return db;

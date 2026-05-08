@@ -22,6 +22,7 @@ app.use('/api/expert',   require('./expertRoutes'));
 app.use('/api/rankings', require('./rankingsRoutes'));
 app.use('/api/me/trends', require('./trendsRoutes'));
 app.use('/api/me/financial-advice', require('./financialAdviceRoutes'));
+app.use('/api/goals', require('./goalsRoutes'));
 app.get('/api/health', (_, res) =>
   res.json({
     status: 'ok',

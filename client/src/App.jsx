@@ -294,6 +294,7 @@ export default function App() {
 
   const [exportBusy, setExportBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [businessPdfBusy, setBusinessPdfBusy] = useState(false);
   const [expertBusy, setExpertBusy] = useState(false);
   const [expertError, setExpertError] = useState('');
   const [expertData, setExpertData] = useState(null);
@@ -336,6 +337,12 @@ export default function App() {
   const [adviceData, setAdviceData] = useState(null);
   const [adviceBusy, setAdviceBusy] = useState(false);
   const [adviceErr, setAdviceErr] = useState('');
+  const [goals, setGoals] = useState([]);
+  const [goalsBusy, setGoalsBusy] = useState(false);
+  const [goalsErr, setGoalsErr] = useState('');
+  const [goalName, setGoalName] = useState('');
+  const [goalType, setGoalType] = useState('retirement');
+  const [goalTarget, setGoalTarget] = useState('');
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -433,6 +440,76 @@ export default function App() {
       setAdviceData(null);
     } finally {
       setAdviceBusy(false);
+    }
+  }
+
+  async function loadGoals() {
+    if (!token) return;
+    setGoalsErr('');
+    setGoalsBusy(true);
+    try {
+      const rows = await api.getGoals(token);
+      setGoals(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      setGoalsErr(e.message);
+      setGoals([]);
+    } finally {
+      setGoalsBusy(false);
+    }
+  }
+
+  async function createGoalItem() {
+    setGoalsErr('');
+    if (!goalName.trim()) {
+      setGoalsErr('Goal name is required.');
+      return;
+    }
+    const target = Number(goalTarget);
+    if (!Number.isFinite(target) || target <= 0) {
+      setGoalsErr('Target amount must be greater than zero.');
+      return;
+    }
+    setGoalsBusy(true);
+    try {
+      await api.createGoal(token, {
+        name: goalName.trim(),
+        goalType,
+        targetAmount: target,
+      });
+      setGoalName('');
+      setGoalTarget('');
+      await loadGoals();
+    } catch (e) {
+      setGoalsErr(e.message);
+    } finally {
+      setGoalsBusy(false);
+    }
+  }
+
+  async function deleteGoalItem(id) {
+    setGoalsErr('');
+    setGoalsBusy(true);
+    try {
+      await api.deleteGoal(token, id);
+      await loadGoals();
+    } catch (e) {
+      setGoalsErr(e.message);
+    } finally {
+      setGoalsBusy(false);
+    }
+  }
+
+  async function addGoalProgress(goal) {
+    const next = Number(goal.currentAmount || 0) + Number(totalExpenses || 0);
+    setGoalsBusy(true);
+    setGoalsErr('');
+    try {
+      await api.updateGoal(token, goal.id, { currentAmount: next });
+      await loadGoals();
+    } catch (e) {
+      setGoalsErr(e.message);
+    } finally {
+      setGoalsBusy(false);
     }
   }
 
@@ -543,6 +620,13 @@ export default function App() {
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, month]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    loadGoals();
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -814,6 +898,19 @@ export default function App() {
     }
   }
 
+  async function exportBusinessDocsPdf() {
+    setError('');
+    setBusinessPdfBusy(true);
+    try {
+      const blob = await api.downloadBusinessDocsPdf(token, month, 12);
+      api.saveBlobAsFile(blob, `financialcheckup-business-docs-${month}.pdf`);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusinessPdfBusy(false);
+    }
+  }
+
   async function loadExpertBriefing() {
     setExpertError('');
     setExpertData(null);
@@ -944,6 +1041,8 @@ export default function App() {
     setForecastData(null);
     setBusinessDocs(null);
     setForecastErr('');
+    setGoals([]);
+    setGoalsErr('');
   }
 
   const shellStyle = {
@@ -992,9 +1091,18 @@ export default function App() {
     return (
       <div style={shellStyle}>
         <div style={{ ...containerStyle, maxWidth: 860 }}>
-        <h1 style={{ marginBottom: 6 }}>FinancialCheckup</h1>
-        <p style={{ opacity: 0.85 }}>API via dev proxy: <code>/api</code></p>
-        <pre style={{ ...cardStyle, color: '#7dd3fc', overflowX: 'auto' }}>{status}</pre>
+        <h1 style={{ marginBottom: 6 }}>Financial Checkup</h1>
+        <div style={{ ...cardStyle, marginTop: '1rem', display: 'grid', gap: 8 }}>
+          <div style={{ fontWeight: 800 }}>What to expect in the app</div>
+          <div style={{ opacity: 0.9, fontSize: 14, lineHeight: 1.45 }}>
+            Track monthly income/expenses, view financial health score and trends, compare against user averages,
+            export executive reports (CSV/PDF), and get actionable financial advice based on your data.
+          </div>
+          <div style={{ opacity: 0.85, fontSize: 13, lineHeight: 1.45 }}>
+            Helpful workflow: register once, save monthly data, review charts/statistics, then export reports and
+            check projections for 3/6/12 months.
+          </div>
+        </div>
 
         <div style={{ ...cardStyle, marginTop: '1.5rem' }}>
           <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
@@ -1058,7 +1166,7 @@ export default function App() {
       <div style={containerStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h1 style={{ marginBottom: 4 }}>FinancialCheckup</h1>
+          <h1 style={{ marginBottom: 4 }}>Financial Checkup</h1>
           <div style={{ opacity: 0.85 }}>Signed in as <strong>{user}</strong></div>
         </div>
         <button
@@ -1109,7 +1217,48 @@ export default function App() {
 
         {error ? <div style={{ color: '#ffb3b3' }}>{error}</div> : null}
 
-        <details style={cardStyle}>
+        <div style={{ ...cardStyle, order: 10 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Quick links</div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : '1fr 1fr 1fr',
+              gap: 8,
+            }}
+          >
+            {[
+              ['#summary-panel', 'Month Summary'],
+              ['#income-panel', 'Income'],
+              ['#expenses-panel', 'Expenses'],
+              ['#advice-panel', 'Financial Advice'],
+              ['#goals-panel', 'Goals & Progress'],
+              ['#expert-panel', 'Expert Briefing'],
+              ['#leaderboard-panel', 'Leaderboard & Trend'],
+              ['#projections-panel', 'Projections & Docs'],
+              ['#resources-panel', 'Financial Resources'],
+              ['#ai-insights-panel', 'AI Insights'],
+            ].map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                style={{
+                  textDecoration: 'none',
+                  color: '#dbeafe',
+                  border: '1px solid rgba(147,197,253,0.35)',
+                  borderRadius: 9,
+                  padding: '0.5rem 0.6rem',
+                  background: 'rgba(59,130,246,0.12)',
+                  fontSize: 13,
+                  textAlign: 'center',
+                }}
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <details id="advice-panel" style={{ ...cardStyle, order: 40 }}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
             Financial advice feed (free API + your data)
           </summary>
@@ -1158,7 +1307,64 @@ export default function App() {
           </div>
         </details>
 
-        <details style={cardStyle}>
+        <details id="goals-panel" style={{ ...cardStyle, order: 41 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
+            Goals & progress (MRR / ARR / retirement / savings)
+          </summary>
+          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr auto', gap: 8 }}>
+              <input value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="Goal name (e.g. Retirement 2035)" style={inputStyle} />
+              <select value={goalType} onChange={(e) => setGoalType(e.target.value)} style={inputStyle}>
+                <option value="mrr">MRR</option>
+                <option value="arr">ARR</option>
+                <option value="retirement">Retirement</option>
+                <option value="savings">Savings</option>
+                <option value="emergency_fund">Emergency fund</option>
+                <option value="custom">Custom</option>
+              </select>
+              <input type="number" value={goalTarget} onChange={(e) => setGoalTarget(e.target.value)} placeholder="Target $" style={inputStyle} />
+              <button type="button" onClick={createGoalItem} disabled={goalsBusy} style={btnPrimary}>
+                {goalsBusy ? 'Saving…' : 'Add goal'}
+              </button>
+            </div>
+            {goalsErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{goalsErr}</div> : null}
+            {goals.length ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {goals.map((g) => (
+                  <div key={g.id} style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.7rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{g.name}</div>
+                        <div style={{ fontSize: 12, opacity: 0.78 }}>
+                          {String(g.goalType || 'custom').toUpperCase()} · target ${Number(g.targetAmount).toLocaleString()} · current $
+                          {Number(g.currentAmount).toLocaleString()}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button type="button" onClick={() => addGoalProgress(g)} disabled={goalsBusy} style={btnNeutral}>
+                          Add this month spend
+                        </button>
+                        <button type="button" onClick={() => deleteGoalItem(g.id)} disabled={goalsBusy} style={btnDanger}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ height: 10, borderRadius: 999, background: 'rgba(148,163,184,0.25)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${Math.min(100, Number(g.progressPercent) || 0)}%`, background: 'linear-gradient(90deg,#22c55e,#3b82f6)' }} />
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>{Number(g.progressPercent).toFixed(1)}% complete</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ opacity: 0.8, fontSize: 14 }}>No goals yet. Add a target above to start tracking progress.</div>
+            )}
+          </div>
+        </details>
+
+        <details id="expert-panel" style={{ ...cardStyle, order: 42 }}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
             Expert financial briefing
           </summary>
@@ -1219,7 +1425,7 @@ export default function App() {
           </div>
         </details>
 
-        <details style={cardStyle}>
+        <details id="leaderboard-panel" style={{ ...cardStyle, order: 43 }}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
             Leaderboard & your improvement trend
           </summary>
@@ -1351,7 +1557,7 @@ export default function App() {
           </div>
         </details>
 
-        <details style={cardStyle}>
+        <details id="projections-panel" style={{ ...cardStyle, order: 44 }}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
             Projections, long-term health & business documents
           </summary>
@@ -1396,7 +1602,12 @@ export default function App() {
 
             {businessDocs ? (
               <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>Business accounting documents (generated)</div>
+                <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span>Business accounting documents (generated)</span>
+                  <button type="button" onClick={exportBusinessDocsPdf} disabled={businessPdfBusy} style={btnNeutral}>
+                    {businessPdfBusy ? 'Building business PDF…' : 'Export Business Docs PDF'}
+                  </button>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : '1fr 1fr 1fr', gap: 12, fontSize: 13 }}>
                   <div>
                     <div style={{ fontWeight: 700, marginBottom: 4 }}>Balance Sheet</div>
@@ -1422,8 +1633,41 @@ export default function App() {
           </div>
         </details>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
-          <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
+        <details id="resources-panel" style={{ ...cardStyle, order: 45 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
+            Resources (authoritative help for people & businesses)
+          </summary>
+          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0, opacity: 0.88, lineHeight: 1.45, fontSize: 14 }}>
+              Trusted financial education and support links. Always verify local/state eligibility and current guidance.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: 12 }}>
+              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Personal finance support</div>
+                <ul style={{ margin: '0 0 0 1.2rem', lineHeight: 1.45 }}>
+                  <li><a href="https://www.consumerfinance.gov/" target="_blank" rel="noreferrer">Consumer Financial Protection Bureau (CFPB)</a></li>
+                  <li><a href="https://www.usa.gov/money" target="_blank" rel="noreferrer">USA.gov Money & Credit</a></li>
+                  <li><a href="https://www.ftc.gov/" target="_blank" rel="noreferrer">Federal Trade Commission (FTC) fraud resources</a></li>
+                  <li><a href="https://www.annualcreditreport.com/" target="_blank" rel="noreferrer">AnnualCreditReport.com (official credit reports)</a></li>
+                  <li><a href="https://www.irs.gov/" target="_blank" rel="noreferrer">IRS tax guidance & payment plans</a></li>
+                </ul>
+              </div>
+              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Business & organizational resources</div>
+                <ul style={{ margin: '0 0 0 1.2rem', lineHeight: 1.45 }}>
+                  <li><a href="https://www.sba.gov/" target="_blank" rel="noreferrer">U.S. Small Business Administration (SBA)</a></li>
+                  <li><a href="https://www.score.org/" target="_blank" rel="noreferrer">SCORE mentoring for businesses</a></li>
+                  <li><a href="https://www.irs.gov/businesses" target="_blank" rel="noreferrer">IRS business tax center</a></li>
+                  <li><a href="https://www.grants.gov/" target="_blank" rel="noreferrer">Grants.gov (official grant listings)</a></li>
+                  <li><a href="https://www.sba.gov/local-assistance/resource-partners/small-business-development-centers-sbdc" target="_blank" rel="noreferrer">SBDC local business development centers</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, order: 30 }}>
+          <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12, order: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <h2 style={{ marginTop: 0, marginBottom: 6 }}>This Month Summary</h2>
@@ -1567,107 +1811,110 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Income</h2>
-            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <span style={{ width: 90, opacity: 0.9 }}>Amount</span>
-              <input
-                type="number"
-                value={income}
-                step="0.01"
-                onChange={(e) => setIncome(e.target.value)}
-                style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-              />
-            </label>
-            <div style={{ marginTop: 10 }}>
-              <button type="button" onClick={saveIncomeOnly} disabled={busy} style={btnPrimary}>
-                {busy ? 'Saving…' : 'Save Income'}
-              </button>
-            </div>
-          </div>
-
-          <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>Expenses (editable)</h2>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12, alignItems: 'flex-end' }}>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ opacity: 0.85, fontSize: 14 }}>Add category</span>
+          <div style={{ ...cardStyle, order: 21, display: 'grid', gap: 14 }}>
+            <div style={{ fontWeight: 800 }}>Income & expense inputs</div>
+            <div id="income-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
+              <h2 style={{ marginTop: 0, marginBottom: 8 }}>Income</h2>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ width: 90, opacity: 0.9 }}>Amount</span>
                 <input
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  placeholder="e.g. Health"
-                  style={{ width: 220, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-                  disabled={catBusy}
+                  type="number"
+                  value={income}
+                  step="0.01"
+                  onChange={(e) => setIncome(e.target.value)}
+                  style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
                 />
               </label>
-              <button
-                type="button"
-                onClick={addCategory}
-                disabled={catBusy || !newCategory.trim()}
-                style={{ padding: '0.5rem 1rem', cursor: 'pointer', background: '#134', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
-              >
-                {catBusy ? 'Adding…' : 'Add'}
-              </button>
-              {catError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{catError}</div> : null}
+              <div style={{ marginTop: 10 }}>
+                <button type="button" onClick={saveIncomeOnly} disabled={busy} style={btnPrimary}>
+                  {busy ? 'Saving…' : 'Save Income'}
+                </button>
+              </div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', opacity: 0.85 }}>
-                    <th style={{ padding: '6px 8px' }}>Category</th>
-                    <th style={{ padding: '6px 8px' }}>Amount</th>
-                    <th style={{ padding: '6px 8px', width: 80 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenses.map((e) => (
-                    <tr key={e.id ?? e.category}>
-                      <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{e.category}</td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <input
-                          type="number"
-                          value={e.amount}
-                          step="0.01"
-                          onChange={(ev) => {
-                            const val = ev.target.value;
-                            setExpenses((prev) =>
-                              prev.map((row) => (row.id === e.id ? { ...row, amount: val } : row))
-                            );
-                          }}
-                          style={{ width: 140, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => removeCategory(e.category)}
-                          disabled={catBusy}
-                          style={{ padding: '0.35rem 0.6rem', cursor: 'pointer', background: '#321', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
-                        >
-                          Remove
-                        </button>
-                      </td>
+
+            <div id="expenses-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
+              <h2 style={{ marginTop: 0, marginBottom: 8 }}>Expenses (editable)</h2>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12, alignItems: 'flex-end' }}>
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span style={{ opacity: 0.85, fontSize: 14 }}>Add category</span>
+                  <input
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="e.g. Health"
+                    style={{ width: 220, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
+                    disabled={catBusy}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={addCategory}
+                  disabled={catBusy || !newCategory.trim()}
+                  style={{ padding: '0.5rem 1rem', cursor: 'pointer', background: '#134', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
+                >
+                  {catBusy ? 'Adding…' : 'Add'}
+                </button>
+                {catError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{catError}</div> : null}
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', opacity: 0.85 }}>
+                      <th style={{ padding: '6px 8px' }}>Category</th>
+                      <th style={{ padding: '6px 8px' }}>Amount</th>
+                      <th style={{ padding: '6px 8px', width: 80 }}>Actions</th>
                     </tr>
-                  ))}
-                  {expenses.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} style={{ padding: 10, opacity: 0.8 }}>
-                        No expenses loaded.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <button type="button" onClick={saveExpensesOnly} disabled={busy || catBusy} style={btnPrimary}>
-                {busy ? 'Saving…' : 'Save Expenses'}
-              </button>
+                  </thead>
+                  <tbody>
+                    {expenses.map((e) => (
+                      <tr key={e.id ?? e.category}>
+                        <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{e.category}</td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input
+                            type="number"
+                            value={e.amount}
+                            step="0.01"
+                            onChange={(ev) => {
+                              const val = ev.target.value;
+                              setExpenses((prev) =>
+                                prev.map((row) => (row.id === e.id ? { ...row, amount: val } : row))
+                              );
+                            }}
+                            style={{ width: 140, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => removeCategory(e.category)}
+                            disabled={catBusy}
+                            style={{ padding: '0.35rem 0.6rem', cursor: 'pointer', background: '#321', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {expenses.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} style={{ padding: 10, opacity: 0.8 }}>
+                          No expenses loaded.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <button type="button" onClick={saveExpensesOnly} disabled={busy || catBusy} style={btnPrimary}>
+                  {busy ? 'Saving…' : 'Save Expenses'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         {insights && insights.length ? (
-          <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
+          <div id="ai-insights-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>AI Insights</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
               {insights.map((ins, idx) => {
@@ -1693,6 +1940,9 @@ export default function App() {
           </div>
         ) : null}
       </div>
+        <div style={{ marginTop: 16, textAlign: 'center', opacity: 0.65, fontSize: 12 }}>
+          Operon E2I
+        </div>
       </div>
     </div>
   );

@@ -143,6 +143,19 @@ export async function downloadExecutivePdf(token, month) {
   return res.blob();
 }
 
+export async function downloadBusinessDocsPdf(token, month, months = 12) {
+  const m = encodeURIComponent(month);
+  const n = encodeURIComponent(months);
+  const res = await fetch(apiUrl(`/api/reports/business-docs-pdf?month=${m}&months=${n}`), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || `Export failed (${res.status})`);
+  }
+  return res.blob();
+}
+
 export async function getForecastOutcomes(token, month) {
   const m = encodeURIComponent(month);
   return apiFetch(`/api/reports/forecast?month=${m}`, { token });
@@ -189,5 +202,21 @@ export async function getMyTrends(token, months = 12) {
 export async function getFinancialAdvice(token, month) {
   const m = encodeURIComponent(month);
   return apiFetch(`/api/me/financial-advice?month=${m}`, { token });
+}
+
+export async function getGoals(token) {
+  return apiFetch('/api/goals', { token });
+}
+
+export async function createGoal(token, body) {
+  return apiFetch('/api/goals', { method: 'POST', token, body });
+}
+
+export async function updateGoal(token, id, body) {
+  return apiFetch(`/api/goals/${encodeURIComponent(id)}`, { method: 'PUT', token, body });
+}
+
+export async function deleteGoal(token, id) {
+  return apiFetch(`/api/goals/${encodeURIComponent(id)}`, { method: 'DELETE', token });
 }
 

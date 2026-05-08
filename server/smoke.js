@@ -152,6 +152,15 @@ async function waitForReady(child) {
     r = await req('GET', '/api/reports/business-docs?month=2026-05&months=12', token);
     assert(r.status === 200 && r.body.balanceSheet && r.body.incomeStatement, `business docs (${r.status})`);
 
+    r = await req('POST', '/api/goals', token, {
+      name: 'Retirement',
+      goalType: 'retirement',
+      targetAmount: 100000,
+      currentAmount: 5000,
+      targetMonth: '2035-01',
+    });
+    assert(r.status === 201 && r.body && r.body.progressPercent != null, `goal create (${r.status})`);
+
     console.log(`Smoke OK (port ${PORT})`);
   } catch (e) {
     console.error('Smoke FAILED:', e?.message ?? e);
