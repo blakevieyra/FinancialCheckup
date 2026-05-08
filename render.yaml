@@ -5,6 +5,7 @@ services:
     rootDir: server
     buildCommand: npm install
     startCommand: npm start
+    plan: starter
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
@@ -14,7 +15,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DB_PATH
-        value: /var/data/financialcheckup.db
+        value: /opt/render/project/src/server/financialcheckup.db
       - key: CLIENT_URL
         sync: false
       - key: SENDGRID_API_KEY
@@ -37,21 +38,13 @@ services:
         value: America/Los_Angeles
       - key: ADMIN_DIGEST_SECRET
         generateValue: true
-    disks:
-      - name: financialcheckup-data
-        mountPath: /var/data
-        sizeGB: 1
-
   - type: web
     env: static
     name: financialcheckup-web
+    plan: starter
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
         sync: false
