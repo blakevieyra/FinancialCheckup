@@ -2,10 +2,11 @@ databases:
   - name: financialcheckup-db
     databaseName: financialcheckup
     user: financialcheckup
-    # basic_256mb (~$6/mo, 256 MB RAM, 1 GB storage) — cheapest paid Postgres on Render's
-    # new plan lineup. Required because this account already has a free Postgres in use
-    # by another project, and Render allows only one free Postgres per workspace.
-    plan: basic_256mb
+    # basic-256mb (~$6/mo, 256 MB RAM, 1 GB storage) — cheapest paid Postgres on Render's
+    # new flexible plan lineup. Required because this account already has a free Postgres
+    # in use by another project, and Render allows only one free Postgres per workspace.
+    # Note: blueprint YAML uses hyphens (basic-256mb); the REST API uses underscores.
+    plan: basic-256mb
 
 services:
   - type: web
