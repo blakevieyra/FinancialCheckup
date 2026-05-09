@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background: #0b0f14;
@@ -11,6 +15,7 @@ body {
   line-height: 1.35;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
 code {
@@ -29,6 +34,7 @@ textarea {
 
 button {
   transform: translateY(0);
+  touch-action: manipulation;
 }
 
 button:hover:not(:disabled) {
@@ -89,6 +95,15 @@ table tbody tr:nth-child(even) {
 @media (max-width: 720px) {
   body {
     font-size: 15px;
+  }
+
+  input[type='text'],
+  input[type='number'],
+  input[type='password'],
+  input[type='month'],
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
 

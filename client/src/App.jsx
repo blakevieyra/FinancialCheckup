@@ -26,7 +26,7 @@ function gradeFromExpenseRatio(ratio) {
   return 'F';
 }
 
-function PieChartSvg({ data, colors }) {
+function PieChartSvg({ data, colors, wrapLegend }) {
   const total = data.reduce((s, d) => s + d.value, 0);
   const r = 78;
   const cx = 110;
@@ -82,14 +82,35 @@ function PieChartSvg({ data, colors }) {
           categories
         </text>
       </svg>
-      <div style={{ display: 'grid', gap: 4 }}>
+      <div style={{ display: 'grid', gap: wrapLegend ? 10 : 4 }}>
         {segments.map((s) => (
-          <div key={`lbl-${s.name}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 999, background: s.color, display: 'inline-block' }} />
-              <span style={{ opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+          <div
+            key={`lbl-${s.name}`}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 8,
+              fontSize: 12,
+              flexWrap: wrapLegend ? 'wrap' : 'nowrap',
+              rowGap: 6,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: '1 1 120px' }}>
+              <span style={{ width: 10, height: 10, borderRadius: 999, background: s.color, display: 'inline-block', flexShrink: 0 }} />
+              <span
+                style={{
+                  opacity: 0.9,
+                  overflow: wrapLegend ? 'visible' : 'hidden',
+                  textOverflow: wrapLegend ? 'clip' : 'ellipsis',
+                  whiteSpace: wrapLegend ? 'normal' : 'nowrap',
+                  wordBreak: wrapLegend ? 'break-word' : undefined,
+                }}
+              >
+                {s.name}
+              </span>
             </div>
-            <div style={{ opacity: 0.86, whiteSpace: 'nowrap' }}>
+            <div style={{ opacity: 0.86, whiteSpace: wrapLegend ? 'normal' : 'nowrap', flexShrink: 0 }}>
               ${Number(s.value).toLocaleString()} · {((s.value / total) * 100).toFixed(1)}%
             </div>
           </div>
@@ -99,15 +120,15 @@ function PieChartSvg({ data, colors }) {
   );
 }
 
-function CategoryBarChartSvg({ data, avgByCategory = {} }) {
+function CategoryBarChartSvg({ data, avgByCategory = {}, compact }) {
   const rows = (data || []).filter((d) => Number(d.value) > 0).sort((a, b) => b.value - a.value);
   if (!rows.length) return <div style={{ opacity: 0.85, padding: '0.75rem 0' }}>No categories with spending yet.</div>;
 
   const width = 700;
   const barH = 18;
   const gap = 10;
-  const padL = 132;
-  const padR = 165;
+  const padL = compact ? 100 : 132;
+  const padR = compact ? 12 : 165;
   const padT = 12;
   const padB = 8;
   const height = padT + padB + rows.length * (barH + gap);
@@ -122,18 +143,24 @@ function CategoryBarChartSvg({ data, avgByCategory = {} }) {
         const w = ((Number(r.value) || 0) / max) * plotW;
         const pct = total > 0 ? ((Number(r.value) || 0) / total) * 100 : 0;
         const avg = Number(avgByCategory?.[r.name] || 0);
+        const labelMax = compact ? 14 : 19;
+        const tip = `${r.name}: $${Number(r.value).toLocaleString()} (${pct.toFixed(1)}%) · avg $${avg.toLocaleString()}`;
         return (
           <g key={`${r.name}-${i}`}>
-            <text x={padL - 8} y={y + barH - 4} textAnchor="end" fill="rgba(230,237,243,0.86)" fontSize="11">
-              {r.name.length > 19 ? `${r.name.slice(0, 19)}…` : r.name}
+            <text x={padL - 8} y={y + barH - 4} textAnchor="end" fill="rgba(230,237,243,0.86)" fontSize={compact ? 10 : 11}>
+              {r.name.length > labelMax ? `${r.name.slice(0, labelMax)}…` : r.name}
             </text>
-            <rect x={padL} y={y} width={plotW} height={barH} fill="rgba(148,163,184,0.16)" rx="4" />
-            <rect x={padL} y={y} width={w} height={barH} fill="#60a5fa" rx="4">
-              <title>{`${r.name}: $${Number(r.value).toLocaleString()} (${pct.toFixed(1)}%)`}</title>
+            <rect x={padL} y={y} width={plotW} height={barH} fill="rgba(148,163,184,0.16)" rx="4">
+              <title>{tip}</title>
             </rect>
-            <text x={padL + plotW + 6} y={y + barH - 4} fill="rgba(230,237,243,0.84)" fontSize="11">
-              ${Number(r.value).toLocaleString()} · {pct.toFixed(1)}% · avg ${avg.toLocaleString()}
-            </text>
+            <rect x={padL} y={y} width={w} height={barH} fill="#60a5fa" rx="4">
+              <title>{tip}</title>
+            </rect>
+            {!compact ? (
+              <text x={padL + plotW + 6} y={y + barH - 4} fill="rgba(230,237,243,0.84)" fontSize="11">
+                ${Number(r.value).toLocaleString()} · {pct.toFixed(1)}% · avg ${avg.toLocaleString()}
+              </text>
+            ) : null}
           </g>
         );
       })}
@@ -217,7 +244,7 @@ function LineChartSvg({ data }) {
 }
 
 /** healthScore 0–100 (blue) and expenseRatio % (orange), shared vertical scale up to maxNeeded */
-function TrendDualLineSvg({ series }) {
+function TrendDualLineSvg({ series, compact }) {
   const width = 680;
   const height = 260;
   const padL = 48;
@@ -243,8 +270,10 @@ function TrendDualLineSvg({ series }) {
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="280" role="img" aria-label="Health score and expense ratio trend">
-      <text x={padL} y={16} fill="rgba(230,237,243,0.75)" fontSize="12">
-        Blue = health score (higher better) · Orange = expense ratio % (lower better)
+      <text x={padL} y={16} fill="rgba(230,237,243,0.75)" fontSize={compact ? 10 : 12}>
+        {compact
+          ? 'Blue = health · Orange = expense % (lower better)'
+          : 'Blue = health score (higher better) · Orange = expense ratio % (lower better)'}
       </text>
       {[0, 0.5, 1].map((t) => {
         const v = maxY * t;
@@ -1070,16 +1099,21 @@ export default function App() {
   const shellStyle = {
     fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
     minHeight: '100vh',
-    padding: '2rem',
+    boxSizing: 'border-box',
+    padding: isMobile
+      ? `max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left))`
+      : isTablet
+        ? `1.25rem max(1.25rem, env(safe-area-inset-right)) 1.5rem max(1.25rem, env(safe-area-inset-left))`
+        : `2rem max(2rem, env(safe-area-inset-right)) 2rem max(2rem, env(safe-area-inset-left))`,
     color: '#e6edf3',
     background:
       'radial-gradient(1200px 550px at 15% -10%, rgba(59,130,246,0.25), transparent 55%), radial-gradient(900px 450px at 90% 0%, rgba(16,185,129,0.18), transparent 50%), #0a0f1a',
   };
-  const containerStyle = { maxWidth: 1080, margin: '0 auto' };
+  const containerStyle = { maxWidth: 1080, margin: '0 auto', width: '100%', minWidth: 0 };
   const cardStyle = {
     border: '1px solid rgba(148,163,184,0.25)',
     borderRadius: 14,
-    padding: '0.85rem 1rem',
+    padding: isMobile ? '0.65rem 0.75rem' : '0.85rem 1rem',
     background: 'rgba(15,23,42,0.62)',
     backdropFilter: 'blur(10px)',
     boxShadow: '0 10px 28px rgba(2,6,23,0.28)',
@@ -1113,7 +1147,7 @@ export default function App() {
     return (
       <div style={shellStyle}>
         <div style={{ ...containerStyle, maxWidth: 860 }}>
-        <h1 style={{ marginBottom: 6 }}>Financial Checkup</h1>
+        <h1 style={{ marginBottom: 6, fontSize: isMobile ? '1.45rem' : undefined, lineHeight: 1.2 }}>Financial Checkup</h1>
         <div style={{ ...cardStyle, marginTop: '1rem', display: 'grid', gap: 8 }}>
           <div style={{ fontWeight: 800 }}>What to expect in the app</div>
           <div style={{ opacity: 0.9, fontSize: 14, lineHeight: 1.45 }}>
@@ -1186,29 +1220,62 @@ export default function App() {
   return (
     <div style={shellStyle}>
       <div style={containerStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Financial Checkup</h1>
-          <div style={{ opacity: 0.85 }}>Signed in as <strong>{user}</strong></div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: isMobile ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexDirection: isMobile ? 'column' : 'row',
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ marginBottom: 4, fontSize: isMobile ? '1.45rem' : undefined, lineHeight: 1.2 }}>Financial Checkup</h1>
+          <div style={{ opacity: 0.85, wordBreak: 'break-word' }}>Signed in as <strong>{user}</strong></div>
         </div>
         <button
           type="button"
           onClick={logout}
-          style={btnDanger}
+          style={{ ...btnDanger, alignSelf: isMobile ? 'stretch' : undefined }}
         >
           Logout
         </button>
       </div>
 
-      <div style={{ ...cardStyle, marginTop: '1rem', display: 'grid', gap: 12, position: 'sticky', top: 10, zIndex: 5 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
-          <label>
+      <div
+        style={{
+          ...cardStyle,
+          marginTop: '1rem',
+          display: 'grid',
+          gap: 12,
+          position: 'sticky',
+          top: 'max(0.5rem, env(safe-area-inset-top))',
+          zIndex: 5,
+        }}
+      >
+        <div
+          style={{
+            display: isMobile ? 'grid' : 'flex',
+            gap: 10,
+            gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : undefined,
+            flexWrap: isMobile ? undefined : 'wrap',
+            alignItems: isMobile ? 'stretch' : 'end',
+          }}
+        >
+          <label
+            style={{
+              display: 'grid',
+              gap: 4,
+              gridColumn: isMobile ? '1 / -1' : undefined,
+              minWidth: isMobile ? undefined : 0,
+            }}
+          >
             <span style={{ opacity: 0.8, fontSize: 13 }}>Month</span>
             <input
               value={month}
               onChange={(e) => setMonth(e.target.value)}
               placeholder="YYYY-MM"
-              style={{ ...inputStyle, marginLeft: 8, width: 160 }}
+              style={{ ...inputStyle, marginLeft: 0, width: '100%', maxWidth: isMobile ? 'none' : 160 }}
             />
           </label>
           <button
@@ -1362,7 +1429,14 @@ export default function App() {
                           {Number(g.currentAmount).toLocaleString()}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 8,
+                          flexDirection: isMobile ? 'column' : 'row',
+                          alignItems: isMobile ? 'stretch' : 'center',
+                        }}
+                      >
                         <button type="button" onClick={() => addGoalProgress(g)} disabled={goalsBusy} style={btnNeutral}>
                           Add this month spend
                         </button>
@@ -1400,7 +1474,16 @@ export default function App() {
               type="button"
               disabled={expertBusy}
               onClick={loadExpertBriefing}
-              style={{ padding: '0.55rem 1rem', cursor: 'pointer', background: '#134', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', maxWidth: 360 }}
+              style={{
+                padding: '0.55rem 1rem',
+                cursor: 'pointer',
+                background: '#134',
+                color: '#fff',
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.2)',
+                maxWidth: '100%',
+                width: isMobile ? '100%' : 360,
+              }}
             >
               {expertBusy ? 'Calling expert API…' : 'Generate expert briefing'}
             </button>
@@ -1571,7 +1654,7 @@ export default function App() {
             {trendsData?.series?.length >= 2 ? (
               <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.75rem' }}>
                 <div style={{ fontWeight: 700, marginBottom: 8 }}>Score vs expense ratio over time</div>
-                <TrendDualLineSvg series={trendsData.series} />
+                <TrendDualLineSvg series={trendsData.series} compact={isMobile} />
               </div>
             ) : trendsData?.series?.length ? (
               <div style={{ opacity: 0.8, fontSize: 14 }}>Add another month of data to see a trend chart.</div>
@@ -1690,7 +1773,16 @@ export default function App() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, order: 30 }}>
           <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12, order: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 12,
+                flexWrap: 'wrap',
+                flexDirection: isMobile ? 'column' : 'row',
+              }}
+            >
               <div>
                 <h2 style={{ marginTop: 0, marginBottom: 6 }}>This Month Summary</h2>
                 <div style={{ opacity: 0.9 }}>
@@ -1701,7 +1793,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ minWidth: 260 }}>
+              <div style={{ minWidth: isMobile ? 0 : 260, width: isMobile ? '100%' : undefined }}>
                 <div style={{ opacity: 0.85, marginBottom: 8 }}>Insights profile</div>
                 <select
                   value={profile}
@@ -1725,7 +1817,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : isTablet ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
               <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
                 <div style={{ opacity: 0.7, fontSize: 12 }}>Net surplus</div>
                 <div style={{ fontWeight: 800, marginTop: 2 }}>${savingsAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
@@ -1788,6 +1880,7 @@ export default function App() {
                 <PieChartSvg
                   data={monthPieData}
                   colors={['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#14b8a6']}
+                  wrapLegend={isMobile}
                 />
               </div>
 
@@ -1809,7 +1902,7 @@ export default function App() {
 
               <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
                 <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Descending categories (your spend vs user average)</div>
-                <CategoryBarChartSvg data={monthBarData} avgByCategory={categoryAverages} />
+                <CategoryBarChartSvg data={monthBarData} avgByCategory={categoryAverages} compact={isMobile} />
               </div>
 
               <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
@@ -1837,14 +1930,21 @@ export default function App() {
             <div style={{ fontWeight: 800 }}>Income & expense inputs</div>
             <div id="income-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
               <h2 style={{ marginTop: 0, marginBottom: 8 }}>Income</h2>
-              <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <span style={{ width: 90, opacity: 0.9 }}>Amount</span>
+              <label
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  alignItems: isMobile ? 'stretch' : 'center',
+                  flexDirection: isMobile ? 'column' : 'row',
+                }}
+              >
+                <span style={{ width: isMobile ? undefined : 90, opacity: 0.9 }}>Amount</span>
                 <input
                   type="number"
                   value={income}
                   step="0.01"
                   onChange={(e) => setIncome(e.target.value)}
-                  style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
+                  style={{ flex: 1, width: '100%', minWidth: 0, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
                 />
               </label>
               <div style={{ marginTop: 10 }}>
@@ -1856,14 +1956,31 @@ export default function App() {
 
             <div id="expenses-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
               <h2 style={{ marginTop: 0, marginBottom: 8 }}>Expenses (editable)</h2>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12, alignItems: 'flex-end' }}>
-                <label style={{ display: 'grid', gap: 6 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                  marginBottom: 12,
+                  alignItems: isMobile ? 'stretch' : 'flex-end',
+                  flexDirection: isMobile ? 'column' : 'row',
+                }}
+              >
+                <label style={{ display: 'grid', gap: 6, flex: isMobile ? undefined : '1 1 220px', minWidth: isMobile ? undefined : 160 }}>
                   <span style={{ opacity: 0.85, fontSize: 14 }}>Add category</span>
                   <input
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     placeholder="e.g. Health"
-                    style={{ width: 220, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
+                    style={{
+                      width: isMobile ? '100%' : 220,
+                      maxWidth: '100%',
+                      padding: 10,
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: '#0b0f14',
+                      color: '#fff',
+                    }}
                     disabled={catBusy}
                   />
                 </label>
@@ -1871,7 +1988,15 @@ export default function App() {
                   type="button"
                   onClick={addCategory}
                   disabled={catBusy || !newCategory.trim()}
-                  style={{ padding: '0.5rem 1rem', cursor: 'pointer', background: '#134', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    cursor: 'pointer',
+                    background: '#134',
+                    color: '#fff',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    alignSelf: isMobile ? 'stretch' : undefined,
+                  }}
                 >
                   {catBusy ? 'Adding…' : 'Add'}
                 </button>
@@ -1889,7 +2014,7 @@ export default function App() {
                   <tbody>
                     {expenses.map((e) => (
                       <tr key={e.id ?? e.category}>
-                        <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{e.category}</td>
+                        <td style={{ padding: '6px 8px', whiteSpace: isMobile ? 'normal' : 'nowrap', wordBreak: isMobile ? 'break-word' : undefined }}>{e.category}</td>
                         <td style={{ padding: '6px 8px' }}>
                           <input
                             type="number"
@@ -1901,7 +2026,16 @@ export default function App() {
                                 prev.map((row) => (row.id === e.id ? { ...row, amount: val } : row))
                               );
                             }}
-                            style={{ width: 140, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
+                            style={{
+                              width: isMobile ? '100%' : 140,
+                              maxWidth: isMobile ? 200 : undefined,
+                              padding: 8,
+                              borderRadius: 8,
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              background: '#0b0f14',
+                              color: '#fff',
+                              boxSizing: 'border-box',
+                            }}
                           />
                         </td>
                         <td style={{ padding: '6px 8px' }}>
