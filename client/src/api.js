@@ -257,3 +257,29 @@ export async function deleteGoal(token, id) {
   return apiFetch(`/api/goals/${encodeURIComponent(id)}`, { method: 'DELETE', token });
 }
 
+export async function previewCheckup(snapshot) {
+  return apiFetch('/api/checkup/preview', { method: 'POST', body: { ...snapshot } });
+}
+
+export async function runCheckup(token, { month, snapshot }) {
+  return apiFetch('/api/checkup/run', { method: 'POST', token, body: { month, snapshot } });
+}
+
+export async function getCheckupPrefill(token, month) {
+  const m = encodeURIComponent(month);
+  return apiFetch(`/api/checkup/prefill?month=${m}`, { token });
+}
+
+export async function getCheckupLatest(token, month) {
+  const qs = month ? `?month=${encodeURIComponent(month)}` : '';
+  return apiFetch(`/api/checkup/latest${qs}`, { token });
+}
+
+export async function getCheckupHistory(token, limit = 12) {
+  return apiFetch(`/api/checkup/history?limit=${encodeURIComponent(limit)}`, { token });
+}
+
+export async function signupMoneyTips(token, email) {
+  return apiFetch('/api/checkup/tips-signup', { method: 'POST', token, body: { email } });
+}
+

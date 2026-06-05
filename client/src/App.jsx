@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as api from './api';
+import LandingPage from './LandingPage';
+import CheckupPanel from './CheckupPanel';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -373,6 +375,13 @@ export default function App() {
   const [goalType, setGoalType] = useState('retirement');
   const [goalTarget, setGoalTarget] = useState('');
 
+  const [showGuestCheckup, setShowGuestCheckup] = useState(false);
+  const [guestEmail, setGuestEmail] = useState('');
+  const [tipsMsg, setTipsMsg] = useState('');
+  const [tipsErr, setTipsErr] = useState('');
+  const [tipsBusy, setTipsBusy] = useState(false);
+  const [lastCheckupScore, setLastCheckupScore] = useState(null);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('checking…');
@@ -701,6 +710,14 @@ export default function App() {
   }, [token, month]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    api.getCheckupLatest(token, month).then((d) => {
+      if (d?.found && d.overallScore != null) setLastCheckupScore(d.overallScore);
+    }).catch(() => {});
+    return undefined;
+  }, [token, month]);
+
+  useEffect(() => {
     if (!isAuthed) return;
     loadMonthData();
     loadHistory();
@@ -719,6 +736,15 @@ export default function App() {
       localStorage.setItem('username', res.username);
       setPassword('');
       setUsername('');
+      try {
+        const pendingTips = localStorage.getItem('fc-tips-email');
+        if (pendingTips) {
+          await api.signupMoneyTips(res.token, pendingTips);
+          localStorage.removeItem('fc-tips-email');
+        }
+      } catch {
+        /** tips signup is best-effort */
+      }
     } catch (e2) {
       setAuthError(e2.message);
     } finally {
@@ -1071,6 +1097,34 @@ export default function App() {
     }
   }
 
+  async function handleTipsSignup() {
+    setTipsErr('');
+    setTipsMsg('');
+    const email = guestEmail.trim();
+    if (!email) {
+      setTipsErr('Enter your email address.');
+      return;
+    }
+    if (token) {
+      setTipsBusy(true);
+      try {
+        const r = await api.signupMoneyTips(token, email);
+        setTipsMsg(r.message || 'Subscribed!');
+      } catch (e) {
+        setTipsErr(e.message);
+      } finally {
+        setTipsBusy(false);
+      }
+      return;
+    }
+    try {
+      localStorage.setItem('fc-tips-email', email);
+    } catch {
+      /** ignore */
+    }
+    setTipsMsg('Create a free account below — we will save your email when you register.');
+  }
+
   function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
@@ -1094,6 +1148,7 @@ export default function App() {
     setForecastErr('');
     setGoals([]);
     setGoalsErr('');
+    setLastCheckupScore(null);
   }
 
   const shellStyle = {
@@ -1145,75 +1200,69 @@ export default function App() {
 
   if (!isAuthed) {
     return (
-      <div style={shellStyle}>
-        <div style={{ ...containerStyle, maxWidth: 860 }}>
-        <h1 style={{ marginBottom: 6, fontSize: isMobile ? '1.45rem' : undefined, lineHeight: 1.2 }}>Financial Checkup</h1>
-        <div style={{ ...cardStyle, marginTop: '1rem', display: 'grid', gap: 8 }}>
-          <div style={{ fontWeight: 800 }}>What to expect in the app</div>
-          <div style={{ opacity: 0.9, fontSize: 14, lineHeight: 1.45 }}>
-            Track monthly income/expenses, view financial health score and trends, compare against user averages,
-            export executive reports (CSV/PDF), and get actionable financial advice based on your data.
-          </div>
-          <div style={{ opacity: 0.85, fontSize: 13, lineHeight: 1.45 }}>
-            Helpful workflow: register once, save monthly data, review charts/statistics, then export reports and
-            check projections for 3/6/12 months.
-          </div>
-        </div>
-
-        <div style={{ ...cardStyle, marginTop: '1.5rem' }}>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-            <button
-              type="button"
-              onClick={() => setAuthMode('login')}
-              style={authMode === 'login' ? btnPrimary : btnNeutral}
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthMode('register')}
-              style={authMode === 'register' ? btnPrimary : btnNeutral}
-            >
-              Register
-            </button>
-          </div>
-
-          <form onSubmit={submitAuth} style={{ display: 'grid', gap: 10, maxWidth: 380 }}>
-            <label>
-              Username
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                style={{ ...inputStyle, width: '100%', marginTop: 4 }}
+      <>
+        <LandingPage
+          shellStyle={shellStyle}
+          containerStyle={containerStyle}
+          cardStyle={cardStyle}
+          cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          isMobile={isMobile}
+          isTablet={isTablet}
+          authMode={authMode}
+          setAuthMode={setAuthMode}
+          username={username}
+          setUsername={setUsername}
+          password={password}
+          setPassword={setPassword}
+          authError={authError}
+          busy={busy}
+          submitAuth={submitAuth}
+          onStartCheckup={() => setShowGuestCheckup(true)}
+          guestEmail={guestEmail}
+          setGuestEmail={setGuestEmail}
+          tipsMsg={tipsMsg}
+          tipsErr={tipsErr}
+          onTipsSignup={handleTipsSignup}
+          tipsBusy={tipsBusy}
+        />
+        {showGuestCheckup ? (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              background: 'rgba(2,6,23,0.88)',
+              overflowY: 'auto',
+              padding: isMobile ? '0.75rem' : '1.5rem',
+            }}
+          >
+            <div style={{ ...containerStyle, maxWidth: 920, margin: '0 auto' }}>
+              <button
+                type="button"
+                onClick={() => setShowGuestCheckup(false)}
+                style={{ ...btnNeutral, marginBottom: 10 }}
+              >
+                ← Back to landing
+              </button>
+              <CheckupPanel
+                token=""
+                month={month}
+                isMobile={isMobile}
+                isTablet={isTablet}
+                cardStyle={cardStyle}
+                cardSoftStyle={cardSoftStyle}
+                inputStyle={inputStyle}
+                btnPrimary={btnPrimary}
+                btnNeutral={btnNeutral}
+                onResult={(d) => setLastCheckupScore(d?.overallScore ?? null)}
               />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{ ...inputStyle, width: '100%', marginTop: 4 }}
-              />
-            </label>
-
-            {authError ? (
-              <div style={{ color: '#ffb3b3', fontSize: 14, marginTop: 2 }}>
-                {authError}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={busy}
-              style={{ ...btnPrimary, marginTop: 6 }}
-            >
-              {busy ? 'Working…' : authMode === 'register' ? 'Create account' : 'Login'}
-            </button>
-          </form>
-        </div>
-        </div>
-      </div>
+            </div>
+          </div>
+        ) : null}
+      </>
     );
   }
 
@@ -1231,7 +1280,12 @@ export default function App() {
       >
         <div style={{ minWidth: 0 }}>
           <h1 style={{ marginBottom: 4, fontSize: isMobile ? '1.45rem' : undefined, lineHeight: 1.2 }}>Financial Checkup</h1>
-          <div style={{ opacity: 0.85, wordBreak: 'break-word' }}>Signed in as <strong>{user}</strong></div>
+          <div style={{ opacity: 0.85, wordBreak: 'break-word' }}>
+            Signed in as <strong>{user}</strong>
+            {lastCheckupScore != null ? (
+              <span> · Checkup score <strong>{Math.round(lastCheckupScore)}</strong></span>
+            ) : null}
+          </div>
         </div>
         <button
           type="button"
@@ -1316,6 +1370,7 @@ export default function App() {
             }}
           >
             {[
+              ['#checkup-panel', '6-Dimension Checkup'],
               ['#summary-panel', 'Month Summary'],
               ['#income-panel', 'Income'],
               ['#expenses-panel', 'Expenses'],
@@ -1346,6 +1401,19 @@ export default function App() {
             ))}
           </div>
         </div>
+
+        <CheckupPanel
+          token={token}
+          month={month}
+          isMobile={isMobile}
+          isTablet={isTablet}
+          cardStyle={{ ...cardStyle, order: 5 }}
+          cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          onResult={(d) => setLastCheckupScore(d?.overallScore ?? null)}
+        />
 
         <details id="advice-panel" style={{ ...cardStyle, order: 40 }}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>

@@ -179,6 +179,27 @@ async function initDb() {
   `);
   await rawQuery(`CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id, status, updated_at)`);
 
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS checkup_profiles (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      snapshot_json TEXT NOT NULL DEFAULT '{}',
+      updated_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
+
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS checkup_history (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      month TEXT NOT NULL,
+      snapshot_json TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      overall_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_checkup_history_user ON checkup_history(user_id, month, created_at DESC)`);
+
   console.log('✓ Postgres database ready');
 }
 

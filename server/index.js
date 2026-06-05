@@ -44,11 +44,12 @@ app.use('/api/rankings', require('./rankingsRoutes'));
 app.use('/api/me/trends', require('./trendsRoutes'));
 app.use('/api/me/financial-advice', require('./financialAdviceRoutes'));
 app.use('/api/goals', require('./goalsRoutes'));
+app.use('/api/checkup', require('./checkupRoutes'));
 app.get('/api/health', (_, res) =>
   res.json({
     status: 'ok',
     /** Lets clients confirm this process includes weekly-digest routes (GET/PUT /api/me/digest). */
-    features: { weeklyDigest: true, trends: true, leaderboard: true, postgres: true },
+    features: { weeklyDigest: true, trends: true, leaderboard: true, postgres: true, sixDimensionCheckup: true },
   }),
 );
 
