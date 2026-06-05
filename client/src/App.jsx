@@ -4,6 +4,10 @@ import LandingPage from './LandingPage';
 import CheckupPanel, { ActionPlanBlock } from './CheckupPanel';
 import AppNav from './AppNav';
 import ScoreHero from './ScoreHero';
+import ScoreExplainer from './ScoreExplainer';
+import RecommendationTimeline from './RecommendationTimeline';
+import FinancialHistoryPanel from './FinancialHistoryPanel';
+import ImprovementRoadmap from './ImprovementRoadmap';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -129,40 +133,50 @@ function CategoryBarChartSvg({ data, avgByCategory = {}, compact }) {
   if (!rows.length) return <div style={{ opacity: 0.85, padding: '0.75rem 0' }}>No categories with spending yet.</div>;
 
   const width = 700;
-  const barH = 18;
-  const gap = 10;
+  const barH = 14;
+  const gap = 12;
   const padL = compact ? 100 : 132;
-  const padR = compact ? 12 : 165;
+  const padR = compact ? 12 : 200;
   const padT = 12;
   const padB = 8;
-  const height = padT + padB + rows.length * (barH + gap);
-  const max = Math.max(...rows.map((r) => Number(r.value) || 0), 1);
+  const height = padT + padB + rows.length * (barH * 2 + gap);
+  const max = Math.max(
+    ...rows.flatMap((r) => [Number(r.value) || 0, Number(avgByCategory?.[r.name]) || 0]),
+    1,
+  );
   const total = rows.reduce((s, r) => s + (Number(r.value) || 0), 0);
   const plotW = width - padL - padR;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={Math.max(220, height)} role="img" aria-label="Descending expense categories bar chart">
+    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={Math.max(240, height)} role="img" aria-label="Your spending vs community average by category">
+      <text x={padL} y={10} fill="rgba(230,237,243,0.55)" fontSize="10">
+        Blue = you · Amber = community avg
+      </text>
       {rows.map((r, i) => {
-        const y = padT + i * (barH + gap);
-        const w = ((Number(r.value) || 0) / max) * plotW;
-        const pct = total > 0 ? ((Number(r.value) || 0) / total) * 100 : 0;
+        const y = padT + 6 + i * (barH * 2 + gap);
+        const val = Number(r.value) || 0;
         const avg = Number(avgByCategory?.[r.name] || 0);
+        const wYou = (val / max) * plotW;
+        const wAvg = (avg / max) * plotW;
+        const pct = total > 0 ? (val / total) * 100 : 0;
         const labelMax = compact ? 14 : 19;
-        const tip = `${r.name}: $${Number(r.value).toLocaleString()} (${pct.toFixed(1)}%) · avg $${avg.toLocaleString()}`;
+        const tip = `${r.name}: you $${val.toLocaleString()} (${pct.toFixed(1)}%) · community avg $${avg.toLocaleString()}`;
         return (
           <g key={`${r.name}-${i}`}>
-            <text x={padL - 8} y={y + barH - 4} textAnchor="end" fill="rgba(230,237,243,0.86)" fontSize={compact ? 10 : 11}>
+            <text x={padL - 8} y={y + barH - 2} textAnchor="end" fill="rgba(230,237,243,0.86)" fontSize={compact ? 10 : 11}>
               {r.name.length > labelMax ? `${r.name.slice(0, labelMax)}…` : r.name}
             </text>
-            <rect x={padL} y={y} width={plotW} height={barH} fill="rgba(148,163,184,0.16)" rx="4">
+            <rect x={padL} y={y} width={plotW} height={barH} fill="rgba(148,163,184,0.12)" rx="3" />
+            <rect x={padL} y={y} width={wAvg} height={barH} fill="rgba(245,158,11,0.45)" rx="3">
               <title>{tip}</title>
             </rect>
-            <rect x={padL} y={y} width={w} height={barH} fill="#60a5fa" rx="4">
+            <rect x={padL} y={y + barH + 2} width={plotW} height={barH} fill="rgba(148,163,184,0.12)" rx="3" />
+            <rect x={padL} y={y + barH + 2} width={wYou} height={barH} fill="#60a5fa" rx="3">
               <title>{tip}</title>
             </rect>
             {!compact ? (
-              <text x={padL + plotW + 6} y={y + barH - 4} fill="rgba(230,237,243,0.84)" fontSize="11">
-                ${Number(r.value).toLocaleString()} · {pct.toFixed(1)}% · avg ${avg.toLocaleString()}
+              <text x={padL + plotW + 6} y={y + barH + 2} fill="rgba(230,237,243,0.84)" fontSize="10">
+                ${val.toLocaleString()} vs avg ${avg.toLocaleString()}
               </text>
             ) : null}
           </g>
@@ -344,9 +358,11 @@ export default function App() {
   const [forecastBusy, setForecastBusy] = useState(false);
   const [forecastErr, setForecastErr] = useState('');
   const [categoryAverages, setCategoryAverages] = useState({});
+  const [categoryAvgPeerCount, setCategoryAvgPeerCount] = useState(0);
 
   const [expensesHistory, setExpensesHistory] = useState([]);
   const [incomeHistory, setIncomeHistory] = useState([]);
+  const [checkupHistory, setCheckupHistory] = useState([]);
   const [historyError, setHistoryError] = useState('');
 
   const [newCategory, setNewCategory] = useState('');
@@ -460,12 +476,14 @@ export default function App() {
   async function loadHistory() {
     setHistoryError('');
     try {
-      const [incRes, expRes] = await Promise.all([
+      const [incRes, expRes, ckRes] = await Promise.all([
         api.getIncomeHistory(token),
         api.getExpensesHistory(token),
+        api.getCheckupHistory(token, 24),
       ]);
       setIncomeHistory(Array.isArray(incRes) ? incRes : []);
       setExpensesHistory(Array.isArray(expRes) ? expRes : []);
+      setCheckupHistory(Array.isArray(ckRes?.history) ? ckRes.history : []);
     } catch (e) {
       setHistoryError(e.message);
     }
@@ -670,10 +688,10 @@ export default function App() {
     if (!token) return;
     try {
       const data = await api.getCategoryAverages(token, month);
-      const map = Object.fromEntries(
-        (data?.categories || []).map((r) => [r.category, Number(r.avgAmount) || 0]),
-      );
+      const cats = data?.categories || [];
+      const map = Object.fromEntries(cats.map((r) => [r.category, Number(r.avgAmount) || 0]));
       setCategoryAverages(map);
+      setCategoryAvgPeerCount(Math.max(0, ...cats.map((r) => Number(r.usersWithCategory) || 0), 0));
     } catch {
       setCategoryAverages({});
     }
@@ -737,10 +755,22 @@ export default function App() {
     try {
       const data = await api.runCheckup(token, { month, snapshot: {} });
       handleCheckupResult(data);
+      await loadHistory();
     } catch (e) {
       setError(e.message);
     } finally {
       setCheckupBusy(false);
+    }
+  }
+
+  function openHistoryMonth(m) {
+    setMonth(m);
+    setActiveSection('money');
+  }
+
+  function goAppTab(tab) {
+    if (tab === 'money' || tab === 'profile' || tab === 'overview' || tab === 'progress' || tab === 'more') {
+      setActiveSection(tab);
     }
   }
 
@@ -877,16 +907,20 @@ export default function App() {
     const nonZeroCount = rows.length;
     const top = rows[0] || null;
     const avgPerActive = nonZeroCount ? total / nonZeroCount : 0;
-    const aboveAvgCount = rows.filter((r) => (Number(r.value) || 0) > (Number(categoryAverages?.[r.name]) || 0)).length;
+    const aboveAvgCount = rows.filter(
+      (r) => (Number(r.value) || 0) > (Number(categoryAverages?.[r.name]) || 0) + 0.5,
+    ).length;
     const topShare = total > 0 && top ? (Number(top.value) / total) * 100 : 0;
+    const peerComparisonReady = categoryAvgPeerCount > 1;
     return {
       nonZeroCount,
       avgPerActive,
-      aboveAvgCount,
+      aboveAvgCount: peerComparisonReady ? aboveAvgCount : null,
+      peerComparisonReady,
       topCategory: top?.name || 'N/A',
       topShare,
     };
-  }, [monthBarData, categoryAverages]);
+  }, [monthBarData, categoryAverages, categoryAvgPeerCount]);
 
   const historySeries = useMemo(() => {
     const expMap = new Map((expensesHistory || []).map((e) => [e.month, Number(e.total) || 0]));
@@ -1402,6 +1436,7 @@ export default function App() {
             btnNeutral={btnNeutral}
             ledger={{ income, totalExpenses }}
             onResult={handleCheckupResult}
+            onGoTab={goAppTab}
             showForm
             showDetails
             showHistory={false}
@@ -1410,6 +1445,103 @@ export default function App() {
 
         {activeSection === 'progress' && (
           <>
+        <FinancialHistoryPanel
+          incomeHistory={incomeHistory}
+          expensesHistory={expensesHistory}
+          checkupHistory={checkupHistory}
+          currentMonth={month}
+          onSelectMonth={openHistoryMonth}
+          isMobile={isMobile}
+          cardStyle={cardStyle}
+          btnNeutral={btnNeutral}
+        />
+
+        <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12 }}>
+          <div>
+            <h2 style={{ marginTop: 0, marginBottom: 6 }}>Spending charts — {month}</h2>
+            <div style={{ opacity: 0.85, fontSize: 14 }}>
+              Edit on <button type="button" onClick={() => setActiveSection('money')} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Money</button>, then Update score.
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+            <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
+              <div style={{ opacity: 0.7, fontSize: 12 }}>Avg monthly spend</div>
+              <div style={{ fontWeight: 800, marginTop: 2 }}>${monthlyExpenseAvg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            </div>
+            <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
+              <div style={{ opacity: 0.7, fontSize: 12 }}>MoM expenses</div>
+              <div style={{ fontWeight: 800, marginTop: 2 }}>
+                {monthOverMonthDelta ? `${monthOverMonthDelta.expenses >= 0 ? '+' : ''}$${Math.abs(monthOverMonthDelta.expenses).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : 'N/A'}
+              </div>
+            </div>
+            <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
+              <div style={{ opacity: 0.7, fontSize: 12 }}>MoM income</div>
+              <div style={{ fontWeight: 800, marginTop: 2 }}>
+                {monthOverMonthDelta ? `${monthOverMonthDelta.income >= 0 ? '+' : ''}$${Math.abs(monthOverMonthDelta.income).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : 'N/A'}
+              </div>
+            </div>
+            <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
+              <div style={{ opacity: 0.7, fontSize: 12 }}>Top concentration</div>
+              <div style={{ fontWeight: 800, marginTop: 2, fontSize: 14 }}>{categoryStats.topCategory} ({categoryStats.topShare.toFixed(0)}%)</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: 16 }}>
+            <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
+              <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Expenses breakdown (pie)</div>
+              <PieChartSvg data={monthPieData} colors={['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#14b8a6']} wrapLegend={isMobile} />
+            </div>
+            <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
+              <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Income vs expenses (history)</div>
+              {historyError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{historyError}</div> : null}
+              {historySeries.length ? (
+                <LineChartSvg
+                  data={historySeries.map((d) => ({
+                    month: d.month,
+                    expensesTotal: d.expensesTotal,
+                    incomeAmount: d.incomeAmount,
+                  }))}
+                />
+              ) : (
+                <div style={{ opacity: 0.85, padding: '0.75rem 0' }}>No history yet.</div>
+              )}
+            </div>
+            <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
+              <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Your spend vs community average</div>
+              <CategoryBarChartSvg data={monthBarData} avgByCategory={categoryAverages} compact={isMobile} />
+            </div>
+            <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
+              <div style={{ marginBottom: 8, opacity: 0.92, fontWeight: 700 }}>Category statistics</div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, fontSize: 13 }}>
+                <div>Active categories: <strong>{categoryStats.nonZeroCount}</strong></div>
+                <div>Avg per active category: <strong>${Number(categoryStats.avgPerActive).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
+                <div>
+                  Above community avg:{' '}
+                  <strong>
+                    {categoryStats.peerComparisonReady
+                      ? categoryStats.aboveAvgCount
+                      : '— (need 2+ users)'}
+                  </strong>
+                </div>
+                <div>Top concentration: <strong>{categoryStats.topCategory} ({categoryStats.topShare.toFixed(1)}%)</strong></div>
+              </div>
+              {rudimentaryStats ? (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: 13, display: 'grid', gap: 6 }}>
+                  <div style={{ fontWeight: 700 }}>Spend statistics over time</div>
+                  <div>Mean monthly spend: <strong>${Number(rudimentaryStats.mean).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
+                  <div>Most spend month: <strong>{rudimentaryStats.maxMonth || 'N/A'}</strong></div>
+                  <div>Least spend month: <strong>{rudimentaryStats.minMonth || 'N/A'}</strong></div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {checkupResult?.recommendationTimeline?.length ? (
+          <RecommendationTimeline timeline={checkupResult.recommendationTimeline} cardSoftStyle={cardSoftStyle} />
+        ) : null}
+
         <details id="goals-panel" style={cardStyle}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
             Goals & progress (MRR / ARR / retirement / savings)
@@ -1617,8 +1749,9 @@ export default function App() {
           btnPrimary={btnPrimary}
           btnNeutral={btnNeutral}
           ledger={{ income, totalExpenses }}
-          onResult={handleCheckupResult}
-          showForm={false}
+            onResult={handleCheckupResult}
+            onGoTab={goAppTab}
+            showForm={false}
           showDetails={false}
           showHistory
         />
@@ -1804,34 +1937,29 @@ export default function App() {
               onGoProfile={() => setActiveSection('profile')}
               onGoMoney={() => setActiveSection('money')}
             />
+            {checkupResult?.improvementRoadmap ? (
+              <ImprovementRoadmap
+                roadmap={checkupResult.improvementRoadmap}
+                compact
+                cardSoftStyle={cardSoftStyle}
+                onGoTab={goAppTab}
+                btnNeutral={btnNeutral}
+              />
+            ) : null}
             {checkupResult ? (
               <ActionPlanBlock actionPlan={checkupResult.actionPlan} cardSoftStyle={cardSoftStyle} compact />
             ) : null}
-            {checkupResult ? (
-              <button type="button" onClick={() => setActiveSection('profile')} style={{ ...btnNeutral, justifySelf: 'start', fontSize: 13 }}>
-                Full breakdown →
-              </button>
+            {checkupResult?.scoreExplanation ? (
+              <ScoreExplainer
+                explanation={checkupResult.scoreExplanation}
+                isMobile={isMobile}
+                cardSoftStyle={cardSoftStyle}
+                compact
+                onGoTab={goAppTab}
+                btnNeutral={btnNeutral}
+              />
             ) : null}
-          <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12 }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: 12,
-                flexWrap: 'wrap',
-                flexDirection: isMobile ? 'column' : 'row',
-              }}
-            >
-              <div>
-                <h2 style={{ marginTop: 0, marginBottom: 6 }}>Spending charts</h2>
-                <div style={{ opacity: 0.85, fontSize: 14 }}>
-                  Edit amounts in the <button type="button" onClick={() => setActiveSection('money')} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Money</button> tab, then tap Update score.
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
               <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
                 <div style={{ opacity: 0.7, fontSize: 12 }}>Net surplus</div>
                 <div style={{ fontWeight: 800, marginTop: 2 }}>${savingsAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
@@ -1841,104 +1969,24 @@ export default function App() {
                 <div style={{ fontWeight: 800, marginTop: 2 }}>{savingsRate.toFixed(1)}%</div>
               </div>
               <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
-                <div style={{ opacity: 0.7, fontSize: 12 }}>Avg monthly spend</div>
-                <div style={{ fontWeight: 800, marginTop: 2 }}>${monthlyExpenseAvg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                <div style={{ opacity: 0.7, fontSize: 12 }}>Trajectory</div>
+                <div style={{ fontWeight: 800, marginTop: 2, fontSize: 14 }}>{trendsData?.improvement?.direction || '—'}</div>
               </div>
               <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
                 <div style={{ opacity: 0.7, fontSize: 12 }}>Largest category</div>
-                <div style={{ fontWeight: 800, marginTop: 2 }}>
-                  {topCategory ? `${topCategory.category} (${topCategory.pct.toFixed(0)}%)` : 'N/A'}
+                <div style={{ fontWeight: 800, marginTop: 2, fontSize: 14 }}>
+                  {topCategory ? `${topCategory.category}` : 'N/A'}
                 </div>
               </div>
             </div>
-
-            <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.75rem' }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>Analytics snapshot</div>
-              <div style={{ display: 'grid', gap: 4, fontSize: 14, opacity: 0.9 }}>
-                <div>
-                  Financial trajectory:{' '}
-                  <strong>{trendsData?.improvement?.direction || 'insufficient history'}</strong>
-                </div>
-                <div>
-                  Month-over-month expenses:{' '}
-                  <strong>
-                    {monthOverMonthDelta ? `${monthOverMonthDelta.expenses >= 0 ? '+' : ''}$${Math.abs(monthOverMonthDelta.expenses).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : 'N/A'}
-                  </strong>
-                </div>
-                <div>
-                  Month-over-month income:{' '}
-                  <strong>
-                    {monthOverMonthDelta ? `${monthOverMonthDelta.income >= 0 ? '+' : ''}$${Math.abs(monthOverMonthDelta.income).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : 'N/A'}
-                  </strong>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.10)', paddingTop: 12, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ flex: '1 1 300px', opacity: 0.85 }}>
-                Share your budget score to help friends compare and improve.
-              </div>
-              <button
-                type="button"
-                onClick={shareResult}
-                disabled={!isAuthed}
-                style={{ padding: '0.6rem 1rem', cursor: 'pointer', background: '#111', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
-              >
-                Copy/Share result
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <button type="button" onClick={() => setActiveSection('profile')} style={{ ...btnNeutral, fontSize: 13 }}>
+                Full score breakdown →
+              </button>
+              <button type="button" onClick={() => setActiveSection('progress')} style={{ ...btnNeutral, fontSize: 13 }}>
+                History & charts →
               </button>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: 16 }}>
-              <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Expenses breakdown (pie)</div>
-                <PieChartSvg
-                  data={monthPieData}
-                  colors={['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#14b8a6']}
-                  wrapLegend={isMobile}
-                />
-              </div>
-
-              <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Last 12 months (income vs expenses)</div>
-                {historyError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{historyError}</div> : null}
-                {historySeries.length ? (
-                  <LineChartSvg
-                    data={historySeries.map((d) => ({
-                      month: d.month,
-                      expensesTotal: d.expensesTotal,
-                      incomeAmount: d.incomeAmount,
-                    }))}
-                  />
-                ) : (
-                  <div style={{ opacity: 0.85, padding: '0.75rem 0' }}>No history yet.</div>
-                )}
-              </div>
-
-              <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Descending categories (your spend vs user average)</div>
-                <CategoryBarChartSvg data={monthBarData} avgByCategory={categoryAverages} compact={isMobile} />
-              </div>
-
-              <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ marginBottom: 8, opacity: 0.92, fontWeight: 700 }}>Category statistics</div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, fontSize: 13 }}>
-                  <div>Active categories: <strong>{categoryStats.nonZeroCount}</strong></div>
-                  <div>Avg per active category: <strong>${Number(categoryStats.avgPerActive).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
-                  <div>Above user average: <strong>{categoryStats.aboveAvgCount}</strong></div>
-                  <div>Top concentration: <strong>{categoryStats.topCategory} ({categoryStats.topShare.toFixed(1)}%)</strong></div>
-                </div>
-                {rudimentaryStats ? (
-                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: 13, display: 'grid', gap: 6 }}>
-                    <div style={{ fontWeight: 700 }}>Rudimentary spend statistics (over time)</div>
-                    <div>Mean monthly spend: <strong>${Number(rudimentaryStats.mean).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
-                    <div>Most spend month: <strong>{rudimentaryStats.maxMonth || 'N/A'}</strong> (${Number(rudimentaryStats.max).toLocaleString(undefined, { maximumFractionDigits: 0 })})</div>
-                    <div>Least spend month: <strong>{rudimentaryStats.minMonth || 'N/A'}</strong> (${Number(rudimentaryStats.min).toLocaleString(undefined, { maximumFractionDigits: 0 })})</div>
-                    <div>Variance: <strong>{Number(rudimentaryStats.variance).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
           </div>
         )}
 

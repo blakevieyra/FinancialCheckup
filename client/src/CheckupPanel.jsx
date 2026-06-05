@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import * as api from './api';
 import { DEFAULT_SNAPSHOT } from './checkupConstants';
+import ScoreExplainer from './ScoreExplainer';
+import RecommendationTimeline from './RecommendationTimeline';
+import ImprovementRoadmap from './ImprovementRoadmap';
 
 const fieldGrid = (isMobile) => ({
   display: 'grid',
@@ -13,14 +16,20 @@ function ActionPlanBlock({ actionPlan, cardSoftStyle, compact }) {
   if (!items.length) return null;
   return (
     <div style={{ ...cardSoftStyle, padding: '0.85rem' }}>
-      <div style={{ fontWeight: 700, marginBottom: 10 }}>Your next steps</div>
+      <div style={{ fontWeight: 700, marginBottom: 10 }}>Top priorities right now</div>
       <div style={{ display: 'grid', gap: 10 }}>
         {items.map((item, i) => (
           <div key={`${item.title}-${i}`} style={{ borderLeft: `3px solid ${item.priority === 'HIGH' ? '#ef4444' : '#f59e0b'}`, paddingLeft: 10 }}>
             <div style={{ fontWeight: 700, fontSize: 14 }}>
               #{i + 1} [{item.priority}] {item.title}
+              {item.horizon ? (
+                <span style={{ fontWeight: 500, fontSize: 10, marginLeft: 6, opacity: 0.7 }}>
+                  {item.horizon === 'wealth' ? 'long-term' : 'security'}
+                </span>
+              ) : null}
             </div>
             <div style={{ fontSize: 13, opacity: 0.88, marginTop: 4 }}>{item.detail}</div>
+            {item.steps?.[0] ? <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>Start: {item.steps[0]}</div> : null}
             {item.timeline ? <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>{item.timeline}</div> : null}
           </div>
         ))}
@@ -87,6 +96,7 @@ export default function CheckupPanel({
   btnNeutral,
   ledger,
   onResult,
+  onGoTab,
   showForm = true,
   showDetails = true,
   showHistory = true,
@@ -324,7 +334,28 @@ export default function CheckupPanel({
 
       {result ? (
         <>
+          {result.improvementRoadmap ? (
+            <ImprovementRoadmap
+              roadmap={result.improvementRoadmap}
+              compact={!showDetails}
+              cardSoftStyle={cardSoftStyle}
+              onGoTab={onGoTab}
+              btnNeutral={btnNeutral}
+            />
+          ) : null}
           <ActionPlanBlock actionPlan={result.actionPlan} cardSoftStyle={cardSoftStyle} compact={!showDetails} />
+          {showDetails && result.scoreExplanation ? (
+            <ScoreExplainer
+              explanation={result.scoreExplanation}
+              isMobile={isMobile}
+              cardSoftStyle={cardSoftStyle}
+              onGoTab={onGoTab}
+              btnNeutral={btnNeutral}
+            />
+          ) : null}
+          {showDetails && result.recommendationTimeline?.length ? (
+            <RecommendationTimeline timeline={result.recommendationTimeline} cardSoftStyle={cardSoftStyle} />
+          ) : null}
           {showDetails ? <DetailCards result={result} isTablet={isTablet} cardSoftStyle={cardSoftStyle} /> : null}
           {showHistory && history.length > 1 ? (
             <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>

@@ -127,9 +127,9 @@ router.get('/latest', async (req, res) => {
 
 router.get('/history', async (req, res) => {
   try {
-    const limit = Math.min(24, Math.max(1, Number(req.query.limit) || 12));
+    const limit = Math.min(36, Math.max(1, Number(req.query.limit) || 24));
     const rows = await dbAll(
-      `SELECT month, overall_score, created_at
+      `SELECT month, overall_score, snapshot_json, result_json, created_at
        FROM checkup_history
        WHERE user_id = ?
        ORDER BY created_at DESC
@@ -137,11 +137,31 @@ router.get('/history', async (req, res) => {
       [req.user.id, limit],
     );
     return res.json({
-      history: rows.map((r) => ({
-        month: r.month,
-        overallScore: Number(r.overall_score),
-        createdAt: r.created_at,
-      })),
+      history: rows.map((r) => {
+        let snap = {};
+        let result = {};
+        try {
+          snap = JSON.parse(r.snapshot_json || '{}');
+        } catch {
+          snap = {};
+        }
+        try {
+          result = JSON.parse(r.result_json || '{}');
+        } catch {
+          result = {};
+        }
+        const income = Number(snap.income) || 0;
+        const expenses = Number(snap.monthlyExpenses) || 0;
+        return {
+          month: r.month,
+          overallScore: Number(r.overall_score),
+          createdAt: r.created_at,
+          income,
+          expenses,
+          surplus: income - expenses,
+          topRecommendations: (result.actionPlan || []).slice(0, 3).map((i) => i.title),
+        };
+      }),
     });
   } catch (e) {
     console.error(e);

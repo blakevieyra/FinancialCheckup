@@ -25,10 +25,13 @@ export default function ScoreHero({
       <div style={{ ...cardSoftStyle, padding: '1rem', display: 'grid', gap: 10 }}>
         <div style={{ fontWeight: 800, fontSize: isMobile ? 17 : 19 }}>Your financial score</div>
         <p style={{ margin: 0, opacity: 0.88, fontSize: 14, lineHeight: 1.45 }}>
-          Add your <button type="button" onClick={onGoMoney} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>income & spending</button>
-          {' '}for {month}, then complete your{' '}
-          <button type="button" onClick={onGoProfile} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>profile</button>
-          {' '}to get your 0–100 score across 6 areas.
+          <strong>Step 1:</strong>{' '}
+          <button type="button" onClick={onGoMoney} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Money</button>
+          {' '}→ income & spending.{' '}
+          <strong>Step 2:</strong>{' '}
+          <button type="button" onClick={onGoProfile} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Profile</button>
+          {' '}→ savings, insurance, retirement.{' '}
+          <strong>Step 3:</strong> Update score for your security + long-term plan.
         </p>
         <button type="button" onClick={onUpdateScore} disabled={updateBusy} style={{ ...btnPrimary, justifySelf: 'start' }}>
           {updateBusy ? 'Calculating…' : 'Calculate my score'}
@@ -39,6 +42,8 @@ export default function ScoreHero({
 
   const color = ringColor(result.overallScore);
   const budgetDim = (result.dimensions || []).find((d) => d.key === 'budget');
+  const sec = result.scoreExplanation?.securityScore ?? result.improvementRoadmap?.securityScore;
+  const wealth = result.scoreExplanation?.wealthScore ?? result.improvementRoadmap?.wealthScore;
 
   return (
     <div style={{ ...cardSoftStyle, padding: '1rem', display: 'grid', gap: 12 }}>
@@ -61,12 +66,22 @@ export default function ScoreHero({
           {Math.round(result.overallScore)}
         </div>
         <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <div style={{ fontSize: 12, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Financial Checkup Score</div>
+          <div style={{ fontSize: 12, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Financial Checkup Score (weighted)</div>
           <div style={{ fontWeight: 800, fontSize: isMobile ? 18 : 22, lineHeight: 1.25 }}>{result.headline}</div>
           <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6 }}>
             Budget (from Money): ${Number(income || 0).toLocaleString()} in · ${Number(totalExpenses || 0).toLocaleString()} out · grade <strong>{budgetGrade}</strong>
-            {budgetDim ? <> · budget dimension <strong>{Math.round(budgetDim.score)}</strong></> : null}
+            {budgetDim ? <> · budget <strong>{Math.round(budgetDim.score)}</strong></> : null}
           </div>
+          {sec != null && wealth != null ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, fontSize: 12 }}>
+              <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)' }}>
+                Security <strong>{Math.round(sec)}</strong>
+              </span>
+              <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)' }}>
+                Long-term <strong>{Math.round(wealth)}</strong>
+              </span>
+            </div>
+          ) : null}
         </div>
         <button type="button" onClick={onUpdateScore} disabled={updateBusy} style={{ ...btnPrimary, alignSelf: isMobile ? 'stretch' : 'center' }}>
           {updateBusy ? 'Updating…' : 'Update score'}

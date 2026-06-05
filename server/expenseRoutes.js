@@ -103,7 +103,7 @@ router.delete('/category', async (req, res) => {
 router.get('/history', async (req, res) => {
   try {
     const rows = await dbAll(
-      'SELECT month, SUM(amount) as total FROM expenses WHERE user_id = ? GROUP BY month ORDER BY month ASC LIMIT 12',
+      'SELECT month, SUM(amount) as total FROM expenses WHERE user_id = ? GROUP BY month ORDER BY month DESC LIMIT 24',
       [req.user.id],
     );
     res.json(rows);

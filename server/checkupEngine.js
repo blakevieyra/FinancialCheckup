@@ -271,6 +271,354 @@ function simulateDebtPayoff(debts, extraMonthly, strategy) {
   };
 }
 
+/** Weights reflect total financial health — cash flow and safety matter most. */
+const DIMENSION_WEIGHTS = {
+  budget: 0.25,
+  savings: 0.2,
+  debt: 0.18,
+  retirement: 0.13,
+  investments: 0.12,
+  insurance: 0.12,
+};
+
+/** Short-term security vs long-term wealth building. */
+const HORIZON_MAP = {
+  budget: 'security',
+  savings: 'security',
+  debt: 'security',
+  insurance: 'security',
+  retirement: 'wealth',
+  investments: 'wealth',
+};
+
+const HORIZON_WEIGHTS = {
+  security: { budget: 0.35, savings: 0.3, debt: 0.2, insurance: 0.15 },
+  wealth: { retirement: 0.55, investments: 0.45 },
+};
+
+const TAB_FOR_DIMENSION = {
+  budget: 'money',
+  savings: 'profile',
+  debt: 'profile',
+  insurance: 'profile',
+  retirement: 'profile',
+  investments: 'profile',
+};
+
+function computeOverallScore(dimensions) {
+  let weighted = 0;
+  for (const d of dimensions) {
+    const w = DIMENSION_WEIGHTS[d.key] ?? 1 / 6;
+    weighted += d.score * w;
+  }
+  return Number(weighted.toFixed(1));
+}
+
+function computeHorizonScore(dimensions, horizon) {
+  const weights = HORIZON_WEIGHTS[horizon] || {};
+  let weighted = 0;
+  let wSum = 0;
+  for (const d of dimensions) {
+    if (HORIZON_MAP[d.key] !== horizon) continue;
+    const w = weights[d.key];
+    if (!w) continue;
+    weighted += d.score * w;
+    wSum += w;
+  }
+  return wSum > 0 ? Number((weighted / wSum).toFixed(1)) : 0;
+}
+
+function estimateScoreLift(dimKey, currentScore, target = 75) {
+  const w = DIMENSION_WEIGHTS[dimKey] ?? 0;
+  return Number((Math.max(0, target - currentScore) * w).toFixed(1));
+}
+
+function concreteActionsForDimension(key, dim, snap) {
+  switch (key) {
+    case 'budget': {
+      const over = snap.income > 0 && snap.monthlyExpenses > snap.income ? snap.monthlyExpenses - snap.income : 0;
+      if (snap.income <= 0) {
+        return ['Open Money tab → enter your monthly take-home income → Save Income.'];
+      }
+      if (over > 0) {
+        return [
+          `Money tab → find categories totaling $${Math.ceil(over).toLocaleString()}/mo to reduce.`,
+          'Lower dining, subscriptions, or discretionary lines first — save expenses.',
+          'Overview → Update score once spending is at or below income.',
+        ];
+      }
+      return [
+        'Money tab → keep total expenses under 80% of income each month.',
+        'Review Progress charts monthly for category drift.',
+        'Update score after any income or spending change.',
+      ];
+    }
+    case 'savings': {
+      const target = dim.targetEmergencyFund || snap.monthlyExpenses * 3;
+      const monthly = snap.monthlySavings > 0 ? snap.monthlySavings : Math.max(50, Math.round(snap.income * 0.05));
+      const months = monthly > 0 ? Math.ceil((dim.gap || target) / monthly) : null;
+      return [
+        `Profile → Emergency fund: enter current balance ($${snap.emergencyFund.toLocaleString()}).`,
+        `Profile → Monthly savings: set $${monthly.toLocaleString()}/mo auto-transfer on payday.`,
+        months
+          ? `Save $${monthly.toLocaleString()}/mo → $${target.toLocaleString()} fund in ~${months} months.`
+          : `Build to $${target.toLocaleString()} (3 months of expenses).`,
+        'Update score after each month you add to the fund.',
+      ];
+    }
+    case 'debt':
+      return [
+        'Profile → Debts: add each loan/card with balance, APR, and minimum payment.',
+        'Pick avalanche (highest APR first) or snowball (smallest balance first).',
+        'Send any monthly surplus (after bills) as extra payment — track in Profile.',
+        'Update score when balances drop.',
+      ];
+    case 'insurance':
+      return [
+        'Profile → check Life insurance if dependents rely on your income.',
+        'Profile → check Disability insurance (~60–65% income replacement).',
+        'Profile → check Umbrella liability if you have assets or a home.',
+        'Update score after each policy is in place.',
+      ];
+    case 'retirement': {
+      const bump = Math.max(25, Math.round((dim.catchUpMonthly || 0) / 4));
+      return [
+        `Profile → Retirement balance: log 401(k)/IRA total ($${snap.retirementBalance.toLocaleString()}).`,
+        `Profile → Monthly contribution: add $${bump.toLocaleString()}/mo this month.`,
+        dim.catchUpMonthly > 0
+          ? `Ramp toward +$${dim.catchUpMonthly.toLocaleString()}/mo over 2–3 months.`
+          : 'Aim for 10–15% of income toward retirement.',
+        'Update score quarterly as balance grows.',
+      ];
+    }
+    case 'investments':
+      return snap.investmentTotal > 0
+        ? [
+            'Profile → verify stock/bond/international/cash allocation matches your age.',
+            'Target broad diversification and fees under 0.5%/yr.',
+            'Rebalance once per year or after large market moves.',
+            'Update score after rebalancing.',
+          ]
+        : [
+            'Open or log an IRA, Roth IRA, or taxable brokerage in Profile.',
+            'Start with low-cost index funds — even $50–100/mo builds the score.',
+            'Enter portfolio total and allocation percentages in Profile.',
+            'Update score once balance is recorded.',
+          ];
+    default:
+      return [suggestImprovement(key, dim, snap)];
+  }
+}
+
+function explainDimension(key, dim, snap) {
+  switch (key) {
+    case 'budget':
+      if (snap.income <= 0) return 'No income entered — we cannot measure whether spending is sustainable.';
+      if (snap.monthlyExpenses > snap.income) {
+        return `You spend $${(snap.monthlyExpenses - snap.income).toLocaleString()} more than you earn each month.`;
+      }
+      return dim.summary || 'Spending is within income.';
+    case 'debt':
+      return dim.totalBalance > 0
+        ? `Reported debt balances affect payoff timeline and cash-flow stress.`
+        : 'No debt balances on file — loan/credit card spending in Money does not count until you add balances in Profile.';
+    case 'savings':
+      return `${dim.emergencyMonths ?? 0} months of expenses saved · target 3–6 months ($${(dim.targetEmergencyFund || 0).toLocaleString()}).`;
+    case 'investments':
+      return snap.investmentTotal > 0 ? dim.summary : 'Starting or reporting an investment balance unlocks diversification scoring.';
+    case 'insurance':
+      return dim.score >= 99 ? 'Core coverage types reported.' : 'Missing coverage leaves income and assets exposed to shocks.';
+    case 'retirement':
+      return dim.onTrack ? dim.summary : `Behind age benchmark of $${(dim.benchmarkBalance || 0).toLocaleString()}.`;
+    default:
+      return dim.summary || '';
+  }
+}
+
+function suggestImprovement(key, dim, snap) {
+  switch (key) {
+    case 'budget': {
+      if (snap.income <= 0) return 'Enter income on the Money tab.';
+      const over = snap.monthlyExpenses - snap.income;
+      if (over > 0) return `Cut or reallocate $${Math.ceil(over).toLocaleString()}/mo to break even, then Update score.`;
+      return 'Keep expense ratio under 80% of income.';
+    }
+    case 'debt':
+      return dim.totalBalance > 0 ? 'Add extra payments in Profile debts or use the debt planner.' : 'Add real balances for loans/cards in Profile if you carry debt.';
+    case 'savings':
+      return snap.monthlySavings > 0
+        ? `Auto-save $${snap.monthlySavings.toLocaleString()}/mo until emergency fund hits $${(dim.targetEmergencyFund || 0).toLocaleString()}.`
+        : `Set a monthly savings amount and build $${(dim.targetEmergencyFund || snap.monthlyExpenses * 3).toLocaleString()} (3 mo expenses).`;
+    case 'investments':
+      return snap.investmentTotal > 0 ? 'Rebalance toward age-appropriate equity and lower fees.' : 'Open an IRA or increase employer plan contributions.';
+    case 'insurance':
+      return 'Check life, disability, and umbrella boxes in Profile as you obtain coverage.';
+    case 'retirement':
+      return dim.catchUpMonthly > 0
+        ? `Increase retirement contributions by $${dim.catchUpMonthly.toLocaleString()}/mo.`
+        : 'Log retirement balance and monthly contributions in Profile.';
+    default:
+      return `Improve ${dim.label.toLowerCase()} score above 75.`;
+  }
+}
+
+function buildImprovementRoadmap(dimensions, snap) {
+  const securityScore = computeHorizonScore(dimensions, 'security');
+  const wealthScore = computeHorizonScore(dimensions, 'wealth');
+  const tracks = { security: [], wealth: [] };
+  let globalStep = 1;
+
+  const addStep = (horizon, dim) => {
+    if (!dim || dim.score >= 80) return;
+    const actions = concreteActionsForDimension(dim.key, dim, snap);
+    tracks[horizon].push({
+      step: globalStep,
+      horizon,
+      dimension: dim.key,
+      dimensionLabel: dim.label,
+      title: dim.key === 'budget' && snap.monthlyExpenses > snap.income
+        ? 'Stop spending more than you earn'
+        : dim.key === 'savings'
+          ? 'Build your emergency safety net'
+          : dim.key === 'insurance'
+            ? 'Cover income and asset risks'
+            : dim.key === 'debt'
+              ? 'Reduce debt stress'
+              : dim.key === 'retirement'
+                ? 'Catch up on retirement savings'
+                : dim.key === 'investments'
+                  ? 'Grow long-term invested wealth'
+                  : `Strengthen ${dim.label.toLowerCase()}`,
+      why: explainDimension(dim.key, dim, snap),
+      actions,
+      goToTab: TAB_FOR_DIMENSION[dim.key] || 'profile',
+      potentialLift: estimateScoreLift(dim.key, dim.score),
+      currentScore: dim.score,
+      targetScore: 75,
+      timeframe:
+        dim.key === 'budget' ? 'now'
+          : dim.key === 'savings' || dim.key === 'insurance' ? '30d'
+            : dim.key === 'debt' ? '90d'
+              : '6mo',
+    });
+    globalStep += 1;
+  };
+
+  const byScore = (a, b) => a.score - b.score;
+  const securityOrder = ['budget', 'savings', 'insurance', 'debt'];
+  for (const key of securityOrder) {
+    addStep('security', dimensions.find((d) => d.key === key));
+  }
+  dimensions.filter((d) => HORIZON_MAP[d.key] === 'security' && !securityOrder.includes(d.key)).sort(byScore).forEach((d) => addStep('security', d));
+
+  const wealthOrder = ['retirement', 'investments'];
+  for (const key of wealthOrder) {
+    addStep('wealth', dimensions.find((d) => d.key === key));
+  }
+
+  tracks.security.push({
+    step: globalStep,
+    horizon: 'security',
+    dimension: 'recap',
+    dimensionLabel: 'Refresh',
+    title: 'Re-check your security score',
+    why: 'Short-term security improves when cash flow, savings, insurance, and debt are all updated.',
+    actions: [
+      'After any Money or Profile change → Overview → Update score.',
+      'Repeat monthly until Security score is 75+.',
+    ],
+    goToTab: 'overview',
+    potentialLift: 0,
+    currentScore: securityScore,
+    targetScore: 75,
+    timeframe: 'now',
+    isRecap: true,
+  });
+  globalStep += 1;
+
+  tracks.wealth.push({
+    step: globalStep,
+    horizon: 'wealth',
+    dimension: 'recap',
+    dimensionLabel: 'Refresh',
+    title: 'Re-check your long-term health score',
+    why: 'Wealth score rises as retirement contributions and investments grow over quarters and years.',
+    actions: [
+      'Update retirement balance and contributions in Profile each quarter.',
+      'Overview → Update score to track progress on the Progress tab.',
+    ],
+    goToTab: 'overview',
+    potentialLift: 0,
+    currentScore: wealthScore,
+    targetScore: 75,
+    timeframe: '6mo',
+    isRecap: true,
+  });
+
+  const totalPotentialLift = [...tracks.security, ...tracks.wealth]
+    .filter((s) => !s.isRecap)
+    .reduce((sum, s) => sum + (s.potentialLift || 0), 0);
+
+  return {
+    securityScore,
+    wealthScore,
+    currentOverallScore: computeOverallScore(dimensions),
+    securityLabel: 'Short-term security',
+    wealthLabel: 'Long-term health',
+    securityIntro:
+      'Protect yourself this month and the next 90 days: live within your means, build a cash buffer, insure risks, and control debt.',
+    wealthIntro:
+      'Build wealth over years: fund retirement consistently and grow investments aligned with your age and goals.',
+    tracks,
+    totalSteps: globalStep,
+    totalPotentialLift: Number(Math.min(100, totalPotentialLift).toFixed(1)),
+    projectedScore: Number(Math.min(100, computeOverallScore(dimensions) + totalPotentialLift).toFixed(1)),
+    alwaysDo: 'Save changes on Money or Profile → tap Update score on Overview → watch Progress history.',
+  };
+}
+
+function buildScoreExplanation(dimensions, overallScore, snap) {
+  const securityScore = computeHorizonScore(dimensions, 'security');
+  const wealthScore = computeHorizonScore(dimensions, 'wealth');
+  return {
+    summary:
+      'Your Financial Checkup Score blends short-term security (cash flow, emergency fund, insurance, debt) and long-term health (retirement, investments). Fix security first — it unlocks room to invest.',
+    formula:
+      'Total = Budget 25% + Savings 20% + Debt 18% + Retirement 13% + Investments 12% + Insurance 12%. Security track = Budget/Savings/Debt/Insurance. Wealth track = Retirement/Investments.',
+    securityScore,
+    wealthScore,
+    securitySummary:
+      securityScore >= 75
+        ? 'Short-term security is solid — maintain your buffer and coverage.'
+        : securityScore >= 50
+          ? 'Security needs work — prioritize budget balance and emergency savings before investing more.'
+          : 'Security is at risk — stop overspending and build a cash buffer before long-term goals.',
+    wealthSummary:
+      wealthScore >= 75
+        ? 'Long-term trajectory looks healthy — stay consistent with contributions.'
+        : wealthScore >= 50
+          ? 'Wealth building is underway — increase retirement contributions steadily.'
+          : 'Long-term health is behind — start retirement contributions even if small.',
+    dimensions: dimensions.map((d) => ({
+      key: d.key,
+      label: d.label,
+      score: d.score,
+      grade: d.grade,
+      horizon: HORIZON_MAP[d.key] || 'security',
+      weightPct: Math.round((DIMENSION_WEIGHTS[d.key] ?? 0) * 100),
+      contribution: Number((d.score * (DIMENSION_WEIGHTS[d.key] ?? 0)).toFixed(1)),
+      summary: d.summary,
+      why: explainDimension(d.key, d, snap),
+      improveBy: suggestImprovement(d.key, d, snap),
+      actions: concreteActionsForDimension(d.key, d, snap),
+      potentialLift: estimateScoreLift(d.key, d.score),
+      goToTab: TAB_FOR_DIMENSION[d.key] || 'profile',
+    })),
+    overallScore,
+    overallGrade: gradeFromScore(overallScore),
+  };
+}
+
 function buildActionPlan(dimensions, snap) {
   const items = [];
   const sorted = [...dimensions].sort((a, b) => a.score - b.score);
@@ -280,9 +628,22 @@ function buildActionPlan(dimensions, snap) {
     const mo = snap.monthlySavings > 0 ? Math.ceil(savings.gap / snap.monthlySavings) : null;
     items.push({
       priority: savings.score < 55 ? 'HIGH' : 'MED',
+      horizon: 'security',
+      timeframe: mo && mo <= 3 ? '90d' : mo && mo <= 6 ? '6mo' : '30d',
       title: 'Build emergency fund',
       detail: `Target: $${savings.targetEmergencyFund.toLocaleString()} (3 months) · Current: $${snap.emergencyFund.toLocaleString()} · Gap: $${savings.gap.toLocaleString()}`,
       timeline: snap.monthlySavings > 0 ? `Save $${snap.monthlySavings.toLocaleString()}/mo → funded in ${mo} months` : 'Set a monthly savings amount to close the gap.',
+      steps: snap.monthlySavings > 0
+        ? [
+            `Transfer $${snap.monthlySavings.toLocaleString()} to a dedicated savings account on payday.`,
+            `Track balance until you reach $${savings.targetEmergencyFund.toLocaleString()}.`,
+            'Re-run checkup monthly to watch your savings score rise.',
+          ]
+        : [
+            `Pick a fixed amount (start with $${Math.max(50, Math.round(snap.income * 0.05)).toLocaleString()}/mo if unsure).`,
+            `Enter it as Monthly savings in Profile.`,
+            `Build toward $${savings.targetEmergencyFund.toLocaleString()} (3 months of expenses).`,
+          ],
     });
   }
 
@@ -290,8 +651,15 @@ function buildActionPlan(dimensions, snap) {
   if (invest && invest.score < 75 && snap.investmentTotal > 0) {
     items.push({
       priority: 'MED',
+      horizon: 'wealth',
+      timeframe: '90d',
       title: 'Rebalance investment portfolio',
       detail: `Add ${Math.max(0, 15 - snap.internationalPct).toFixed(0)}% international equity exposure · Target equity ~${invest.allocation?.targetEquityPct ?? 70}% for your age`,
+      steps: [
+        'Review current stock/bond/international/cash split in Profile.',
+        `Shift toward ~${invest.allocation?.targetEquityPct ?? 70}% equity for your age.`,
+        'Confirm fund fees are under 0.5%/yr where possible.',
+      ],
     });
   }
 
@@ -301,8 +669,15 @@ function buildActionPlan(dimensions, snap) {
     if (dis) {
       items.push({
         priority: 'MED',
+        horizon: 'security',
+        timeframe: '30d',
         title: 'Close disability insurance gap',
         detail: `Estimated cost: $${dis.estMonthlyCost}/month · Replaces $${dis.replacesMonthly?.toLocaleString()}/mo if unable to work`,
+        steps: [
+          'Get quotes from employer benefits or an independent broker.',
+          `Budget ~$${dis.estMonthlyCost}/mo for long-term disability coverage.`,
+          'Check the box in Profile once active and Update score.',
+        ],
       });
     }
   }
@@ -311,8 +686,15 @@ function buildActionPlan(dimensions, snap) {
   if (debt && debt.totalBalance > 0 && debt.score < 70) {
     items.push({
       priority: debt.score < 50 ? 'HIGH' : 'MED',
+      horizon: 'security',
+      timeframe: '6mo',
       title: 'Accelerate debt payoff',
       detail: `$${debt.totalBalance.toLocaleString()} outstanding · Compare avalanche vs snowball in the debt planner`,
+      steps: [
+        'List each debt with balance, APR, and minimum payment in Profile.',
+        'Choose avalanche (highest APR first) or snowball (smallest balance first).',
+        'Apply any monthly surplus after essentials toward extra payments.',
+      ],
     });
   }
 
@@ -320,17 +702,38 @@ function buildActionPlan(dimensions, snap) {
   if (ret && !ret.onTrack) {
     items.push({
       priority: ret.score < 55 ? 'HIGH' : 'MED',
+      horizon: 'wealth',
+      timeframe: ret.catchUpMonthly > 200 ? '6mo' : '90d',
       title: 'Boost retirement contributions',
       detail: `Catch-up: +$${ret.catchUpMonthly.toLocaleString()}/mo to reach age benchmark of $${ret.benchmarkBalance.toLocaleString()}`,
+      steps: [
+        `Increase 401(k)/IRA by $${Math.max(25, Math.round(ret.catchUpMonthly / 4)).toLocaleString()}/mo this month.`,
+        `Work up to +$${ret.catchUpMonthly.toLocaleString()}/mo over the next 2–3 months.`,
+        'Update retirement balance in Profile each quarter.',
+      ],
     });
   }
 
   const budget = dimensions.find((d) => d.key === 'budget');
   if (budget && budget.score < 65 && budget.gaps?.length) {
+    const over = snap.income > 0 && snap.monthlyExpenses > snap.income ? snap.monthlyExpenses - snap.income : 0;
     items.push({
       priority: budget.score < 50 ? 'HIGH' : 'MED',
+      horizon: 'security',
+      timeframe: 'now',
       title: 'Fix budget gaps',
       detail: budget.gaps[0],
+      steps: over > 0
+        ? [
+            `On Money tab, identify categories totaling at least $${Math.ceil(over).toLocaleString()}/mo to trim.`,
+            'Cut dining, subscriptions, or discretionary lines first.',
+            'Save expenses, then Update score to refresh your budget dimension.',
+          ]
+        : [
+            'Review top spending categories on the Progress tab charts.',
+            budget.gaps[0],
+            'Update score after changes.',
+          ],
     });
   }
 
@@ -340,12 +743,32 @@ function buildActionPlan(dimensions, snap) {
     if (dim.score >= 80) continue;
     items.push({
       priority: dim.score < 55 ? 'HIGH' : 'MED',
+      horizon: HORIZON_MAP[dim.key] || 'security',
+      timeframe: '90d',
       title: `Improve ${dim.label.toLowerCase()}`,
       detail: dim.summary,
+      steps: concreteActionsForDimension(dim.key, dim, snap),
     });
   }
 
   return items.slice(0, 6);
+}
+
+const TIMEFRAME_LABELS = {
+  now: 'This month',
+  '30d': 'Next 30 days',
+  '90d': 'Next 90 days',
+  '6mo': '6+ months',
+};
+
+function buildRecommendationTimeline(actionPlan) {
+  const order = ['now', '30d', '90d', '6mo'];
+  const phases = order.map((tf) => ({
+    timeframe: tf,
+    label: TIMEFRAME_LABELS[tf],
+    items: (actionPlan || []).filter((i) => (i.timeframe || '90d') === tf),
+  }));
+  return phases.filter((p) => p.items.length > 0);
 }
 
 function runCheckup(rawSnapshot) {
@@ -359,10 +782,12 @@ function runCheckup(rawSnapshot) {
     scoreRetirement(snap),
   ];
 
-  const overallScore = Number(
-    (dimensions.reduce((s, d) => s + d.score, 0) / dimensions.length).toFixed(1),
-  );
+  const overallScore = computeOverallScore(dimensions);
   const overallGrade = gradeFromScore(overallScore);
+  const scoreExplanation = buildScoreExplanation(dimensions, overallScore, snap);
+  const actionPlan = buildActionPlan(dimensions, snap);
+  const recommendationTimeline = buildRecommendationTimeline(actionPlan);
+  const improvementRoadmap = buildImprovementRoadmap(dimensions, snap);
   const weakCount = dimensions.filter((d) => d.score < 75).length;
   const headline =
     overallScore >= 85
@@ -386,7 +811,10 @@ function runCheckup(rawSnapshot) {
     headline,
     expenseRatioGrade: gradeFromExpenseRatio(snap.income > 0 ? (snap.monthlyExpenses / snap.income) * 100 : null),
     dimensions,
-    actionPlan: buildActionPlan(dimensions, snap),
+    scoreExplanation,
+    improvementRoadmap,
+    actionPlan,
+    recommendationTimeline,
     budgetGapAnalysis: dimensions.find((d) => d.key === 'budget')?.gaps || [],
     debtPlanner,
     insuranceGaps: dimensions.find((d) => d.key === 'insurance')?.gaps || [],
@@ -456,4 +884,6 @@ module.exports = {
   extractExtendedProfile,
   mergeSnapshotWithLedger,
   gradeFromScore,
+  DIMENSION_WEIGHTS,
+  computeOverallScore,
 };
