@@ -753,7 +753,16 @@ export default function App() {
     setCheckupBusy(true);
     setError('');
     try {
-      const data = await api.runCheckup(token, { month, snapshot: {} });
+      let excludedFromScore = checkupResult?.excludedFromScore;
+      if (!Array.isArray(excludedFromScore)) {
+        try {
+          const saved = JSON.parse(localStorage.getItem('fc-checkup-extended') || '{}');
+          excludedFromScore = Array.isArray(saved.excludedFromScore) ? saved.excludedFromScore : [];
+        } catch {
+          excludedFromScore = [];
+        }
+      }
+      const data = await api.runCheckup(token, { month, snapshot: { excludedFromScore } });
       handleCheckupResult(data);
       await loadHistory();
     } catch (e) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as api from './api';
-import { DEFAULT_SNAPSHOT } from './checkupConstants';
+import { DEFAULT_SNAPSHOT, DIMENSION_LABELS } from './checkupConstants';
 import ScoreExplainer from './ScoreExplainer';
 import RecommendationTimeline from './RecommendationTimeline';
 import ImprovementRoadmap from './ImprovementRoadmap';
@@ -143,6 +143,7 @@ export default function CheckupPanel({
       targetRetirementAge,
       retirementBalance,
       monthlyRetirementContribution,
+      excludedFromScore,
     } = s;
     return {
       debts,
@@ -161,7 +162,21 @@ export default function CheckupPanel({
       targetRetirementAge,
       retirementBalance,
       monthlyRetirementContribution,
+      excludedFromScore: Array.isArray(excludedFromScore) ? excludedFromScore : [],
     };
+  }
+
+  function toggleScoreDimension(key) {
+    setExtended((prev) => {
+      const excluded = new Set(prev.excludedFromScore || []);
+      if (excluded.has(key)) {
+        excluded.delete(key);
+      } else {
+        if (DIMENSION_LABELS.length - excluded.size <= 1) return prev;
+        excluded.add(key);
+      }
+      return { ...prev, excludedFromScore: [...excluded] };
+    });
   }
 
   useEffect(() => {
@@ -236,6 +251,31 @@ export default function CheckupPanel({
               <strong>Money tab ({month}):</strong> ${Number(income || 0).toLocaleString()} income · ${Number(expenses || 0).toLocaleString()} expenses
             </div>
           ) : null}
+
+          <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Overall score — include or exclude categories</div>
+            <p style={{ margin: '0 0 10px', fontSize: 13, opacity: 0.85, lineHeight: 1.45 }}>
+              Uncheck a category to remove it from your <strong>total</strong> score. It still appears individually. At least one category must stay included.
+            </p>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {DIMENSION_LABELS.map(({ key, label }) => {
+                const included = !(extended.excludedFromScore || []).includes(key);
+                return (
+                  <label key={key} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={included}
+                      onChange={() => toggleScoreDimension(key)}
+                    />
+                    <span>
+                      Include <strong>{label}</strong> in overall score
+                      {!included ? <span style={{ opacity: 0.65, marginLeft: 6 }}>(excluded from total)</span> : null}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
 
           {isGuest ? (
             <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>

@@ -51,6 +51,7 @@ function normalizeSnapshot(raw = {}) {
     targetRetirementAge: num(raw.targetRetirementAge, 65),
     retirementBalance: num(raw.retirementBalance),
     monthlyRetirementContribution: num(raw.monthlyRetirementContribution),
+    excludedFromScore: normalizeExcludedFromScore(raw.excludedFromScore),
   };
 }
 
@@ -281,6 +282,33 @@ const DIMENSION_WEIGHTS = {
   insurance: 0.12,
 };
 
+const SCORABLE_DIMENSION_KEYS = Object.keys(DIMENSION_WEIGHTS);
+
+function normalizeExcludedFromScore(raw) {
+  const list = Array.isArray(raw) ? raw.filter((k) => SCORABLE_DIMENSION_KEYS.includes(k)) : [];
+  if (list.length >= SCORABLE_DIMENSION_KEYS.length) return [];
+  return [...new Set(list)];
+}
+
+function getEffectiveWeights(excludedFromScore = []) {
+  const excluded = new Set(normalizeExcludedFromScore(excludedFromScore));
+  let rawSum = 0;
+  const raw = {};
+  for (const key of SCORABLE_DIMENSION_KEYS) {
+    if (excluded.has(key)) continue;
+    raw[key] = DIMENSION_WEIGHTS[key];
+    rawSum += DIMENSION_WEIGHTS[key];
+  }
+  if (rawSum <= 0) {
+    return { weights: { ...DIMENSION_WEIGHTS }, included: [...SCORABLE_DIMENSION_KEYS] };
+  }
+  const weights = {};
+  for (const [key, w] of Object.entries(raw)) {
+    weights[key] = w / rawSum;
+  }
+  return { weights, included: Object.keys(weights) };
+}
+
 /** Short-term security vs long-term wealth building. */
 const HORIZON_MAP = {
   budget: 'security',
@@ -305,32 +333,50 @@ const TAB_FOR_DIMENSION = {
   investments: 'profile',
 };
 
-function computeOverallScore(dimensions) {
+function computeOverallScore(dimensions, excludedFromScore = []) {
+  const { weights } = getEffectiveWeights(excludedFromScore);
   let weighted = 0;
   for (const d of dimensions) {
-    const w = DIMENSION_WEIGHTS[d.key] ?? 1 / 6;
+    const w = weights[d.key];
+    if (w == null) continue;
     weighted += d.score * w;
   }
   return Number(weighted.toFixed(1));
 }
 
-function computeHorizonScore(dimensions, horizon) {
+function computeHorizonScore(dimensions, horizon, excludedFromScore = []) {
+  const excluded = new Set(normalizeExcludedFromScore(excludedFromScore));
   const weights = HORIZON_WEIGHTS[horizon] || {};
   let weighted = 0;
   let wSum = 0;
   for (const d of dimensions) {
-    if (HORIZON_MAP[d.key] !== horizon) continue;
+    if (HORIZON_MAP[d.key] !== horizon || excluded.has(d.key)) continue;
     const w = weights[d.key];
     if (!w) continue;
     weighted += d.score * w;
     wSum += w;
   }
-  return wSum > 0 ? Number((weighted / wSum).toFixed(1)) : 0;
+  return wSum > 0 ? Number((weighted / wSum).toFixed(1)) : null;
 }
 
-function estimateScoreLift(dimKey, currentScore, target = 75) {
-  const w = DIMENSION_WEIGHTS[dimKey] ?? 0;
+function estimateScoreLift(dimKey, currentScore, excludedFromScore = [], target = 75) {
+  if (normalizeExcludedFromScore(excludedFromScore).includes(dimKey)) return 0;
+  const { weights } = getEffectiveWeights(excludedFromScore);
+  const w = weights[dimKey] ?? 0;
   return Number((Math.max(0, target - currentScore) * w).toFixed(1));
+}
+
+function buildScoreFormulaText(excludedFromScore = []) {
+  const { weights, included } = getEffectiveWeights(excludedFromScore);
+  const parts = included.map((k) => {
+    const label = k.charAt(0).toUpperCase() + k.slice(1);
+    return `${label} ${Math.round(weights[k] * 100)}%`;
+  });
+  const excluded = normalizeExcludedFromScore(excludedFromScore);
+  const excludedNote = excluded.length
+    ? ` Excluded from total: ${excluded.join(', ')}.`
+    : '';
+  return `Total uses ${parts.join(' · ')}.${excludedNote}`;
 }
 
 function concreteActionsForDimension(key, dim, snap) {
@@ -463,13 +509,15 @@ function suggestImprovement(key, dim, snap) {
 }
 
 function buildImprovementRoadmap(dimensions, snap) {
-  const securityScore = computeHorizonScore(dimensions, 'security');
-  const wealthScore = computeHorizonScore(dimensions, 'wealth');
+  const excluded = snap.excludedFromScore || [];
+  const securityScore = computeHorizonScore(dimensions, 'security', excluded);
+  const wealthScore = computeHorizonScore(dimensions, 'wealth', excluded);
   const tracks = { security: [], wealth: [] };
   let globalStep = 1;
 
   const addStep = (horizon, dim) => {
     if (!dim || dim.score >= 80) return;
+    if (excluded.includes(dim.key)) return;
     const actions = concreteActionsForDimension(dim.key, dim, snap);
     tracks[horizon].push({
       step: globalStep,
@@ -492,7 +540,7 @@ function buildImprovementRoadmap(dimensions, snap) {
       why: explainDimension(dim.key, dim, snap),
       actions,
       goToTab: TAB_FOR_DIMENSION[dim.key] || 'profile',
-      potentialLift: estimateScoreLift(dim.key, dim.score),
+      potentialLift: estimateScoreLift(dim.key, dim.score, excluded),
       currentScore: dim.score,
       targetScore: 75,
       timeframe:
@@ -558,11 +606,14 @@ function buildImprovementRoadmap(dimensions, snap) {
   const totalPotentialLift = [...tracks.security, ...tracks.wealth]
     .filter((s) => !s.isRecap)
     .reduce((sum, s) => sum + (s.potentialLift || 0), 0);
+  const currentOverallScore = computeOverallScore(dimensions, excluded);
 
   return {
-    securityScore,
-    wealthScore,
-    currentOverallScore: computeOverallScore(dimensions),
+    securityScore: securityScore ?? 0,
+    wealthScore: wealthScore ?? 0,
+    securityScoreNA: securityScore == null,
+    wealthScoreNA: wealthScore == null,
+    currentOverallScore,
     securityLabel: 'Short-term security',
     wealthLabel: 'Long-term health',
     securityIntro:
@@ -572,21 +623,29 @@ function buildImprovementRoadmap(dimensions, snap) {
     tracks,
     totalSteps: globalStep,
     totalPotentialLift: Number(Math.min(100, totalPotentialLift).toFixed(1)),
-    projectedScore: Number(Math.min(100, computeOverallScore(dimensions) + totalPotentialLift).toFixed(1)),
+    projectedScore: Number(Math.min(100, currentOverallScore + totalPotentialLift).toFixed(1)),
+    excludedFromScore: excluded,
     alwaysDo: 'Save changes on Money or Profile → tap Update score on Overview → watch Progress history.',
   };
 }
 
 function buildScoreExplanation(dimensions, overallScore, snap) {
-  const securityScore = computeHorizonScore(dimensions, 'security');
-  const wealthScore = computeHorizonScore(dimensions, 'wealth');
+  const excluded = snap.excludedFromScore || [];
+  const { weights: effectiveWeights, included } = getEffectiveWeights(excluded);
+  const securityScore = computeHorizonScore(dimensions, 'security', excluded);
+  const wealthScore = computeHorizonScore(dimensions, 'wealth', excluded);
   return {
     summary:
-      'Your Financial Checkup Score blends short-term security (cash flow, emergency fund, insurance, debt) and long-term health (retirement, investments). Fix security first — it unlocks room to invest.',
-    formula:
-      'Total = Budget 25% + Savings 20% + Debt 18% + Retirement 13% + Investments 12% + Insurance 12%. Security track = Budget/Savings/Debt/Insurance. Wealth track = Retirement/Investments.',
-    securityScore,
-    wealthScore,
+      excluded.length
+        ? `Your overall score uses ${included.length} of 6 categories (you excluded ${excluded.length}). Excluded areas still show their individual scores but do not affect the total.`
+        : 'Your Financial Checkup Score blends short-term security (cash flow, emergency fund, insurance, debt) and long-term health (retirement, investments). Fix security first — it unlocks room to invest.',
+    formula: buildScoreFormulaText(excluded),
+    excludedFromScore: excluded,
+    includedDimensions: included,
+    securityScore: securityScore ?? 0,
+    wealthScore: wealthScore ?? 0,
+    securityScoreNA: securityScore == null,
+    wealthScoreNA: wealthScore == null,
     securitySummary:
       securityScore >= 75
         ? 'Short-term security is solid — maintain your buffer and coverage.'
@@ -605,13 +664,16 @@ function buildScoreExplanation(dimensions, overallScore, snap) {
       score: d.score,
       grade: d.grade,
       horizon: HORIZON_MAP[d.key] || 'security',
-      weightPct: Math.round((DIMENSION_WEIGHTS[d.key] ?? 0) * 100),
-      contribution: Number((d.score * (DIMENSION_WEIGHTS[d.key] ?? 0)).toFixed(1)),
+      includedInOverall: !excluded.includes(d.key),
+      weightPct: Math.round((effectiveWeights[d.key] ?? 0) * 100),
+      contribution: excluded.includes(d.key)
+        ? 0
+        : Number((d.score * (effectiveWeights[d.key] ?? 0)).toFixed(1)),
       summary: d.summary,
       why: explainDimension(d.key, d, snap),
       improveBy: suggestImprovement(d.key, d, snap),
       actions: concreteActionsForDimension(d.key, d, snap),
-      potentialLift: estimateScoreLift(d.key, d.score),
+      potentialLift: estimateScoreLift(d.key, d.score, excluded),
       goToTab: TAB_FOR_DIMENSION[d.key] || 'profile',
     })),
     overallScore,
@@ -782,13 +844,14 @@ function runCheckup(rawSnapshot) {
     scoreRetirement(snap),
   ];
 
-  const overallScore = computeOverallScore(dimensions);
+  const excluded = snap.excludedFromScore || [];
+  const overallScore = computeOverallScore(dimensions, excluded);
   const overallGrade = gradeFromScore(overallScore);
   const scoreExplanation = buildScoreExplanation(dimensions, overallScore, snap);
   const actionPlan = buildActionPlan(dimensions, snap);
   const recommendationTimeline = buildRecommendationTimeline(actionPlan);
   const improvementRoadmap = buildImprovementRoadmap(dimensions, snap);
-  const weakCount = dimensions.filter((d) => d.score < 75).length;
+  const weakCount = dimensions.filter((d) => !excluded.includes(d.key) && d.score < 75).length;
   const headline =
     overallScore >= 85
       ? 'Excellent — minor tweaks only'
@@ -809,6 +872,8 @@ function runCheckup(rawSnapshot) {
     overallScore,
     overallGrade,
     headline,
+    excludedFromScore: excluded,
+    includedDimensions: getEffectiveWeights(excluded).included,
     expenseRatioGrade: gradeFromExpenseRatio(snap.income > 0 ? (snap.monthlyExpenses / snap.income) * 100 : null),
     dimensions,
     scoreExplanation,
@@ -856,11 +921,18 @@ const EXTENDED_PROFILE_KEYS = [
   'targetRetirementAge',
   'retirementBalance',
   'monthlyRetirementContribution',
+  'excludedFromScore',
 ];
 
 function extractExtendedProfile(raw = {}) {
   const out = {};
   for (const key of EXTENDED_PROFILE_KEYS) {
+    if (key === 'excludedFromScore') {
+      if (raw[key] !== undefined && raw[key] !== null) {
+        out[key] = normalizeExcludedFromScore(raw[key]);
+      }
+      continue;
+    }
     if (raw[key] !== undefined && raw[key] !== null) out[key] = raw[key];
   }
   return out;
@@ -885,5 +957,8 @@ module.exports = {
   mergeSnapshotWithLedger,
   gradeFromScore,
   DIMENSION_WEIGHTS,
+  SCORABLE_DIMENSION_KEYS,
   computeOverallScore,
+  normalizeExcludedFromScore,
+  getEffectiveWeights,
 };

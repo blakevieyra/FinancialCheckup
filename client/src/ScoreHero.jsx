@@ -42,8 +42,11 @@ export default function ScoreHero({
 
   const color = ringColor(result.overallScore);
   const budgetDim = (result.dimensions || []).find((d) => d.key === 'budget');
+  const excluded = new Set(result.excludedFromScore || []);
   const sec = result.scoreExplanation?.securityScore ?? result.improvementRoadmap?.securityScore;
   const wealth = result.scoreExplanation?.wealthScore ?? result.improvementRoadmap?.wealthScore;
+  const secNa = result.scoreExplanation?.securityScoreNA || result.improvementRoadmap?.securityScoreNA;
+  const wealthNa = result.scoreExplanation?.wealthScoreNA || result.improvementRoadmap?.wealthScoreNA;
 
   return (
     <div style={{ ...cardSoftStyle, padding: '1rem', display: 'grid', gap: 12 }}>
@@ -75,11 +78,16 @@ export default function ScoreHero({
           {sec != null && wealth != null ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, fontSize: 12 }}>
               <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)' }}>
-                Security <strong>{Math.round(sec)}</strong>
+                Security <strong>{secNa ? '—' : Math.round(sec)}</strong>
               </span>
               <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)' }}>
-                Long-term <strong>{Math.round(wealth)}</strong>
+                Long-term <strong>{wealthNa ? '—' : Math.round(wealth)}</strong>
               </span>
+              {excluded.size ? (
+                <span style={{ padding: '3px 8px', borderRadius: 6, opacity: 0.75 }}>
+                  {excluded.size} categor{excluded.size === 1 ? 'y' : 'ies'} excluded from total
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -88,12 +96,26 @@ export default function ScoreHero({
         </button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, minmax(0, 1fr))', gap: 6 }}>
-        {(result.dimensions || []).map((d) => (
-          <div key={d.key} style={{ textAlign: 'center', padding: '0.4rem', borderRadius: 8, background: 'rgba(15,23,42,0.45)' }}>
+        {(result.dimensions || []).map((d) => {
+          const isExcluded = excluded.has(d.key);
+          return (
+          <div
+            key={d.key}
+            style={{
+              textAlign: 'center',
+              padding: '0.4rem',
+              borderRadius: 8,
+              background: isExcluded ? 'rgba(15,23,42,0.25)' : 'rgba(15,23,42,0.45)',
+              opacity: isExcluded ? 0.55 : 1,
+              border: isExcluded ? '1px dashed rgba(255,255,255,0.2)' : 'none',
+            }}
+          >
             <div style={{ fontSize: 10, opacity: 0.75 }}>{d.label}</div>
             <div style={{ fontWeight: 800 }}>{Math.round(d.score)}</div>
+            {isExcluded ? <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>not in total</div> : null}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

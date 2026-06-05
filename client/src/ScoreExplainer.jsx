@@ -47,6 +47,9 @@ export default function ScoreExplainer({ explanation, isMobile, cardSoftStyle, c
                 {d.label}{' '}
                 <span style={{ color: dimColor(d.score) }}>{Math.round(d.score)}</span>
                 <span style={{ fontWeight: 400, opacity: 0.65, fontSize: 12 }}> ({d.grade})</span>
+                {!d.includedInOverall ? (
+                  <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.65 }}>excluded from total</span>
+                ) : null}
                 <span
                   style={{
                     marginLeft: 6,
@@ -60,7 +63,9 @@ export default function ScoreExplainer({ explanation, isMobile, cardSoftStyle, c
                 </span>
               </div>
               <div style={{ fontSize: 11, opacity: 0.7 }}>
-                {d.weightPct}% weight · +{d.contribution} pts{d.potentialLift > 0 ? ` · up to +${d.potentialLift} if fixed` : ''}
+                {d.includedInOverall
+                  ? `${d.weightPct}% of total · +${d.contribution} pts${d.potentialLift > 0 ? ` · up to +${d.potentialLift} if fixed` : ''}`
+                  : 'Tracked only — not counted in overall score'}
               </div>
             </div>
             <div style={{ fontSize: 13, opacity: 0.88, marginTop: 4, lineHeight: 1.45 }}>{d.why}</div>

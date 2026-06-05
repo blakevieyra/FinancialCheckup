@@ -67,6 +67,7 @@ export const DEFAULT_SNAPSHOT = {
   targetRetirementAge: 65,
   retirementBalance: 85000,
   monthlyRetirementContribution: 500,
+  excludedFromScore: [],
 };
 
 export const DIMENSION_LABELS = [
