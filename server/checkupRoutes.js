@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { verifyToken } = require('./auth');
 const { dbGet, dbAll, dbRun } = require('./db');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
-const { runCheckup, prefillFromLedger } = require('./checkupEngine');
+const { runCheckup, prefillFromLedger, extractExtendedProfile, mergeSnapshotWithLedger } = require('./checkupEngine');
 
 /** Public preview — no account required (matches landing “free to start”). */
 router.post('/preview', (req, res) => {
@@ -24,23 +24,23 @@ router.get('/prefill', async (req, res) => {
       return res.status(400).json({ error: 'month must be YYYY-MM.' });
     }
     const ledger = await snapshotForUserMonth(req.user.id, month);
-    const template = prefillFromLedger(ledger);
     const saved = await dbGet(
       'SELECT snapshot_json FROM checkup_profiles WHERE user_id = ?',
       [req.user.id],
     );
-    let profile = {};
+    let savedExtended = {};
     if (saved?.snapshot_json) {
       try {
-        profile = JSON.parse(saved.snapshot_json);
+        savedExtended = extractExtendedProfile(JSON.parse(saved.snapshot_json));
       } catch {
-        profile = {};
+        savedExtended = {};
       }
     }
     return res.json({
       month,
       ledger: { income: ledger.income, totalExpenses: ledger.totalExpenses, expenses: ledger.expenses },
-      template: { ...template, ...profile, income: ledger.income, monthlyExpenses: ledger.totalExpenses, expenses: ledger.expenses },
+      extended: savedExtended,
+      template: mergeSnapshotWithLedger(ledger, savedExtended),
     });
   } catch (e) {
     console.error(e);
@@ -54,8 +54,22 @@ router.post('/run', async (req, res) => {
     if (!/^\d{4}-\d{2}$/.test(month)) {
       return res.status(400).json({ error: 'month must be YYYY-MM.' });
     }
-    const snapshot = req.body?.snapshot || req.body || {};
-    const result = runCheckup(snapshot);
+    const ledger = await snapshotForUserMonth(req.user.id, month);
+    const saved = await dbGet(
+      'SELECT snapshot_json FROM checkup_profiles WHERE user_id = ?',
+      [req.user.id],
+    );
+    let savedExtended = {};
+    if (saved?.snapshot_json) {
+      try {
+        savedExtended = extractExtendedProfile(JSON.parse(saved.snapshot_json));
+      } catch {
+        savedExtended = {};
+      }
+    }
+    const clientExtended = extractExtendedProfile(req.body?.snapshot || req.body || {});
+    const merged = mergeSnapshotWithLedger(ledger, { ...savedExtended, ...clientExtended });
+    const result = runCheckup(merged);
 
     await dbRun(
       `INSERT INTO checkup_profiles (user_id, snapshot_json, updated_at)
@@ -63,7 +77,7 @@ router.post('/run', async (req, res) => {
        ON CONFLICT (user_id) DO UPDATE SET
          snapshot_json = EXCLUDED.snapshot_json,
          updated_at = EXCLUDED.updated_at`,
-      [req.user.id, JSON.stringify(result.snapshot)],
+      [req.user.id, JSON.stringify(extractExtendedProfile(result.snapshot))],
     );
 
     await dbRun(

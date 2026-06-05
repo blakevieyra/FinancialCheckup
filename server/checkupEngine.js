@@ -410,4 +410,50 @@ function prefillFromLedger(ledger) {
   };
 }
 
-module.exports = { runCheckup, normalizeSnapshot, prefillFromLedger, gradeFromScore };
+/** Fields stored in checkup_profiles — budget numbers always come from the ledger when authed. */
+const EXTENDED_PROFILE_KEYS = [
+  'debts',
+  'emergencyFund',
+  'monthlySavings',
+  'investmentTotal',
+  'stockPct',
+  'bondPct',
+  'internationalPct',
+  'cashPct',
+  'feePct',
+  'hasLifeInsurance',
+  'hasDisabilityInsurance',
+  'hasLiabilityInsurance',
+  'age',
+  'targetRetirementAge',
+  'retirementBalance',
+  'monthlyRetirementContribution',
+];
+
+function extractExtendedProfile(raw = {}) {
+  const out = {};
+  for (const key of EXTENDED_PROFILE_KEYS) {
+    if (raw[key] !== undefined && raw[key] !== null) out[key] = raw[key];
+  }
+  return out;
+}
+
+function mergeSnapshotWithLedger(ledger, extended = {}) {
+  const fromLedger = prefillFromLedger(ledger);
+  return normalizeSnapshot({
+    ...fromLedger,
+    ...extractExtendedProfile(extended),
+    income: ledger.income,
+    monthlyExpenses: ledger.totalExpenses,
+    expenses: ledger.expenses,
+  });
+}
+
+module.exports = {
+  runCheckup,
+  normalizeSnapshot,
+  prefillFromLedger,
+  extractExtendedProfile,
+  mergeSnapshotWithLedger,
+  gradeFromScore,
+};

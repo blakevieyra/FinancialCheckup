@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as api from './api';
 import LandingPage from './LandingPage';
-import CheckupPanel from './CheckupPanel';
+import CheckupPanel, { ActionPlanBlock } from './CheckupPanel';
+import AppNav from './AppNav';
+import ScoreHero from './ScoreHero';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -381,6 +383,9 @@ export default function App() {
   const [tipsErr, setTipsErr] = useState('');
   const [tipsBusy, setTipsBusy] = useState(false);
   const [lastCheckupScore, setLastCheckupScore] = useState(null);
+  const [checkupResult, setCheckupResult] = useState(null);
+  const [checkupBusy, setCheckupBusy] = useState(false);
+  const [activeSection, setActiveSection] = useState('overview');
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -712,10 +717,32 @@ export default function App() {
   useEffect(() => {
     if (!token) return undefined;
     api.getCheckupLatest(token, month).then((d) => {
-      if (d?.found && d.overallScore != null) setLastCheckupScore(d.overallScore);
+      if (d?.found) {
+        setLastCheckupScore(d.overallScore ?? null);
+        setCheckupResult(d.result ?? null);
+      }
     }).catch(() => {});
     return undefined;
   }, [token, month]);
+
+  function handleCheckupResult(data) {
+    setCheckupResult(data);
+    setLastCheckupScore(data?.overallScore ?? null);
+  }
+
+  async function updateCheckupScore() {
+    if (!token) return;
+    setCheckupBusy(true);
+    setError('');
+    try {
+      const data = await api.runCheckup(token, { month, snapshot: {} });
+      handleCheckupResult(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCheckupBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!isAuthed) return;
@@ -1149,6 +1176,8 @@ export default function App() {
     setGoals([]);
     setGoalsErr('');
     setLastCheckupScore(null);
+    setCheckupResult(null);
+    setActiveSection('overview');
   }
 
   const shellStyle = {
@@ -1257,7 +1286,7 @@ export default function App() {
                 inputStyle={inputStyle}
                 btnPrimary={btnPrimary}
                 btnNeutral={btnNeutral}
-                onResult={(d) => setLastCheckupScore(d?.overallScore ?? null)}
+                onResult={handleCheckupResult}
               />
             </div>
           </div>
@@ -1283,7 +1312,7 @@ export default function App() {
           <div style={{ opacity: 0.85, wordBreak: 'break-word' }}>
             Signed in as <strong>{user}</strong>
             {lastCheckupScore != null ? (
-              <span> · Checkup score <strong>{Math.round(lastCheckupScore)}</strong></span>
+              <span> · Score <strong>{Math.round(lastCheckupScore)}</strong>/100</span>
             ) : null}
           </div>
         </div>
@@ -1342,129 +1371,46 @@ export default function App() {
           </button>
           <button
             type="button"
-            disabled={exportBusy || busy}
-            onClick={exportMonthCsv}
-            style={btnNeutral}
+            disabled={checkupBusy || busy}
+            onClick={updateCheckupScore}
+            style={btnPrimary}
           >
-            {exportBusy ? 'Exporting…' : 'Export CSV'}
-          </button>
-          <button
-            type="button"
-            disabled={pdfBusy || busy}
-            onClick={exportExecutivePdf}
-            style={btnNeutral}
-          >
-            {pdfBusy ? 'Building PDF…' : 'Export Executive PDF'}
+            {checkupBusy ? 'Updating score…' : 'Update score'}
           </button>
         </div>
 
         {error ? <div style={{ color: '#ffb3b3' }}>{error}</div> : null}
 
-        <div style={{ ...cardStyle, order: 10 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Quick links</div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : '1fr 1fr 1fr',
-              gap: 8,
-            }}
-          >
-            {[
-              ['#checkup-panel', '6-Dimension Checkup'],
-              ['#summary-panel', 'Month Summary'],
-              ['#income-panel', 'Income'],
-              ['#expenses-panel', 'Expenses'],
-              ['#advice-panel', 'Financial Advice'],
-              ['#goals-panel', 'Goals & Progress'],
-              ['#expert-panel', 'Expert Briefing'],
-              ['#leaderboard-panel', 'Leaderboard & Trend'],
-              ['#projections-panel', 'Projections & Docs'],
-              ['#resources-panel', 'Financial Resources'],
-              ['#ai-insights-panel', 'AI Insights'],
-            ].map(([href, label]) => (
-              <a
-                key={href}
-                href={href}
-                style={{
-                  textDecoration: 'none',
-                  color: '#dbeafe',
-                  border: '1px solid rgba(147,197,253,0.35)',
-                  borderRadius: 9,
-                  padding: '0.5rem 0.6rem',
-                  background: 'rgba(59,130,246,0.12)',
-                  fontSize: 13,
-                  textAlign: 'center',
-                }}
-              >
-                {label}
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <CheckupPanel
-          token={token}
-          month={month}
+        <AppNav
+          active={activeSection}
+          onChange={setActiveSection}
           isMobile={isMobile}
-          isTablet={isTablet}
-          cardStyle={{ ...cardStyle, order: 5 }}
-          cardSoftStyle={cardSoftStyle}
-          inputStyle={inputStyle}
           btnPrimary={btnPrimary}
           btnNeutral={btnNeutral}
-          onResult={(d) => setLastCheckupScore(d?.overallScore ?? null)}
         />
 
-        <details id="advice-panel" style={{ ...cardStyle, order: 40 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
-            Financial advice feed (free API + your data)
-          </summary>
-          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-            <p style={{ margin: 0, opacity: 0.88, lineHeight: 1.45, fontSize: 14 }}>
-              This replaces weekly digest. Advice is pulled from a free external advice API and blended with your
-              current month financial health from this app.
-            </p>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button type="button" onClick={loadFinancialAdvice} disabled={adviceBusy} style={btnPrimary}>
-                {adviceBusy ? 'Refreshing advice…' : 'Refresh financial advice'}
-              </button>
-            </div>
-            {adviceErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{adviceErr}</div> : null}
-            {adviceData?.metrics ? (
-              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem', fontSize: 14 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Health snapshot ({adviceData.month})</div>
-                <div style={{ opacity: 0.9, lineHeight: 1.45 }}>
-                  Score <strong>{Number(adviceData.metrics.healthScore || 0).toFixed(1)}</strong> · Grade{' '}
-                  <strong>{adviceData.metrics.grade || 'N/A'}</strong> · Ratio{' '}
-                  <strong>{Number(adviceData.metrics.expenseRatio || 0).toFixed(1)}%</strong> · Balance{' '}
-                  <strong>${Number(adviceData.metrics.balance || 0).toLocaleString()}</strong>
-                </div>
-              </div>
-            ) : null}
-            {Array.isArray(adviceData?.advice?.external) && adviceData.advice.external.length ? (
-              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>External advice (free API)</div>
-                <ul style={{ margin: '0 0 0 1.2rem', lineHeight: 1.45 }}>
-                  {adviceData.advice.external.map((x, i) => (
-                    <li key={`ext-${i}-${x.slice(0, 20)}`}>{x}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {Array.isArray(adviceData?.advice?.internal) && adviceData.advice.internal.length ? (
-              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Internal financial health recommendations</div>
-                <ul style={{ margin: '0 0 0 1.2rem', lineHeight: 1.45 }}>
-                  {adviceData.advice.internal.map((x, i) => (
-                    <li key={`int-${i}-${x.slice(0, 20)}`}>{x}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-        </details>
+        {activeSection === 'profile' && (
+          <CheckupPanel
+            token={token}
+            month={month}
+            isMobile={isMobile}
+            isTablet={isTablet}
+            cardStyle={cardStyle}
+            cardSoftStyle={cardSoftStyle}
+            inputStyle={inputStyle}
+            btnPrimary={btnPrimary}
+            btnNeutral={btnNeutral}
+            ledger={{ income, totalExpenses }}
+            onResult={handleCheckupResult}
+            showForm
+            showDetails
+            showHistory={false}
+          />
+        )}
 
-        <details id="goals-panel" style={{ ...cardStyle, order: 41 }}>
+        {activeSection === 'progress' && (
+          <>
+        <details id="goals-panel" style={cardStyle}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
             Goals & progress (MRR / ARR / retirement / savings)
           </summary>
@@ -1528,84 +1474,13 @@ export default function App() {
           </div>
         </details>
 
-        <details id="expert-panel" style={{ ...cardStyle, order: 42 }}>
+        <details id="leaderboard-panel" style={cardStyle}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
-            Expert financial briefing
-          </summary>
-          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-            <p style={{ margin: 0, opacity: 0.88, lineHeight: 1.45, fontSize: 14 }}>
-              One API call pulls an <strong>expert-style CFO / coach brief</strong> (personal vs business vs org) focused on
-              budget quality, risk flags, and next best actions. Uses <strong>Anthropic</strong>; add <code>FRED_API_KEY</code> on
-              the server for optional US macro context.
-            </p>
-            <button
-              type="button"
-              disabled={expertBusy}
-              onClick={loadExpertBriefing}
-              style={{
-                padding: '0.55rem 1rem',
-                cursor: 'pointer',
-                background: '#134',
-                color: '#fff',
-                borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.2)',
-                maxWidth: '100%',
-                width: isMobile ? '100%' : 360,
-              }}
-            >
-              {expertBusy ? 'Calling expert API…' : 'Generate expert briefing'}
-            </button>
-            {expertError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{expertError}</div> : null}
-            {expertData ? (
-              <div style={{ display: 'grid', gap: 14 }}>
-                {expertData.macroUsed ? (
-                  <div style={{ fontSize: 13, opacity: 0.82 }}>Macro context from FRED was included.</div>
-                ) : (
-                  <div style={{ fontSize: 13, opacity: 0.72 }}>
-                    No FRED macro line (optional). Set <code>FRED_API_KEY</code> in server <code>.env</code>.
-                  </div>
-                )}
-                <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.75rem' }}>
-                  <div style={{ fontWeight: 800, marginBottom: 6 }}>{expertData.expert?.headline}</div>
-                  <div style={{ opacity: 0.92, lineHeight: 1.45 }}>{expertData.expert?.executiveVerdict}</div>
-                  <div style={{ marginTop: 10, opacity: 0.88, fontSize: 13 }}>{expertData.expert?.benchmarkContext}</div>
-                  {Array.isArray(expertData.expert?.personalizedPriorities) && expertData.expert.personalizedPriorities.length ? (
-                    <>
-                      <div style={{ marginTop: 10, fontWeight: 700 }}>Priorities</div>
-                      <ul style={{ margin: '6px 0 0 1.25rem', lineHeight: 1.45 }}>
-                        {expertData.expert.personalizedPriorities.map((x, i) => (
-                          <li key={`${i}-${x.slice(0, 24)}`}>{x}</li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : null}
-                  {Array.isArray(expertData.expert?.riskWatchouts) && expertData.expert.riskWatchouts.length ? (
-                    <>
-                      <div style={{ marginTop: 10, fontWeight: 700 }}>Risks to watch</div>
-                      <ul style={{ margin: '6px 0 0 1.25rem', lineHeight: 1.45 }}>
-                        {expertData.expert.riskWatchouts.map((x, i) => (
-                          <li key={`${i}-${x.slice(0, 24)}`}>{x}</li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : null}
-                  {expertData.expert?.disclaimer ? (
-                    <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>{expertData.expert.disclaimer}</div>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </details>
-
-        <details id="leaderboard-panel" style={{ ...cardStyle, order: 43 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
-            Leaderboard & your improvement trend
+            Leaderboard & budget trend
           </summary>
           <div style={{ marginTop: 12, display: 'grid', gap: 18 }}>
             <p style={{ margin: 0, opacity: 0.86, lineHeight: 1.45, fontSize: 14 }}>
-              <strong>Ranking</strong> uses the same month as the picker above. Score = <code>100 − expense ratio %</code>{' '}
-              (0–100), only for users with income for that month. <strong>Trends</strong> use your stored history across months.
+              Leaderboard ranks <strong>budget score only</strong> (100 − expense ratio). Your main Financial Checkup Score on Overview includes all 6 dimensions.
             </p>
 
             <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 14, opacity: 0.9 }}>
@@ -1730,7 +1605,79 @@ export default function App() {
           </div>
         </details>
 
-        <details id="projections-panel" style={{ ...cardStyle, order: 44 }}>
+        <CheckupPanel
+          key={`history-${month}-${lastCheckupScore ?? 'none'}`}
+          token={token}
+          month={month}
+          isMobile={isMobile}
+          isTablet={isTablet}
+          cardStyle={cardStyle}
+          cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          ledger={{ income, totalExpenses }}
+          onResult={handleCheckupResult}
+          showForm={false}
+          showDetails={false}
+          showHistory
+        />
+          </>
+        )}
+
+        {activeSection === 'more' && (
+          <>
+        <div style={{ ...cardStyle, display: 'grid', gap: 10 }}>
+          <div style={{ fontWeight: 700 }}>Export reports</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            <button type="button" disabled={exportBusy || busy} onClick={exportMonthCsv} style={btnNeutral}>
+              {exportBusy ? 'Exporting…' : 'Export CSV'}
+            </button>
+            <button type="button" disabled={pdfBusy || busy} onClick={exportExecutivePdf} style={btnNeutral}>
+              {pdfBusy ? 'Building PDF…' : 'Export Executive PDF'}
+            </button>
+          </div>
+        </div>
+
+        <details id="insights-panel" style={cardStyle}>
+          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>Optional AI & advice tools</summary>
+          <div style={{ marginTop: 12, display: 'grid', gap: 14 }}>
+            <select value={profile} onChange={(e) => setProfile(e.target.value)} style={{ ...inputStyle, maxWidth: 280 }}>
+              <option value="personal">Personal</option>
+              <option value="business">Business</option>
+              <option value="organizational">Organizational</option>
+            </select>
+            <button type="button" disabled={aiBusy} onClick={generateInsights} style={btnNeutral}>
+              {aiBusy ? 'Generating…' : 'Get AI insights'}
+            </button>
+            {aiError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{aiError}</div> : null}
+            {insights && insights.length ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {insights.map((ins, idx) => (
+                  <div key={`${ins.title}-${idx}`} style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
+                    <div style={{ fontWeight: 700 }}>{ins.title}</div>
+                    <div style={{ marginTop: 4, opacity: 0.9, fontSize: 14 }}>{ins.message}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <button type="button" onClick={loadFinancialAdvice} disabled={adviceBusy} style={btnNeutral}>
+              {adviceBusy ? 'Loading…' : 'Refresh money tips feed'}
+            </button>
+            {adviceErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{adviceErr}</div> : null}
+            <button type="button" disabled={expertBusy} onClick={loadExpertBriefing} style={btnNeutral}>
+              {expertBusy ? 'Loading…' : 'Generate expert briefing'}
+            </button>
+            {expertError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{expertError}</div> : null}
+            {expertData?.expert?.headline ? (
+              <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.45 }}>
+                <strong>{expertData.expert.headline}</strong> — {expertData.expert.executiveVerdict}
+              </div>
+            ) : null}
+          </div>
+        </details>
+
+        <details id="projections-panel" style={cardStyle}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
             Projections, long-term health & business documents
           </summary>
@@ -1806,7 +1753,7 @@ export default function App() {
           </div>
         </details>
 
-        <details id="resources-panel" style={{ ...cardStyle, order: 45 }}>
+        <details id="resources-panel" style={cardStyle}>
           <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
             Resources (authoritative help for people & businesses)
           </summary>
@@ -1838,9 +1785,34 @@ export default function App() {
             </div>
           </div>
         </details>
+          </>
+        )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, order: 30 }}>
-          <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12, order: 20 }}>
+        {activeSection === 'overview' && (
+          <div style={{ display: 'grid', gap: 16 }}>
+            <ScoreHero
+              result={checkupResult}
+              income={income}
+              totalExpenses={totalExpenses}
+              budgetGrade={grade}
+              month={month}
+              isMobile={isMobile}
+              cardSoftStyle={cardSoftStyle}
+              btnPrimary={btnPrimary}
+              onUpdateScore={updateCheckupScore}
+              updateBusy={checkupBusy}
+              onGoProfile={() => setActiveSection('profile')}
+              onGoMoney={() => setActiveSection('money')}
+            />
+            {checkupResult ? (
+              <ActionPlanBlock actionPlan={checkupResult.actionPlan} cardSoftStyle={cardSoftStyle} compact />
+            ) : null}
+            {checkupResult ? (
+              <button type="button" onClick={() => setActiveSection('profile')} style={{ ...btnNeutral, justifySelf: 'start', fontSize: 13 }}>
+                Full breakdown →
+              </button>
+            ) : null}
+          <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12 }}>
             <div
               style={{
                 display: 'flex',
@@ -1852,36 +1824,10 @@ export default function App() {
               }}
             >
               <div>
-                <h2 style={{ marginTop: 0, marginBottom: 6 }}>This Month Summary</h2>
-                <div style={{ opacity: 0.9 }}>
-                  <div>Income: <strong>${Number(income || 0).toLocaleString()}</strong></div>
-                  <div>Expenses: <strong>${Number(totalExpenses || 0).toLocaleString()}</strong></div>
-                  <div>Expense ratio: <strong>{expenseRatioText}</strong></div>
-                  <div>Budget grade: <strong>{grade}</strong></div>
+                <h2 style={{ marginTop: 0, marginBottom: 6 }}>Spending charts</h2>
+                <div style={{ opacity: 0.85, fontSize: 14 }}>
+                  Edit amounts in the <button type="button" onClick={() => setActiveSection('money')} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Money</button> tab, then tap Update score.
                 </div>
-              </div>
-
-              <div style={{ minWidth: isMobile ? 0 : 260, width: isMobile ? '100%' : undefined }}>
-                <div style={{ opacity: 0.85, marginBottom: 8 }}>Insights profile</div>
-                <select
-                  value={profile}
-                  onChange={(e) => setProfile(e.target.value)}
-                  style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-                >
-                  <option value="personal">Personal</option>
-                  <option value="business">Business</option>
-                  <option value="organizational">Organizational</option>
-                </select>
-
-                <button
-                  type="button"
-                  disabled={aiBusy}
-                  onClick={generateInsights}
-                  style={{ marginTop: 10, width: '100%', padding: '0.6rem 1rem', cursor: 'pointer', background: '#134', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
-                >
-                  {aiBusy ? 'Generating…' : 'Get AI insights'}
-                </button>
-                {aiError ? <div style={{ marginTop: 8, color: '#ffb3b3', fontSize: 14 }}>{aiError}</div> : null}
               </div>
             </div>
 
@@ -1993,9 +1939,17 @@ export default function App() {
               </div>
             </div>
           </div>
+          </div>
+        )}
 
-          <div style={{ ...cardStyle, order: 21, display: 'grid', gap: 14 }}>
-            <div style={{ fontWeight: 800 }}>Income & expense inputs</div>
+        {activeSection === 'money' && (
+          <div style={{ ...cardStyle, display: 'grid', gap: 14 }}>
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: 6 }}>Income & spending</h2>
+              <p style={{ margin: 0, opacity: 0.85, fontSize: 14 }}>
+                This is the single place to enter income and expenses. Your budget dimension updates when you tap Update score.
+              </p>
+            </div>
             <div id="income-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
               <h2 style={{ marginTop: 0, marginBottom: 8 }}>Income</h2>
               <label
@@ -2135,34 +2089,8 @@ export default function App() {
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {insights && insights.length ? (
-          <div id="ai-insights-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
-            <h2 style={{ marginTop: 0, marginBottom: 8 }}>AI Insights</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
-              {insights.map((ins, idx) => {
-                const color =
-                  ins.type === 'alert'
-                    ? '#ef4444'
-                    : ins.type === 'warning'
-                      ? '#f59e0b'
-                      : ins.type === 'success'
-                        ? '#22c55e'
-                        : '#3b82f6';
-                return (
-                  <div key={`${ins.title}-${idx}`} style={{ border: `1px solid rgba(255,255,255,0.12)`, borderRadius: 10, padding: '0.8rem' }}>
-                    <div style={{ fontWeight: 800, display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 999, background: color, display: 'inline-block' }} />
-                      {ins.title}
-                    </div>
-                    <div style={{ marginTop: 6, opacity: 0.9, lineHeight: 1.35 }}>{ins.message}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
       </div>
         <div style={{ marginTop: 16, textAlign: 'center', opacity: 0.65, fontSize: 12 }}>
           Operon E2I
