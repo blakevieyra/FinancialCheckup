@@ -40,7 +40,7 @@ function ToolCard({ tool, locked, onAction, btnNeutral, btnPrimary, busy, busyLa
         onClick={onAction}
         style={{ ...(locked ? btnNeutral : btnPrimary), justifySelf: 'start', opacity: locked ? 0.55 : 1 }}
       >
-        {busy && busyLabel ? busyLabel : locked ? 'Upgrade in Plan tab' : tool.label}
+        {busy && busyLabel ? busyLabel : locked ? 'Upgrade in Account' : tool.label}
       </button>
     </div>
   );
@@ -68,11 +68,7 @@ export default function MoreToolsPanel({
   aiBusy,
   onAiInsights,
   aiError,
-  insights,
-  adviceBusy,
-  onAdvice,
-  adviceErr,
-  adviceData,
+  aiPlan,
   expertBusy,
   onExpert,
   expertError,
@@ -82,6 +78,7 @@ export default function MoreToolsPanel({
   forecastData,
   businessDocs,
   onOpenProjections,
+  onScrollToProjections,
 }) {
   const grid2 = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
   const gridDims = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
@@ -91,11 +88,10 @@ export default function MoreToolsPanel({
     pdf: onExportPdf,
     bizpdf: onExportBusinessPdf,
     ai: onAiInsights,
-    tips: onAdvice,
     expert: onExpert,
-    forecast: onOpenProjections,
-    longterm: onOpenProjections,
-    bizdocs: onOpenProjections,
+    forecast: () => { onOpenProjections?.(); onScrollToProjections?.('outcomes'); },
+    longterm: () => { onOpenProjections?.(); onScrollToProjections?.('longterm'); },
+    bizdocs: () => { onOpenProjections?.(); onScrollToProjections?.('bizdocs'); },
   };
 
   const toolBusy = {
@@ -103,8 +99,10 @@ export default function MoreToolsPanel({
     pdf: pdfBusy,
     bizpdf: businessPdfBusy,
     ai: aiBusy,
-    tips: adviceBusy,
     expert: expertBusy,
+    forecast: forecastBusy,
+    longterm: forecastBusy,
+    bizdocs: forecastBusy,
   };
 
   const toolBusyLabel = {
@@ -112,8 +110,10 @@ export default function MoreToolsPanel({
     pdf: 'Building PDF…',
     bizpdf: 'Building PDF…',
     ai: 'Generating…',
-    tips: 'Loading…',
     expert: 'Loading…',
+    forecast: 'Loading…',
+    longterm: 'Loading…',
+    bizdocs: 'Loading…',
   };
 
   return (
@@ -138,7 +138,7 @@ export default function MoreToolsPanel({
             <>
               {' '}
               <button type="button" onClick={onGoPlan} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-                Upgrade in Plan
+                Upgrade in Account
               </button>{' '}
               to unlock Pro tools.
             </>
@@ -172,7 +172,7 @@ export default function MoreToolsPanel({
                 key={tool.id}
                 tool={tool}
                 locked={section.pro && !isPro}
-                onAction={section.pro && !isPro ? onGoPlan : toolActions[tool.id]}
+                onAction={section.pro && !isPro ? onGoPlan : () => toolActions[tool.id]?.()}
                 btnNeutral={btnNeutral}
                 btnPrimary={btnPrimary}
                 busy={toolBusy[tool.id] || busy}
@@ -188,28 +188,32 @@ export default function MoreToolsPanel({
                 <option value="organizational">Organizational profile</option>
               </select>
               {aiError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{aiError}</div> : null}
-              {insights?.length ? (
+              {aiPlan?.summary ? (
+                <div style={{ ...cardSoftStyle, padding: '0.85rem', display: 'grid', gap: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{aiPlan.summary}</div>
+                  {aiPlan.emailSent ? <div style={{ fontSize: 12, color: '#86efac' }}>A copy was emailed to your account address.</div> : null}
+                </div>
+              ) : null}
+              {aiPlan?.categoryPlans?.length ? (
                 <div style={{ display: 'grid', gap: 8 }}>
-                  {insights.map((ins, idx) => (
-                    <div key={`${ins.title}-${idx}`} style={{ ...cardSoftStyle, padding: '0.75rem' }}>
-                      <div style={{ fontWeight: 700 }}>{ins.title}</div>
-                      <div style={{ marginTop: 4, opacity: 0.9, fontSize: 14, lineHeight: 1.4 }}>{ins.message}</div>
+                  {aiPlan.categoryPlans.map((cat) => (
+                    <div key={cat.key || cat.label} style={{ ...cardSoftStyle, padding: '0.75rem' }}>
+                      <div style={{ fontWeight: 700 }}>
+                        {cat.label} — {Math.round(cat.score || 0)}/100 ({cat.grade}) · <span style={{ textTransform: 'capitalize', opacity: 0.8 }}>{cat.status}</span>
+                      </div>
+                      <ul style={{ margin: '8px 0 0', paddingLeft: '1.1rem', fontSize: 13, lineHeight: 1.45 }}>
+                        {(cat.optimizedPlan || []).slice(0, 4).map((step, i) => <li key={i}>{step}</li>)}
+                      </ul>
                     </div>
                   ))}
                 </div>
               ) : null}
-              {adviceErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{adviceErr}</div> : null}
-              {adviceData?.advice ? (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  <div style={{ fontSize: 13, opacity: 0.75 }}>
-                    Tips for {adviceData.month}
-                    {adviceData.metrics?.healthScore != null ? (
-                      <> · health score <strong>{adviceData.metrics.healthScore}</strong></>
-                    ) : null}
-                  </div>
-                  {[...(adviceData.advice.internal || []), ...(adviceData.advice.external || [])].map((tip, i) => (
-                    <div key={`tip-${i}`} style={{ ...cardSoftStyle, padding: '0.75rem', fontSize: 14, lineHeight: 1.45 }}>
-                      {tip}
+              {aiPlan?.insights?.length && !aiPlan?.categoryPlans?.length ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {aiPlan.insights.map((ins, idx) => (
+                    <div key={`${ins.title}-${idx}`} style={{ ...cardSoftStyle, padding: '0.75rem' }}>
+                      <div style={{ fontWeight: 700 }}>{ins.title}</div>
+                      <div style={{ marginTop: 4, opacity: 0.9, fontSize: 14, lineHeight: 1.4 }}>{ins.message}</div>
                     </div>
                   ))}
                 </div>
@@ -235,7 +239,7 @@ export default function MoreToolsPanel({
             </div>
           ) : null}
           {section.id === 'projections' ? (
-            <div style={{ display: 'grid', gap: 12 }}>
+            <div id="projections-results" style={{ display: 'grid', gap: 12 }}>
               {forecastBusy ? <div style={{ opacity: 0.8, fontSize: 14 }}>Building financial outlook…</div> : null}
               {forecastErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{forecastErr}</div> : null}
               {!isPro ? (
@@ -244,7 +248,7 @@ export default function MoreToolsPanel({
                 </p>
               ) : null}
               {isPro && forecastData?.outcomes?.length ? (
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                <div id="projections-outcomes" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
                   {forecastData.outcomes.map((o) => (
                     <div key={o.months} style={{ ...cardSoftStyle, padding: '0.75rem', fontSize: 13 }}>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{o.months}-month outlook</div>
@@ -257,7 +261,7 @@ export default function MoreToolsPanel({
                 </div>
               ) : null}
               {isPro && forecastData?.longTermHealth ? (
-                <div style={{ ...cardSoftStyle, padding: '0.85rem' }}>
+                <div id="longterm-health" style={{ ...cardSoftStyle, padding: '0.85rem' }}>
                   <div style={{ fontWeight: 700 }}>
                     Long-term health: <span style={{ textTransform: 'capitalize' }}>{forecastData.longTermHealth.status}</span>
                   </div>
@@ -265,7 +269,7 @@ export default function MoreToolsPanel({
                 </div>
               ) : null}
               {isPro && businessDocs ? (
-                <div style={{ ...cardSoftStyle, padding: '0.85rem', fontSize: 13 }}>
+                <div id="biz-docs" style={{ ...cardSoftStyle, padding: '0.85rem', fontSize: 13 }}>
                   <div style={{ fontWeight: 700, marginBottom: 8 }}>Business documents (generated)</div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 10 }}>
                     <div>

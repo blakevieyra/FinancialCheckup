@@ -6,7 +6,7 @@ const TAB_LABELS = {
   overview: 'Overview',
   progress: 'Progress',
   tools: 'Tools',
-  plan: 'Plan',
+  plan: 'Account',
 };
 
 function StepChip({ step, selected, onSelect }) {

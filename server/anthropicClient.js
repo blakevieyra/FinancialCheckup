@@ -81,7 +81,26 @@ async function createMessage({ userContent, maxTokens = 2048, system }) {
 }
 
 function stripJsonFence(text) {
-  return text.replace(/```json|```/g, '').trim();
+  return String(text || '')
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .replace(/```json|```/g, '')
+    .trim();
 }
 
-module.exports = { createMessage, stripJsonFence, modelName };
+/** Extract and parse JSON even when the model adds prose or truncates fences. */
+function parseJsonFromText(text) {
+  const cleaned = stripJsonFence(text);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    }
+    throw new Error('Could not parse JSON from model response.');
+  }
+}
+
+module.exports = { createMessage, stripJsonFence, parseJsonFromText, modelName };

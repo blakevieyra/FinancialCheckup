@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { verifyToken } = require('./auth');
-const { createMessage, stripJsonFence } = require('./anthropicClient');
+const { createMessage, parseJsonFromText } = require('./anthropicClient');
 const { requireFeature } = require('./requireFeature');
 const { sendAiInsightsEmail } = require('./transactionalEmail');
 
@@ -109,12 +109,16 @@ Return ONLY valid JSON (no markdown) with this exact shape:
 Include exactly 6 categoryPlans (one per dimension). Give 2-3 real sources per category and specialist section. Prioritize lowest-scoring dimensions with more aggressive plans.`;
 
   try {
-    const text = await createMessage({ userContent: prompt, maxTokens: 4096 });
+    const system = 'You respond with a single valid JSON object only. No markdown fences, no commentary before or after.';
     let parsed;
     try {
-      parsed = JSON.parse(stripJsonFence(text));
-    } catch {
-      return res.status(502).json({ error: 'AI returned invalid JSON.' });
+      const text = await createMessage({ userContent: prompt, maxTokens: 8192, system });
+      parsed = parseJsonFromText(text);
+    } catch (parseErr) {
+      console.warn('AI insights JSON retry:', parseErr.message);
+      const retryPrompt = `${prompt}\n\nIMPORTANT: Your previous reply was not valid JSON. Return ONLY the JSON object, nothing else. Keep categoryPlans to 6 items with shorter optimizedPlan arrays (2 steps each).`;
+      const text2 = await createMessage({ userContent: retryPrompt, maxTokens: 8192, system });
+      parsed = parseJsonFromText(text2);
     }
 
     const result = {
@@ -141,12 +145,15 @@ const SPECIALIST_PROMPTS = {
   insurance: 'You are an insurance planning educator. Analyze life, disability, and liability coverage gaps.',
   investments: 'You are an investment educator (not a broker). Analyze portfolio allocation, fees, diversification, and age-appropriate targets.',
   savings: 'You are a savings and emergency fund coach. Analyze emergency fund target vs balance, savings rate, and automation strategies.',
+  budget: 'You are a budgeting coach. Analyze expense ratio, category concentration, and realistic cuts to improve cash flow.',
+  debt: 'You are a debt payoff strategist. Compare avalanche vs snowball, interest savings, and realistic extra payment plans.',
+  retirement: 'You are a retirement planning educator. Analyze savings rate, contribution gaps, and trajectory vs age benchmarks.',
 };
 
 router.post('/specialist', requireFeature('aiInsights'), async (req, res) => {
   const area = req.body?.area;
-  if (!['insurance', 'investments', 'savings'].includes(area)) {
-    return res.status(400).json({ error: 'area must be insurance, investments, or savings.' });
+  if (!['insurance', 'investments', 'savings', 'budget', 'debt', 'retirement'].includes(area)) {
+    return res.status(400).json({ error: 'area must be insurance, investments, savings, budget, debt, or retirement.' });
   }
 
   const {
@@ -193,13 +200,9 @@ Return ONLY valid JSON:
 }`;
 
   try {
-    const text = await createMessage({ userContent: prompt, maxTokens: 2048 });
-    let parsed;
-    try {
-      parsed = JSON.parse(stripJsonFence(text));
-    } catch {
-      return res.status(502).json({ error: 'AI returned invalid JSON.' });
-    }
+    const system = 'Return a single valid JSON object only. No markdown.';
+    const text = await createMessage({ userContent: prompt, maxTokens: 2048, system });
+    const parsed = parseJsonFromText(text);
     res.json({
       area,
       month: safeMonth,

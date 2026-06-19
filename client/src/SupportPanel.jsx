@@ -12,6 +12,7 @@ export default function SupportPanel({
 }) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [contactEmail, setContactEmail] = useState(accountEmail || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
@@ -22,7 +23,11 @@ export default function SupportPanel({
     setOk('');
     setBusy(true);
     try {
-      const res = await api.sendSupportMessage(token, { subject, message });
+      const res = await api.sendSupportMessage(token, {
+        subject,
+        message,
+        contactEmail: contactEmail.trim() || undefined,
+      });
       setOk(res.message || 'Message sent.');
       setSubject('');
       setMessage('');
@@ -55,7 +60,12 @@ export default function SupportPanel({
           <div>
             <div style={{ fontWeight: 800, fontSize: 18 }}>Contact support</div>
             <div style={{ fontSize: 13, opacity: 0.82, marginTop: 4, lineHeight: 1.45 }}>
-              Send a message to our team. Replies go to <strong>{accountEmail || 'your account email'}</strong>.
+              Your message is sent to <strong>info@operone2i.com</strong>.
+              {accountEmail ? (
+                <> We&apos;ll reply to <strong>{accountEmail}</strong>.</>
+              ) : (
+                <> Add a reply email below so we can respond.</>
+              )}
             </div>
           </div>
           <button type="button" onClick={onClose} style={{ ...btnNeutral, padding: '0.35rem 0.65rem' }} aria-label="Close">
@@ -64,6 +74,19 @@ export default function SupportPanel({
         </div>
 
         <form onSubmit={submit} style={{ display: 'grid', gap: 10 }}>
+          {!accountEmail ? (
+            <label style={{ display: 'grid', gap: 4, fontSize: 14 }}>
+              Your email (for replies)
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                style={{ ...inputStyle, width: '100%' }}
+              />
+            </label>
+          ) : null}
           <label style={{ display: 'grid', gap: 4, fontSize: 14 }}>
             Subject
             <input

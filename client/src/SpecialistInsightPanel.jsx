@@ -3,6 +3,9 @@ import * as api from './api';
 import ExpandablePanel from './ExpandablePanel';
 
 const AREA_META = {
+  budget: { title: 'Budget gaps', hint: 'Spending concentration & cuts — tap for AI report' },
+  debt: { title: 'Debt payoff plan', hint: 'Avalanche vs snowball — tap for AI report' },
+  retirement: { title: 'Retirement trajectory', hint: 'Contributions & benchmarks — tap for AI report' },
   insurance: { title: 'Insurance gap analysis', hint: 'Life, disability & liability — tap for AI report' },
   investments: { title: 'Investment portfolio', hint: 'Allocation, fees & diversification — tap for AI report' },
   savings: { title: 'Savings & emergency fund', hint: 'Fund target & savings rate — tap for AI report' },

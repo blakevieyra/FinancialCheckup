@@ -22,19 +22,24 @@ router.post('/', supportLimiter, verifyToken, async (req, res) => {
 
     const subject = String(req.body?.subject || '').trim().slice(0, 120);
     const message = String(req.body?.message || '').trim().slice(0, 4000);
+    const contactEmail = String(req.body?.contactEmail || '').trim().toLowerCase();
 
     if (!subject) return res.status(400).json({ error: 'Subject is required.' });
     if (message.length < 10) return res.status(400).json({ error: 'Please enter at least 10 characters in your message.' });
 
     const user = await dbGet('SELECT username, email FROM users WHERE id = ?', [req.user.id]);
-    const fromEmail = user?.email || 'unknown';
+    const fromEmail = user?.email || contactEmail || 'unknown';
+    if (!user?.email && contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      return res.status(400).json({ error: 'Enter a valid reply email address.' });
+    }
     const username = user?.username || req.user.username || 'user';
 
     const body = [
       `Support request from Financial Checkup`,
       '',
       `User: ${username} (id ${req.user.id})`,
-      `Email: ${fromEmail}`,
+      `Account email: ${user?.email || 'not set'}`,
+      contactEmail && !user?.email ? `Reply email: ${contactEmail}` : null,
       '',
       `Subject: ${subject}`,
       '',
@@ -43,13 +48,13 @@ router.post('/', supportLimiter, verifyToken, async (req, res) => {
       '',
       '---',
       `Sent ${new Date().toISOString()}`,
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
     await sendEmailPlain({
       to: SUPPORT_TO,
       subject: `[Support] ${subject} — ${username}`,
       text: body,
-      replyTo: fromEmail.includes('@') ? fromEmail : undefined,
+      replyTo: fromEmail.includes('@') ? fromEmail : contactEmail.includes('@') ? contactEmail : undefined,
     });
 
     res.json({ ok: true, message: 'Message sent. We typically reply within 1–2 business days.' });

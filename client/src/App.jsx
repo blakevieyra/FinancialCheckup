@@ -800,6 +800,18 @@ export default function App() {
     }
   }
 
+  function scrollToProjections(focus) {
+    const map = {
+      outcomes: 'projections-outcomes',
+      longterm: 'longterm-health',
+      bizdocs: 'biz-docs',
+    };
+    const id = map[focus] || 'projections-results';
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  }
+
   async function loadCategoryAverages() {
     if (!token) return;
     try {
@@ -2101,6 +2113,8 @@ export default function App() {
             subscription={subscription}
             billingBusy={billingBusy}
             billingErr={billingErr}
+            token={token}
+            accountEmail={accountEmail}
             onSubscribeMonthly={() => startCheckout('monthly')}
             onSubscribeAnnual={() => startCheckout('annual')}
             onManageBilling={openBillingPortal}
@@ -2150,6 +2164,7 @@ export default function App() {
             forecastData={forecastData}
             businessDocs={businessDocs}
             onOpenProjections={loadForecastAndDocs}
+            onScrollToProjections={scrollToProjections}
           />
         )}
 

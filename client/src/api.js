@@ -83,11 +83,19 @@ export async function getMarketTicker() {
   return apiFetch('/api/market/ticker');
 }
 
-export async function sendSupportMessage(token, { subject, message }) {
+export async function sendSupportMessage(token, { subject, message, contactEmail }) {
   return apiFetch('/api/support', {
     method: 'POST',
     token,
-    body: { subject, message },
+    body: { subject, message, contactEmail },
+  });
+}
+
+export async function changePassword(token, { currentPassword, newPassword }) {
+  return apiFetch('/api/auth/change-password', {
+    method: 'POST',
+    token,
+    body: { currentPassword, newPassword },
   });
 }
 

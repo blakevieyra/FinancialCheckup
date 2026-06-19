@@ -2,7 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { dbGet, dbRun } = require('./db');
 const { signToken, verifyToken } = require('./auth');
-const { validateRegistration, validateLogin } = require('./authValidation');
+const { validateRegistration, validateLogin, validatePassword } = require('./authValidation');
 const {
   generateVerifyToken,
   generateOtpCode,
@@ -240,6 +240,30 @@ router.get('/verify-email', async (req, res) => {
   } catch (e) {
     console.error(e);
     return res.redirect(`${clientBaseUrl()}/?verify=error`);
+  }
+});
+
+router.post('/change-password', verifyToken, async (req, res) => {
+  try {
+    const currentPassword = req.body?.currentPassword;
+    const newPassword = req.body?.newPassword;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password are required.' });
+    }
+    const pwErr = validatePassword(newPassword);
+    if (pwErr) return res.status(400).json({ error: pwErr });
+
+    const user = await dbGet('SELECT id, password_hash FROM users WHERE id = ?', [req.user.id]);
+    if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+      return res.status(401).json({ error: 'Current password is incorrect.' });
+    }
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await dbRun('UPDATE users SET password_hash = ? WHERE id = ?', [hash, req.user.id]);
+    res.json({ ok: true, message: 'Password updated successfully.' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 

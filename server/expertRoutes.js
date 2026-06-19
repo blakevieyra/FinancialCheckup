@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { verifyToken } = require('./auth');
-const { createMessage, stripJsonFence } = require('./anthropicClient');
+const { createMessage, parseJsonFromText } = require('./anthropicClient');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
 const { buildMacroContextLine } = require('./fredContext');
 const { requireFeature } = require('./requireFeature');
@@ -82,12 +82,7 @@ Return ONLY valid JSON (no markdown) with this exact shape:
 
   try {
     const raw = await createMessage({ userContent, maxTokens: 2500, system });
-    let parsed;
-    try {
-      parsed = JSON.parse(stripJsonFence(raw));
-    } catch {
-      return res.status(502).json({ error: 'Expert model returned invalid JSON.' });
-    }
+    const parsed = parseJsonFromText(raw);
 
     res.json({
       month,

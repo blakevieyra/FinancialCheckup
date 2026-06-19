@@ -3,6 +3,7 @@ import {
   PLAN_COMPARISON,
   CHECKUP_DIMENSIONS,
 } from './planConstants';
+import AccountSettingsPanel from './AccountSettingsPanel';
 
 function statusLabel(status) {
   switch (status) {
@@ -124,6 +125,8 @@ export default function SubscriptionPortal({
   billingBusy,
   billingErr,
   billingMsg,
+  token,
+  accountEmail,
   onSubscribeMonthly,
   onSubscribeAnnual,
   onManageBilling,
@@ -155,10 +158,10 @@ export default function SubscriptionPortal({
         }}
       >
         <div style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          Plan & billing
+          Account & billing
         </div>
         <h2 style={{ margin: '6px 0 8px', fontSize: isMobile ? '1.35rem' : '1.65rem', lineHeight: 1.2 }}>
-          Transparent. Fair. No gotchas.
+          Your account, plan & subscription
         </h2>
         <p style={{ margin: 0, opacity: 0.88, fontSize: 15, lineHeight: 1.5, maxWidth: 640 }}>
           Start free. Upgrade to unlock full action plans, score history, AI insights, exports, and monthly tracking —
@@ -176,6 +179,17 @@ export default function SubscriptionPortal({
         </div>
       ) : null}
       {billingErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{billingErr}</div> : null}
+
+      {token ? (
+        <AccountSettingsPanel
+          token={token}
+          accountEmail={accountEmail}
+          cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+        />
+      ) : null}
 
       <div style={{ ...cardStyle, display: 'grid', gap: 16 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start' }}>
