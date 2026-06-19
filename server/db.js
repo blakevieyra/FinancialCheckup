@@ -169,6 +169,8 @@ async function initDb() {
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_phone TEXT`,
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_weekday INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_last_sent_at TEXT`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS onboarding_complete INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS primary_goal TEXT`,
   ];
   for (const stmt of prefMigrations) await rawQuery(stmt);
 

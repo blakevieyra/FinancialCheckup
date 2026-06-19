@@ -136,6 +136,12 @@ table tbody tr:nth-child(even) {
   }
 }
 
+@keyframes fcSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (min-width: 1024px) {
   .fc-dashboard-shell {
     width: 100%;

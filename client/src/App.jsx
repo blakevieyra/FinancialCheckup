@@ -8,6 +8,9 @@ import RecommendationTimeline from './RecommendationTimeline';
 import FinancialHistoryPanel from './FinancialHistoryPanel';
 import MoreToolsPanel from './MoreToolsPanel';
 import SubscriptionPortal from './SubscriptionPortal';
+import LoadingOverlay from './LoadingOverlay';
+import OnboardingWizard from './OnboardingWizard';
+import ExpandablePanel from './ExpandablePanel';
 import {
   clearAuthSession,
   clearCrossUserSessionState,
@@ -396,12 +399,42 @@ export default function App() {
   const [digestErr, setDigestErr] = useState('');
   const [digestPreview, setDigestPreview] = useState(null);
   const [accountEmail, setAccountEmail] = useState('');
+  const [primaryGoal, setPrimaryGoal] = useState('');
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [appLoading, setAppLoading] = useState('');
   const [goals, setGoals] = useState([]);
   const [goalsBusy, setGoalsBusy] = useState(false);
   const [goalsErr, setGoalsErr] = useState('');
   const [goalName, setGoalName] = useState('');
   const [goalType, setGoalType] = useState('retirement');
   const [goalTarget, setGoalTarget] = useState('');
+
+  async function loadOnboardingStatus() {
+    if (!token) return;
+    try {
+      const o = await api.getOnboarding(token);
+      setPrimaryGoal(o.primaryGoal || '');
+      if (!o.complete) setShowOnboarding(true);
+    } catch {
+      /** best-effort */
+    }
+  }
+
+  async function completeOnboarding() {
+    setShowOnboarding(false);
+    setAppLoading('Building your dashboard…');
+    try {
+      await Promise.all([loadMonthData(), loadHistory(), loadSubscription()]);
+      const d = await api.getCheckupLatest(token, month);
+      if (d?.found) {
+        setLastCheckupScore(d.overallScore ?? null);
+        setCheckupResult(d.result ?? null);
+      }
+      setActiveSection('overview');
+    } finally {
+      setAppLoading('');
+    }
+  }
 
   async function loadSubscription() {
     if (!token) return;
@@ -795,6 +828,7 @@ export default function App() {
   useEffect(() => {
     if (!token) return undefined;
     loadSubscription();
+    loadOnboardingStatus();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -888,6 +922,9 @@ export default function App() {
       setAccountEmail(res.email || '');
       setPassword('');
       setUsername('');
+      if (authMode === 'register') {
+        setShowOnboarding(true);
+      }
       try {
         const pendingTips = localStorage.getItem('fc-tips-email');
         if (pendingTips) {
@@ -1442,6 +1479,21 @@ export default function App() {
 
   return (
     <div style={shellStyle} className="fc-dashboard-shell">
+      {appLoading ? <LoadingOverlay message={appLoading} /> : null}
+      {checkupBusy ? <LoadingOverlay message="Updating your score…" submessage="Analyzing all 6 dimensions" /> : null}
+      {showOnboarding ? (
+        <OnboardingWizard
+          token={token}
+          userId={userId}
+          month={month}
+          cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          isMobile={isMobile}
+          onComplete={completeOnboarding}
+        />
+      ) : null}
       <div style={containerStyle} className="fc-dashboard">
       <div
         style={{
@@ -1467,6 +1519,19 @@ export default function App() {
           </div>
           </div>
         </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <a
+          href="mailto:info@operone2i.com"
+          style={{
+            ...btnNeutral,
+            textDecoration: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            fontSize: 13,
+          }}
+        >
+          Support
+        </a>
         <button
           type="button"
           onClick={logout}
@@ -1474,6 +1539,7 @@ export default function App() {
         >
           Logout
         </button>
+        </div>
       </div>
 
       <div
@@ -1558,6 +1624,10 @@ export default function App() {
             showForm
             showDetails
             showHistory={false}
+            profile={profile}
+            primaryGoal={primaryGoal}
+            isPro={isPro}
+            onGoPlan={() => setActiveSection('plan')}
           />
         )}
 
@@ -1657,14 +1727,13 @@ export default function App() {
         </div>
 
         {checkupResult?.recommendationTimeline?.length ? (
-          <RecommendationTimeline timeline={checkupResult.recommendationTimeline} cardSoftStyle={cardSoftStyle} />
+          <ExpandablePanel title="Action timeline" hint="Tap cards for full steps by period" cardSoftStyle={cardSoftStyle}>
+            <RecommendationTimeline timeline={checkupResult.recommendationTimeline} cardSoftStyle={cardSoftStyle} isMobile={isMobile} />
+          </ExpandablePanel>
         ) : null}
 
-        <details id="goals-panel" style={cardStyle}>
-          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
-            Goals & progress (MRR / ARR / retirement / savings)
-          </summary>
-          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+        <ExpandablePanel title="Goals & progress" hint="MRR, ARR, retirement & savings targets" cardSoftStyle={cardSoftStyle}>
+          <div style={{ display: 'grid', gap: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr auto', gap: 8 }}>
               <input value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="Goal name (e.g. Retirement 2035)" style={inputStyle} />
               <select value={goalType} onChange={(e) => setGoalType(e.target.value)} style={inputStyle}>
@@ -1722,13 +1791,10 @@ export default function App() {
               <div style={{ opacity: 0.8, fontSize: 14 }}>No goals yet. Add a target above to start tracking progress.</div>
             )}
           </div>
-        </details>
+        </ExpandablePanel>
 
-        <details id="leaderboard-panel" style={cardStyle}>
-          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
-            Leaderboard & budget trend
-          </summary>
-          <div style={{ marginTop: 12, display: 'grid', gap: 18 }}>
+        <ExpandablePanel title="Leaderboard & budget trend" hint="Compare budget grade and spending trajectory" cardSoftStyle={cardSoftStyle}>
+          <div style={{ display: 'grid', gap: 18 }}>
             <p style={{ margin: 0, opacity: 0.86, lineHeight: 1.45, fontSize: 14 }}>
               Leaderboard ranks <strong>budget score only</strong> (100 − expense ratio). Your main Financial Checkup Score on Overview includes all 6 dimensions.
             </p>
@@ -1853,7 +1919,7 @@ export default function App() {
               <div style={{ opacity: 0.8, fontSize: 14 }}>Add another month of data to see a trend chart.</div>
             ) : null}
           </div>
-        </details>
+        </ExpandablePanel>
 
         <CheckupPanel
           key={`history-${month}-${lastCheckupScore ?? 'none'}`}

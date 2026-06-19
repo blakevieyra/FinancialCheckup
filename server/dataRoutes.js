@@ -67,6 +67,52 @@ router.get('/data-export', async (req, res) => {
   }
 });
 
+/** GET /api/me/onboarding */
+router.get('/onboarding', async (req, res) => {
+  try {
+    const prefs = await dbGet(
+      'SELECT onboarding_complete, primary_goal FROM user_preferences WHERE user_id = ?',
+      [req.user.id],
+    );
+    const history = await dbGet(
+      'SELECT id FROM checkup_history WHERE user_id = ? LIMIT 1',
+      [req.user.id],
+    );
+    res.json({
+      complete: Boolean(prefs?.onboarding_complete) || Boolean(history),
+      primaryGoal: prefs?.primary_goal || '',
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not load onboarding status.' });
+  }
+});
+
+/** PATCH /api/me/onboarding */
+router.patch('/onboarding', async (req, res) => {
+  try {
+    const { complete, primaryGoal } = req.body || {};
+    const existing = await dbGet(
+      'SELECT onboarding_complete, primary_goal FROM user_preferences WHERE user_id = ?',
+      [req.user.id],
+    );
+    const nextComplete = complete !== undefined ? (complete ? 1 : 0) : (existing?.onboarding_complete ?? 0);
+    const nextGoal = primaryGoal !== undefined ? String(primaryGoal) : (existing?.primary_goal ?? null);
+    await dbRun(
+      `INSERT INTO user_preferences (user_id, onboarding_complete, primary_goal)
+       VALUES (?, ?, ?)
+       ON CONFLICT (user_id) DO UPDATE SET
+         onboarding_complete = EXCLUDED.onboarding_complete,
+         primary_goal = EXCLUDED.primary_goal`,
+      [req.user.id, nextComplete, nextGoal],
+    );
+    res.json({ ok: true, complete: Boolean(nextComplete), primaryGoal: nextGoal || '' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not save onboarding.' });
+  }
+});
+
 /** DELETE /api/me/account — permanently delete account and all data */
 router.delete('/account', async (req, res) => {
   try {

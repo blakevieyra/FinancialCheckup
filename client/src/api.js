@@ -249,6 +249,18 @@ export async function deleteMyAccount(token, password) {
   return apiFetch('/api/me/account', { method: 'DELETE', token, body: { password } });
 }
 
+export async function getOnboarding(token) {
+  return apiFetch('/api/me/onboarding', { token });
+}
+
+export async function setOnboarding(token, body) {
+  return apiFetch('/api/me/onboarding', { method: 'PATCH', token, body });
+}
+
+export async function getSpecialistAdvice(token, payload) {
+  return apiFetch('/api/ai/specialist', { method: 'POST', token, body: payload });
+}
+
 export async function getGoals(token) {
   return apiFetch('/api/goals', { token });
 }

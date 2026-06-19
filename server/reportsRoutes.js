@@ -246,6 +246,9 @@ router.get('/executive-pdf', requireFeature('exports'), async (req, res) => {
     doc.end();
     sendReportEmail(req.user.id, { reportType: 'executive-pdf', month }).catch(() => {});
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
+});
+
+/** GET /api/reports/forecast?month=YYYY-MM */
 router.get('/forecast', requireFeature('forecast'), async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);

@@ -137,4 +137,83 @@ Include exactly 6 categoryPlans (one per dimension). Give 2-3 real sources per c
   }
 });
 
+const SPECIALIST_PROMPTS = {
+  insurance: 'You are an insurance planning educator. Analyze life, disability, and liability coverage gaps.',
+  investments: 'You are an investment educator (not a broker). Analyze portfolio allocation, fees, diversification, and age-appropriate targets.',
+  savings: 'You are a savings and emergency fund coach. Analyze emergency fund target vs balance, savings rate, and automation strategies.',
+};
+
+router.post('/specialist', requireFeature('aiInsights'), async (req, res) => {
+  const area = req.body?.area;
+  if (!['insurance', 'investments', 'savings'].includes(area)) {
+    return res.status(400).json({ error: 'area must be insurance, investments, or savings.' });
+  }
+
+  const {
+    month,
+    profile,
+    primaryGoal,
+    income,
+    totalExpenses,
+    dimensionScore,
+    dimensionGrade,
+    snapshot = {},
+    gaps = [],
+    summary: existingSummary,
+  } = req.body;
+
+  const safeMonth = month || new Date().toISOString().slice(0, 7);
+  const persona = SPECIALIST_PROMPTS[area];
+  const goalLine = primaryGoal ? `User primary goal: ${primaryGoal}.` : 'User primary goal: general financial wellness.';
+
+  const prompt = `${persona} Educational only — not licensed advice.
+
+${goalLine}
+Month: ${safeMonth}
+Profile: ${profile || 'personal'}
+Income: $${Number(income || 0).toLocaleString()} · Expenses: $${Number(totalExpenses || 0).toLocaleString()}
+${area} dimension score: ${dimensionScore != null ? Math.round(dimensionScore) : 'unknown'}/100 (${dimensionGrade || 'N/A'})
+
+SNAPSHOT
+${JSON.stringify(snapshot, null, 2)}
+
+GAPS / CONTEXT
+${gaps.length ? gaps.map((g) => (typeof g === 'string' ? g : `${g.label || g.type}: ${g.estMonthlyCost ? `~$${g.estMonthlyCost}/mo` : g.summary || ''}`)).join('\n') : existingSummary || 'See snapshot.'}
+
+${AUTHORITATIVE_SOURCES}
+
+Return ONLY valid JSON:
+{
+  "summary": "2 sentence executive summary tailored to user goal",
+  "report": "3-5 sentence detailed analysis paragraph",
+  "advice": ["3-5 specific recommendations"],
+  "nextSteps": ["3-5 ordered action steps for the next 30-90 days"],
+  "sources": [{"title":"","url":"","why":""}],
+  "disclaimer": "Educational only."
+}`;
+
+  try {
+    const text = await createMessage({ userContent: prompt, maxTokens: 2048 });
+    let parsed;
+    try {
+      parsed = JSON.parse(stripJsonFence(text));
+    } catch {
+      return res.status(502).json({ error: 'AI returned invalid JSON.' });
+    }
+    res.json({
+      area,
+      month: safeMonth,
+      summary: parsed.summary || '',
+      report: parsed.report || '',
+      advice: Array.isArray(parsed.advice) ? parsed.advice : [],
+      nextSteps: Array.isArray(parsed.nextSteps) ? parsed.nextSteps : [],
+      sources: Array.isArray(parsed.sources) ? parsed.sources : [],
+      disclaimer: parsed.disclaimer || 'Educational only.',
+    });
+  } catch (err) {
+    console.error('AI specialist error:', err.message);
+    res.status(502).json({ error: err.message || 'Specialist AI failed.' });
+  }
+});
+
 module.exports = router;

@@ -8,6 +8,7 @@ import {
 import ScoreExplainer from './ScoreExplainer';
 import RecommendationTimeline from './RecommendationTimeline';
 import ImprovementRoadmap from './ImprovementRoadmap';
+import SpecialistInsightPanel from './SpecialistInsightPanel';
 
 const fieldGrid = (isMobile) => ({
   display: 'grid',
@@ -42,8 +43,27 @@ function ActionPlanBlock({ actionPlan, cardSoftStyle, compact, bare }) {
   );
 }
 
-function DetailCards({ result, isTablet, cardSoftStyle }) {
+function DetailCards({
+  result,
+  isTablet,
+  cardSoftStyle,
+  token,
+  month,
+  profile,
+  primaryGoal,
+  isPro,
+  onGoPlan,
+  btnPrimary,
+  btnNeutral,
+  income,
+  totalExpenses,
+  extended,
+}) {
   if (!result) return null;
+  const savingsDim = result.dimensions?.find((d) => d.key === 'savings');
+  const investDim = result.dimensions?.find((d) => d.key === 'investments');
+  const insDim = result.dimensions?.find((d) => d.key === 'insurance');
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: 12 }}>
       <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
@@ -64,25 +84,66 @@ function DetailCards({ result, isTablet, cardSoftStyle }) {
           Snowball: {result.debtPlanner?.snowball?.months ?? 0} mo · ${result.debtPlanner?.snowball?.totalInterest?.toLocaleString()} interest
         </div>
       </div>
+      <SpecialistInsightPanel
+        area="insurance"
+        summary={insDim?.summary}
+        gaps={result.insuranceGaps}
+        dimensionScore={insDim?.score}
+        dimensionGrade={insDim?.grade}
+        snapshot={{ ...extended, hasLifeInsurance: extended?.hasLifeInsurance, hasDisabilityInsurance: extended?.hasDisabilityInsurance }}
+        token={token}
+        month={month}
+        profile={profile}
+        primaryGoal={primaryGoal}
+        isPro={isPro}
+        onGoPlan={onGoPlan}
+        cardSoftStyle={cardSoftStyle}
+        btnPrimary={btnPrimary}
+        btnNeutral={btnNeutral}
+        income={income}
+        totalExpenses={totalExpenses}
+      />
+      <SpecialistInsightPanel
+        area="investments"
+        summary={result.investmentHealth?.summary || investDim?.summary}
+        gaps={result.investmentHealth?.gaps || []}
+        dimensionScore={investDim?.score}
+        dimensionGrade={investDim?.grade}
+        snapshot={extended}
+        token={token}
+        month={month}
+        profile={profile}
+        primaryGoal={primaryGoal}
+        isPro={isPro}
+        onGoPlan={onGoPlan}
+        cardSoftStyle={cardSoftStyle}
+        btnPrimary={btnPrimary}
+        btnNeutral={btnNeutral}
+        income={income}
+        totalExpenses={totalExpenses}
+      />
+      <SpecialistInsightPanel
+        area="savings"
+        summary={savingsDim?.summary}
+        gaps={savingsDim?.gap ? [{ label: `Emergency fund gap: $${Number(savingsDim.gap).toLocaleString()}` }] : []}
+        dimensionScore={savingsDim?.score}
+        dimensionGrade={savingsDim?.grade}
+        snapshot={extended}
+        token={token}
+        month={month}
+        profile={profile}
+        primaryGoal={primaryGoal}
+        isPro={isPro}
+        onGoPlan={onGoPlan}
+        cardSoftStyle={cardSoftStyle}
+        btnPrimary={btnPrimary}
+        btnNeutral={btnNeutral}
+        income={income}
+        totalExpenses={totalExpenses}
+      />
       <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Insurance gaps</div>
-        {(result.insuranceGaps || []).length ? (
-          <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: 13 }}>
-            {result.insuranceGaps.map((g, i) => (
-              <li key={i}>{g.label} · ~${g.estMonthlyCost}/mo</li>
-            ))}
-          </ul>
-        ) : (
-          <div style={{ fontSize: 13, opacity: 0.85 }}>No major gaps flagged.</div>
-        )}
-      </div>
-      <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Investments & retirement</div>
-        <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.45 }}>
-          {result.investmentHealth?.summary}
-          <br />
-          {result.retirementTrajectory?.summary}
-        </div>
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>Retirement trajectory</div>
+        <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.45 }}>{result.retirementTrajectory?.summary}</div>
       </div>
     </div>
   );
@@ -105,6 +166,10 @@ export default function CheckupPanel({
   showForm = true,
   showDetails = true,
   showHistory = true,
+  profile = 'personal',
+  primaryGoal = '',
+  isPro = false,
+  onGoPlan,
 }) {
   const isGuest = !token;
   const [extended, setExtended] = useState(() => loadExtendedProfile(userId, isGuest));
@@ -395,9 +460,26 @@ export default function CheckupPanel({
             />
           ) : null}
           {showDetails && result.recommendationTimeline?.length ? (
-            <RecommendationTimeline timeline={result.recommendationTimeline} cardSoftStyle={cardSoftStyle} />
+            <RecommendationTimeline timeline={result.recommendationTimeline} cardSoftStyle={cardSoftStyle} isMobile={isMobile} />
           ) : null}
-          {showDetails ? <DetailCards result={result} isTablet={isTablet} cardSoftStyle={cardSoftStyle} /> : null}
+          {showDetails ? (
+            <DetailCards
+              result={result}
+              isTablet={isTablet}
+              cardSoftStyle={cardSoftStyle}
+              token={token}
+              month={month}
+              profile={profile}
+              primaryGoal={primaryGoal}
+              isPro={isPro}
+              onGoPlan={onGoPlan}
+              btnPrimary={btnPrimary}
+              btnNeutral={btnNeutral}
+              income={income}
+              totalExpenses={expenses}
+              extended={extended}
+            />
+          ) : null}
           {showHistory && history.length > 1 ? (
             <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
               <div style={{ fontWeight: 700, marginBottom: 8 }}>Score over time</div>
