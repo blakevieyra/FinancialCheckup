@@ -18,21 +18,25 @@ router.get('/', async (req, res) => {
       [req.user.id, m],
     );
     if (rows.length === 0) {
-      const cats = await dbAll(
-        'SELECT DISTINCT category FROM expenses WHERE user_id = ? ORDER BY category',
-        [req.user.id],
-      );
-      const seed = cats.length > 0 ? cats.map((r) => r.category) : (PROFILE_DEFAULTS[profile] || PROFILE_DEFAULTS.personal);
-      for (const category of seed) {
-        await dbRun(
-          'INSERT INTO expenses (user_id, category, amount, month) VALUES (?, ?, 0, ?)',
-          [req.user.id, category, m],
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      // Only seed default categories for the current month — avoids phantom history rows for past months.
+      if (m === currentMonth) {
+        const cats = await dbAll(
+          'SELECT DISTINCT category FROM expenses WHERE user_id = ? ORDER BY category',
+          [req.user.id],
+        );
+        const seed = cats.length > 0 ? cats.map((r) => r.category) : (PROFILE_DEFAULTS[profile] || PROFILE_DEFAULTS.personal);
+        for (const category of seed) {
+          await dbRun(
+            'INSERT INTO expenses (user_id, category, amount, month) VALUES (?, ?, 0, ?)',
+            [req.user.id, category, m],
+          );
+        }
+        rows = await dbAll(
+          'SELECT id, category, amount, month FROM expenses WHERE user_id = ? AND month = ? ORDER BY category',
+          [req.user.id, m],
         );
       }
-      rows = await dbAll(
-        'SELECT id, category, amount, month FROM expenses WHERE user_id = ? AND month = ? ORDER BY category',
-        [req.user.id, m],
-      );
     }
     res.json(rows);
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
@@ -103,7 +107,9 @@ router.delete('/category', async (req, res) => {
 router.get('/history', async (req, res) => {
   try {
     const rows = await dbAll(
-      'SELECT month, SUM(amount) as total FROM expenses WHERE user_id = ? GROUP BY month ORDER BY month DESC LIMIT 24',
+      `SELECT month, SUM(amount) as total FROM expenses WHERE user_id = ?
+       GROUP BY month HAVING SUM(amount) > 0
+       ORDER BY month DESC LIMIT 24`,
       [req.user.id],
     );
     res.json(rows);

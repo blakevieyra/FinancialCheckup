@@ -16,7 +16,13 @@ export default function FinancialHistoryPanel({
   const expMap = new Map((expensesHistory || []).map((r) => [r.month, Number(r.total) || 0]));
   const checkupByMonth = new Map((checkupHistory || []).map((r) => [r.month, r]));
 
-  const months = Array.from(new Set([...incMap.keys(), ...expMap.keys(), ...(checkupHistory || []).map((r) => r.month)]));
+  const months = Array.from(new Set([...incMap.keys(), ...expMap.keys(), ...(checkupHistory || []).map((r) => r.month)]))
+    .filter((m) => {
+      const income = incMap.get(m) ?? 0;
+      const expenses = expMap.get(m) ?? 0;
+      const ck = checkupByMonth.get(m);
+      return income > 0 || expenses > 0 || ck;
+    });
   months.sort((a, b) => b.localeCompare(a));
 
   if (!months.length) {
@@ -32,7 +38,7 @@ export default function FinancialHistoryPanel({
       <div>
         <h2 style={{ marginTop: 0, marginBottom: 6 }}>Income & expense history</h2>
         <p style={{ margin: 0, opacity: 0.85, fontSize: 14, lineHeight: 1.45 }}>
-          Every month you save on Finances. Tap a row to view that month. Scores update automatically as you enter data.
+          Months appear here only after you save income or expenses on Finances. Tap a row to view that month.
         </p>
       </div>
 

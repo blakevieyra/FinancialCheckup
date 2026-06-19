@@ -616,6 +616,7 @@ export default function App() {
   }, []);
 
   async function loadMonthData() {
+    skipLedgerAutoSave.current = true;
     setError('');
     setBusy(true);
     try {
@@ -636,6 +637,7 @@ export default function App() {
       }
     } finally {
       setBusy(false);
+      skipLedgerAutoSave.current = false;
     }
   }
 
@@ -1002,6 +1004,7 @@ export default function App() {
   }
 
   function openHistoryMonth(m) {
+    skipLedgerAutoSave.current = true;
     setMonth(m);
     setActiveSection('finances');
   }
@@ -1053,7 +1056,7 @@ export default function App() {
     }, 1400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [income, expenses, isAuthed, showOnboarding]);
+  }, [income, expenses, isAuthed, showOnboarding, month]);
 
   async function completeAuthSession(res, { isNewAccount = false } = {}) {
     resetSessionForNewUser();
