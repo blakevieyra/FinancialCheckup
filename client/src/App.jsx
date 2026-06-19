@@ -10,6 +10,7 @@ import MoreToolsPanel from './MoreToolsPanel';
 import MarketTicker from './MarketTicker';
 import SupportPanel from './SupportPanel';
 import SubscriptionPortal from './SubscriptionPortal';
+import AppFooter from './AppFooter';
 import LoadingOverlay from './LoadingOverlay';
 import OnboardingWizard from './OnboardingWizard';
 import ExpandablePanel from './ExpandablePanel';
@@ -20,7 +21,7 @@ import {
   persistAuthSession,
   extendedStorageKey,
 } from './userStorage';
-import { awardXp, loadXp, xpProgressLabel } from './progression';
+import { awardXp, loadXp, saveXp, xpProgressLabel } from './progression';
 import { validateRegisterForm } from './authValidation';
 
 function currentMonth() {
@@ -442,7 +443,14 @@ export default function App() {
         setCheckupResult(d.result ?? null);
       }
       setActiveSection('overview');
-      if (userId) setUserXp(awardXp(userId, 'onboarding'));
+      if (userId && token) {
+        api.awardProgress(token, 'onboarding').then(({ xp }) => {
+          setUserXp(xp);
+          saveXp(userId, xp);
+        }).catch(() => {
+          setUserXp(awardXp(userId, 'onboarding'));
+        });
+      }
     } finally {
       setAppLoading('');
     }
@@ -540,7 +548,32 @@ export default function App() {
   const isDesktop = viewportW >= 1024;
 
   useEffect(() => {
-    if (userId) setUserXp(loadXp(userId));
+    if (!token) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await api.getProfile(token);
+        if (cancelled) return;
+        const uid = profile?.userId;
+        if (uid) {
+          setUserId(uid);
+          localStorage.setItem('fc-user-id', String(uid));
+        }
+        const progress = await api.getProgress(token);
+        if (cancelled) return;
+        setUserXp(progress.xp);
+        if (uid) saveXp(uid, progress.xp);
+      } catch {
+        const stored = getStoredUserId();
+        if (stored) setUserXp(loadXp(stored));
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    if (userId) setUserXp((prev) => Math.max(prev, loadXp(userId)));
   }, [userId]);
 
   useEffect(() => {
@@ -677,6 +710,7 @@ export default function App() {
       setGoalName('');
       setGoalTarget('');
       await loadGoals();
+      awardXpThrottled('goalCreated', 30000);
     } catch (e) {
       setGoalsErr(e.message);
     } finally {
@@ -899,11 +933,18 @@ export default function App() {
   }, [token, month]);
 
   function awardXpThrottled(reason, cooldownMs = 120000) {
-    if (!userId) return;
+    if (!userId || !token) return;
     const now = Date.now();
     if (now - lastXpAwardRef.current < cooldownMs) return;
     lastXpAwardRef.current = now;
-    setUserXp(awardXp(userId, reason));
+    api.awardProgress(token, reason)
+      .then(({ xp }) => {
+        setUserXp(xp);
+        saveXp(userId, xp);
+      })
+      .catch(() => {
+        setUserXp(awardXp(userId, reason));
+      });
   }
 
   function handleCheckupResult(data) {
@@ -1069,7 +1110,7 @@ export default function App() {
       try {
         await api.sendRegisterCode(username, password, registerEmail.trim());
         setRegisterPhase('code');
-        setAuthNotice(`We sent a 6-digit code to ${registerEmail.trim()}.`);
+        setAuthNotice(`We sent a 6-digit code to ${registerEmail.trim()}. Check your spam folder if it does not arrive within a minute.`);
       } catch (e2) {
         setAuthError(e2.message);
       } finally {
@@ -1093,8 +1134,8 @@ export default function App() {
     setAuthError('');
     setResendBusy(true);
     try {
-      await api.sendRegisterCode(username, password, registerEmail.trim());
-      setAuthNotice(`New code sent to ${registerEmail.trim()}.`);
+      await api.resendRegisterCode(registerEmail.trim());
+      setAuthNotice(`New code sent to ${registerEmail.trim()}. Check spam if needed.`);
     } catch (e) {
       setAuthError(e.message);
     } finally {
@@ -2085,26 +2126,6 @@ export default function App() {
             ) : null}
           </div>
         </ExpandablePanel>
-
-        <CheckupPanel
-          key={`history-${month}-${lastCheckupScore ?? 'none'}`}
-          token={token}
-          userId={userId}
-          month={month}
-          isMobile={isMobile}
-          isTablet={isTablet}
-          cardStyle={cardStyle}
-          cardSoftStyle={cardSoftStyle}
-          inputStyle={inputStyle}
-          btnPrimary={btnPrimary}
-          btnNeutral={btnNeutral}
-          ledger={{ income, totalExpenses }}
-            onResult={handleCheckupResult}
-            onGoTab={goAppTab}
-            showForm={false}
-          showDetails={false}
-          showHistory
-        />
           </>
         )}
 
@@ -2194,10 +2215,8 @@ export default function App() {
             xpLabel={`${xpInfo.current} / ${xpInfo.next} XP to next level`}
           />
         )}
+        <AppFooter />
       </div>
-        <div style={{ marginTop: 16, textAlign: 'center', opacity: 0.65, fontSize: 12 }}>
-          Operon E2I
-        </div>
       </div>
     </div>
   );

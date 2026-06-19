@@ -74,7 +74,7 @@ router.post('/register/send-code', async (req, res) => {
     }
 
     if (!smtpConfigured()) {
-      return res.status(503).json({ error: 'Email verification is not configured on the server yet. Contact support@operone2i.com.' });
+      return res.status(503).json({ error: 'Email verification is not configured on the server yet. Contact info@operone2i.com.' });
     }
 
     const hash = await bcrypt.hash(password, 12);
@@ -100,13 +100,46 @@ router.post('/register/send-code', async (req, res) => {
   }
 });
 
+router.post('/register/resend-code', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+
+    if (!smtpConfigured()) {
+      return res.status(503).json({ error: 'Email verification is not configured on the server yet. Contact info@operone2i.com.' });
+    }
+
+    const pending = await dbGet('SELECT * FROM registration_pending WHERE LOWER(email) = ?', [email]);
+    if (!pending) {
+      return res.status(404).json({ error: 'No pending registration for this email. Start sign-up again.' });
+    }
+
+    const code = generateOtpCode();
+    const expires = otpExpiresAt();
+    await dbRun(
+      'UPDATE registration_pending SET verify_code = ?, expires_at = ? WHERE id = ?',
+      [code, expires, pending.id],
+    );
+
+    const sent = await sendRegistrationOtpEmail(email, pending.username, code);
+    if (!sent.sent) {
+      return res.status(502).json({ error: sent.reason || 'Could not send verification email.' });
+    }
+
+    res.json({ ok: true, message: 'New verification code sent. Check your inbox and spam folder.' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
 router.post('/register/verify', async (req, res) => {
   try {
     const email = String(req.body?.email || '').trim().toLowerCase();
-    const code = String(req.body?.code || '').trim();
+    const code = String(req.body?.code || '').replace(/\D/g, '').trim();
 
-    if (!email || !code) {
-      return res.status(400).json({ error: 'Email and verification code are required.' });
+    if (!email || !code || code.length !== 6) {
+      return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
     }
 
     const pending = await dbGet(

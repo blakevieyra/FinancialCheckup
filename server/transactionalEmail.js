@@ -24,10 +24,9 @@ function generateOtpCode() {
 }
 
 async function sendRegistrationOtpEmail(email, username, code) {
-  return sendIfConfigured(
-    email,
-    'Your Financial Checkup verification code',
-    `Hi ${username},
+  const app = clientBaseUrl();
+  const subject = 'Your Financial Checkup verification code';
+  const text = `Hi ${username},
 
 Your one-time verification code is:
 
@@ -37,14 +36,35 @@ Enter this code in the app to finish creating your account. It expires in 15 min
 
 If you did not request this, you can ignore this email.
 
-— Financial Checkup`,
-  );
+Sign in: ${app}
+Support: info@operone2i.com
+
+— Financial Checkup · Operon E2I LLC`;
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:24px;background:#eef2ff;font-family:Segoe UI,Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,0.12);">
+    <tr><td style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:22px 24px;color:#fff;">
+      <div style="font-size:18px;font-weight:800;">Financial Checkup</div>
+      <div style="font-size:12px;opacity:0.9;margin-top:4px;">Operon E2I LLC</div>
+    </td></tr>
+    <tr><td style="padding:24px;color:#0f172a;">
+      <p style="margin:0 0 12px;">Hi ${username},</p>
+      <p style="margin:0 0 16px;color:#475569;line-height:1.5;">Use this code to verify your email and finish creating your account:</p>
+      <div style="font-size:32px;font-weight:800;letter-spacing:0.35em;text-align:center;padding:16px;background:#f1f5f9;border-radius:10px;color:#1e3a8a;">${code}</div>
+      <p style="margin:16px 0 0;font-size:13px;color:#64748b;line-height:1.5;">Expires in 15 minutes. Check spam if you do not see this message.</p>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  return sendIfConfigured(email, subject, text, html);
 }
 
-async function sendIfConfigured(to, subject, text) {
+async function sendIfConfigured(to, subject, text, html) {
   if (!to || !smtpConfigured()) return { sent: false, reason: 'no_email_or_smtp' };
   try {
-    await sendEmailPlain({ to, subject, text });
+    await sendEmailPlain({ to, subject, text, html });
     return { sent: true };
   } catch (e) {
     console.error('[email]', subject, e.message);

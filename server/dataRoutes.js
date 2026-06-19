@@ -5,6 +5,80 @@ const { dbGet, dbAll, dbRun } = require('./db');
 
 router.use(verifyToken);
 
+const { XP_REWARDS, XP_PER_LEVEL, levelFromXp, computeBaselineXp } = require('./progression');
+
+/** GET /api/me/profile — lightweight session identity */
+router.get('/profile', async (req, res) => {
+  try {
+    const user = await dbGet(
+      'SELECT id, username, email, email_verified FROM users WHERE id = ?',
+      [req.user.id],
+    );
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    res.json({
+      userId: user.id,
+      username: user.username,
+      email: user.email || null,
+      emailVerified: Boolean(user.email_verified),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not load profile.' });
+  }
+});
+
+/** GET /api/me/progress — XP synced to account (not browser-only) */
+router.get('/progress', async (req, res) => {
+  try {
+    const uid = req.user.id;
+    const xp = await computeBaselineXp(dbGet, uid);
+    await dbRun(
+      `INSERT INTO user_preferences (user_id, xp_total)
+       VALUES (?, ?)
+       ON CONFLICT (user_id) DO UPDATE SET xp_total = EXCLUDED.xp_total`,
+      [uid, xp],
+    );
+    res.json({
+      xp,
+      level: levelFromXp(xp),
+      xpPerLevel: XP_PER_LEVEL,
+      xpInLevel: xp % XP_PER_LEVEL,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not load progress.' });
+  }
+});
+
+/** POST /api/me/progress/award — { reason: checkup | saveData | aiReport | goalCreated | onboarding } */
+router.post('/progress/award', async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    const amount = XP_REWARDS[reason];
+    if (!amount) return res.status(400).json({ error: 'Invalid progress reason.' });
+
+    const uid = req.user.id;
+    const current = await computeBaselineXp(dbGet, uid);
+    const next = current + amount;
+    await dbRun(
+      `INSERT INTO user_preferences (user_id, xp_total)
+       VALUES (?, ?)
+       ON CONFLICT (user_id) DO UPDATE SET xp_total = ?`,
+      [uid, next, next],
+    );
+    res.json({
+      xp: next,
+      level: levelFromXp(next),
+      xpPerLevel: XP_PER_LEVEL,
+      xpInLevel: next % XP_PER_LEVEL,
+      awarded: amount,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not award progress.' });
+  }
+});
+
 /** GET /api/me/data-export — full JSON bundle of user-entered data */
 router.get('/data-export', async (req, res) => {
   try {

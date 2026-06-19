@@ -204,7 +204,7 @@ export default function LandingPage({
             marginTop: isMobile ? 4 : 0,
           }}
         >
-          <div>© 2026 Financial Checkup · Operon E2I LLC · Fresno, CA</div>
+          <div>© 2026 Financial Checkup · OPERON E2I LLC · Fresno, CA</div>
           <div>Contact: info@operone2i.com</div>
         </footer>
       </div>

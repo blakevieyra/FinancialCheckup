@@ -5,6 +5,7 @@ const AUTH_PATH_PREFIXES = [
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/register/send-code',
+  '/api/auth/register/resend-code',
   '/api/auth/register/verify',
 ];
 
@@ -116,8 +117,27 @@ export async function sendRegisterCode(username, password, email) {
 export async function verifyRegister(email, code) {
   return apiFetch('/api/auth/register/verify', {
     method: 'POST',
-    body: { email, code },
+    body: { email, code: String(code || '').replace(/\D/g, '') },
   });
+}
+
+export async function resendRegisterCode(email) {
+  return apiFetch('/api/auth/register/resend-code', {
+    method: 'POST',
+    body: { email },
+  });
+}
+
+export async function getProfile(token) {
+  return apiFetch('/api/me/profile', { token });
+}
+
+export async function getProgress(token) {
+  return apiFetch('/api/me/progress', { token });
+}
+
+export async function awardProgress(token, reason) {
+  return apiFetch('/api/me/progress/award', { method: 'POST', token, body: { reason } });
 }
 
 export async function login(username, password) {

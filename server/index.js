@@ -55,6 +55,8 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/register/send-code', authLimiter);
+app.use('/api/auth/register/resend-code', authLimiter);
+app.use('/api/auth/register/verify', authLimiter);
 
 app.use('/api/auth', require('./authRoutes'));
 app.use('/api/billing', billingRouter);

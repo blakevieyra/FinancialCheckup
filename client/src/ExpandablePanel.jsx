@@ -37,10 +37,12 @@ export default function ExpandablePanel({ title, hint, children, cardSoftStyle, 
           transition: 'max-height 420ms ease, opacity 380ms ease',
         }}
       >
-        <div style={{ padding: '0 1rem 1rem', borderTop: '1px solid rgba(148,163,184,0.12)' }}>
-          <div className={open ? 'fc-fade-in' : undefined} style={{ paddingTop: 12 }}>
-            {children}
-          </div>
+        <div style={{ padding: open ? '0 1rem 1rem' : 0, borderTop: open ? '1px solid rgba(148,163,184,0.12)' : 'none' }}>
+          {open ? (
+            <div className="fc-fade-in" style={{ paddingTop: 12 }}>
+              {children}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
