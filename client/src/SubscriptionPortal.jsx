@@ -200,15 +200,27 @@ export default function SubscriptionPortal({
           </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
           {[
             { label: 'Status', value: statusLabel(status), color: statusColor(status, tier) },
-            { label: 'Billing', value: plan === 'annual' ? 'Annual' : plan === 'monthly' ? 'Monthly' : 'None' },
+            { label: 'Billing', value: plan === 'annual' ? 'Annual ($96/yr)' : plan === 'monthly' ? 'Monthly ($10/mo)' : 'None' },
             {
-              label: subscription?.cancelAtPeriodEnd ? 'Access until' : isPro ? 'Renews' : 'Next step',
-              value: subscription?.cancelAtPeriodEnd || isPro
-                ? formatDate(subscription?.currentPeriodEnd)
-                : 'Pick a plan below',
+              label: subscription?.cancelAtPeriodEnd ? 'Access until' : isPro ? 'Next billing' : 'Renews',
+              value: formatDate(subscription?.currentPeriodEnd),
+            },
+            { label: 'Started', value: formatDate(subscription?.subscriptionStart) },
+            { label: 'Current period', value: subscription?.currentPeriodStart ? `${formatDate(subscription.currentPeriodStart)} → ${formatDate(subscription.currentPeriodEnd)}` : '—' },
+            {
+              label: 'Last charge',
+              value: subscription?.lastChargeAmount != null
+                ? `$${Number(subscription.lastChargeAmount).toFixed(2)} · ${formatDate(subscription.lastChargeDate)}`
+                : '—',
+            },
+            {
+              label: 'Next charge',
+              value: subscription?.nextChargeAmount != null && isPro
+                ? `$${Number(subscription.nextChargeAmount).toFixed(2)}`
+                : '—',
             },
             { label: 'Pro tools', value: isPro ? 'Unlocked' : 'Upgrade', color: isPro ? '#86efac' : '#93c5fd' },
           ].map((stat) => (

@@ -1,9 +1,9 @@
 import ScoreHero from './ScoreHero';
 import ImprovementRoadmap from './ImprovementRoadmap';
-import ExpandablePanel from './ExpandablePanel';
 import ScoreExplainer from './ScoreExplainer';
 import GuidePanel from './GuidePanel';
-import { ActionPlanBlock } from './CheckupPanel';
+import PrioritiesPanel from './PrioritiesPanel';
+import RecommendationTimeline from './RecommendationTimeline';
 
 function StatTile({ label, value, cardSoftStyle }) {
   return (
@@ -37,7 +37,6 @@ export default function OverviewDashboard({
   xpLabel,
 }) {
   const gridOverview = isMobile ? '1fr' : isDesktop ? 'minmax(0, 1fr) minmax(280px, 340px)' : '1fr';
-  const gridLower = isMobile ? '1fr' : isDesktop ? 'repeat(2, minmax(0, 1fr))' : '1fr';
 
   return (
     <div style={{ display: 'grid', gap: isDesktop ? 24 : 18, width: '100%' }}>
@@ -86,6 +85,25 @@ export default function OverviewDashboard({
         </div>
       </div>
 
+      {checkupResult?.actionPlan?.length ? (
+        <PrioritiesPanel
+          actionPlan={checkupResult.actionPlan}
+          cardSoftStyle={cardSoftStyle}
+          onGoFinances={onGoFinances}
+          btnNeutral={btnNeutral}
+        />
+      ) : null}
+
+      {checkupResult?.recommendationTimeline?.length ? (
+        <div style={{ ...cardSoftStyle, padding: '1rem 1.15rem' }}>
+          <RecommendationTimeline
+            timeline={checkupResult.recommendationTimeline}
+            cardSoftStyle={cardSoftStyle}
+            isMobile={isMobile}
+          />
+        </div>
+      ) : null}
+
       {checkupResult?.improvementRoadmap ? (
         <ImprovementRoadmap
           roadmap={checkupResult.improvementRoadmap}
@@ -96,24 +114,17 @@ export default function OverviewDashboard({
         />
       ) : null}
 
-      {checkupResult ? (
-        <div style={{ display: 'grid', gridTemplateColumns: gridLower, gap: 16 }}>
-          <ExpandablePanel title="Top priorities" hint="Tap to see ranked action items" cardSoftStyle={cardSoftStyle}>
-            <ActionPlanBlock actionPlan={checkupResult.actionPlan} cardSoftStyle={cardSoftStyle} compact={false} bare />
-          </ExpandablePanel>
-          {checkupResult.scoreExplanation ? (
-            <ExpandablePanel title="How your score works" hint="Tap for breakdown & formula" cardSoftStyle={cardSoftStyle}>
-              <ScoreExplainer
-                explanation={checkupResult.scoreExplanation}
-                isMobile={isMobile}
-                cardSoftStyle={cardSoftStyle}
-                compact={false}
-                bare
-                onGoTab={onGoTab}
-                btnNeutral={btnNeutral}
-              />
-            </ExpandablePanel>
-          ) : null}
+      {checkupResult?.scoreExplanation ? (
+        <div style={{ ...cardSoftStyle, padding: '1rem 1.15rem' }}>
+          <ScoreExplainer
+            explanation={checkupResult.scoreExplanation}
+            isMobile={isMobile}
+            cardSoftStyle={cardSoftStyle}
+            compact={false}
+            bare
+            onGoTab={onGoTab}
+            btnNeutral={btnNeutral}
+          />
         </div>
       ) : null}
     </div>

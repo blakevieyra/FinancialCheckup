@@ -60,11 +60,11 @@ function fieldsFromStripeSub(sub) {
 
 async function buildStatusJson(userId) {
   const row = await dbGet(
-    'SELECT status, plan, current_period_end, stripe_customer_id, cancel_at_period_end FROM subscriptions WHERE user_id = ?',
+    'SELECT status, plan, current_period_end, stripe_customer_id, stripe_subscription_id, cancel_at_period_end, updated_at FROM subscriptions WHERE user_id = ?',
     [userId],
   );
   const tier = resolveTier(row);
-  return {
+  const base = {
     tier,
     tierLabel: tierLabel(tier),
     status: row?.status || 'free',
@@ -78,7 +78,46 @@ async function buildStatusJson(userId) {
       annual: STRIPE_PRICES.annual,
     },
     billingConfigured: Boolean(stripe),
+    subscriptionStart: null,
+    currentPeriodStart: null,
+    lastChargeAmount: null,
+    lastChargeCurrency: 'usd',
+    lastChargeDate: null,
+    nextChargeAmount: null,
   };
+
+  if (stripe && row?.stripe_subscription_id) {
+    try {
+      const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+      base.subscriptionStart = sub.start_date ? new Date(sub.start_date * 1000).toISOString() : null;
+      base.currentPeriodStart = sub.current_period_start
+        ? new Date(sub.current_period_start * 1000).toISOString()
+        : null;
+      base.currentPeriodEnd = sub.current_period_end
+        ? new Date(sub.current_period_end * 1000).toISOString()
+        : base.currentPeriodEnd;
+      const price = sub.items?.data?.[0]?.price;
+      if (price?.unit_amount) {
+        base.nextChargeAmount = price.unit_amount / 100;
+        base.lastChargeCurrency = price.currency || 'usd';
+      }
+      const invoices = await stripe.invoices.list({ subscription: sub.id, limit: 3 });
+      const paid = invoices.data.find((inv) => inv.status === 'paid' && inv.amount_paid > 0);
+      if (paid) {
+        base.lastChargeAmount = paid.amount_paid / 100;
+        base.lastChargeCurrency = paid.currency || 'usd';
+        base.lastChargeDate = paid.status_transitions?.paid_at
+          ? new Date(paid.status_transitions.paid_at * 1000).toISOString()
+          : paid.created
+            ? new Date(paid.created * 1000).toISOString()
+            : null;
+      }
+    } catch (e) {
+      console.error('[billing] status enrich failed:', e.message);
+    }
+  }
+
+  return base;
 }
 
 function billingReturnBase(clientUrl) {

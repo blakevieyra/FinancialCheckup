@@ -5,9 +5,10 @@ import CheckupPanel from './CheckupPanel';
 import OverviewDashboard from './OverviewDashboard';
 import FinancesPage from './FinancesPage';
 import AppNav from './AppNav';
-import RecommendationTimeline from './RecommendationTimeline';
 import FinancialHistoryPanel from './FinancialHistoryPanel';
 import MoreToolsPanel from './MoreToolsPanel';
+import MarketTicker from './MarketTicker';
+import SupportPanel from './SupportPanel';
 import SubscriptionPortal from './SubscriptionPortal';
 import LoadingOverlay from './LoadingOverlay';
 import OnboardingWizard from './OnboardingWizard';
@@ -518,6 +519,7 @@ export default function App() {
   const [lastCheckupScore, setLastCheckupScore] = useState(null);
   const [checkupResult, setCheckupResult] = useState(null);
   const [checkupBusy, setCheckupBusy] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
   const [userXp, setUserXp] = useState(() => loadXp(getStoredUserId()));
   const skipLedgerAutoSave = useRef(true);
@@ -1634,6 +1636,17 @@ export default function App() {
   return (
     <div style={shellStyle} className="fc-dashboard-shell">
       {appLoading ? <LoadingOverlay message={appLoading} /> : null}
+      {showSupport ? (
+        <SupportPanel
+          token={token}
+          accountEmail={accountEmail}
+          cardStyle={cardStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          onClose={() => setShowSupport(false)}
+        />
+      ) : null}
       {showOnboarding ? (
         <OnboardingWizard
           token={token}
@@ -1658,9 +1671,9 @@ export default function App() {
           flexDirection: isMobile ? 'column' : 'row',
         }}
       >
-        <div style={{ minWidth: 0, display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ minWidth: 0, display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
           <img src="/logo.png" alt="" width={isMobile ? 40 : 48} height={isMobile ? 40 : 48} style={{ borderRadius: 10, flexShrink: 0 }} />
-          <div>
+          <div style={{ minWidth: 0, flex: 1 }}>
           <h1 style={{ marginBottom: 4, fontSize: isMobile ? '1.45rem' : undefined, lineHeight: 1.2 }}>Financial Checkup</h1>
           <div style={{ opacity: 0.85, wordBreak: 'break-word' }}>
             Signed in as <strong>{user}</strong>
@@ -1674,21 +1687,22 @@ export default function App() {
               <span> · Plan <strong>{subscription.tierLabel}</strong></span>
             ) : null}
           </div>
+          {!isMobile ? (
+            <div style={{ marginTop: 10 }}>
+              <MarketTicker isMobile={isMobile} />
+            </div>
+          ) : null}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <a
-          href="mailto:info@operone2i.com"
-          style={{
-            ...btnNeutral,
-            textDecoration: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            fontSize: 13,
-          }}
+        {isMobile ? <MarketTicker isMobile={isMobile} /> : null}
+        <button
+          type="button"
+          onClick={() => setShowSupport(true)}
+          style={{ ...btnNeutral, fontSize: 13 }}
         >
           Support
-        </a>
+        </button>
         <button
           type="button"
           onClick={logout}
@@ -1870,12 +1884,6 @@ export default function App() {
             </div>
           </div>
         </div>
-
-        {checkupResult?.recommendationTimeline?.length ? (
-          <ExpandablePanel title="Action timeline" hint="Tap cards for full steps by period" cardSoftStyle={cardSoftStyle}>
-            <RecommendationTimeline timeline={checkupResult.recommendationTimeline} cardSoftStyle={cardSoftStyle} isMobile={isMobile} />
-          </ExpandablePanel>
-        ) : null}
 
         <ExpandablePanel title="Goals & progress" hint="MRR, ARR, retirement & savings targets" cardSoftStyle={cardSoftStyle}>
           <div style={{ display: 'grid', gap: 12 }}>

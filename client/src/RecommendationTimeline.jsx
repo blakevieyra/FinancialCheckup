@@ -72,9 +72,9 @@ export default function RecommendationTimeline({ timeline, cardSoftStyle, compac
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div>
-        <div style={{ fontWeight: 800, fontSize: 17 }}>Your action timeline</div>
-        <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
-          Summary cards by period — tap any item for full steps.
+        <div style={{ fontWeight: 800, fontSize: 17 }}>Action timeline</div>
+        <div style={{ fontSize: 13, opacity: 0.78, marginTop: 4, lineHeight: 1.45 }}>
+          What to do now, this month, and long-term — tap any card for step-by-step instructions.
         </div>
       </div>
       {phases.map((phase) => (

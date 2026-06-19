@@ -79,6 +79,18 @@ export async function health() {
   return apiFetch('/api/health');
 }
 
+export async function getMarketTicker() {
+  return apiFetch('/api/market/ticker');
+}
+
+export async function sendSupportMessage(token, { subject, message }) {
+  return apiFetch('/api/support', {
+    method: 'POST',
+    token,
+    body: { subject, message },
+  });
+}
+
 export async function register(username, password, email) {
   return apiFetch('/api/auth/register', {
     method: 'POST',

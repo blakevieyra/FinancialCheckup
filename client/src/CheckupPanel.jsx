@@ -5,9 +5,6 @@ import {
   loadExtendedProfile,
   saveExtendedProfile,
 } from './userStorage';
-import ScoreExplainer from './ScoreExplainer';
-import RecommendationTimeline from './RecommendationTimeline';
-import ImprovementRoadmap from './ImprovementRoadmap';
 import SpecialistInsightPanel from './SpecialistInsightPanel';
 
 const fieldGrid = (isMobile) => ({
@@ -459,28 +456,6 @@ export default function CheckupPanel({
 
       {result ? (
         <>
-          {result.improvementRoadmap ? (
-            <ImprovementRoadmap
-              roadmap={result.improvementRoadmap}
-              compact={!showDetails}
-              cardSoftStyle={cardSoftStyle}
-              onGoTab={onGoTab}
-              btnNeutral={btnNeutral}
-            />
-          ) : null}
-          <ActionPlanBlock actionPlan={result.actionPlan} cardSoftStyle={cardSoftStyle} compact={!showDetails} />
-          {showDetails && result.scoreExplanation ? (
-            <ScoreExplainer
-              explanation={result.scoreExplanation}
-              isMobile={isMobile}
-              cardSoftStyle={cardSoftStyle}
-              onGoTab={onGoTab}
-              btnNeutral={btnNeutral}
-            />
-          ) : null}
-          {showDetails && result.recommendationTimeline?.length ? (
-            <RecommendationTimeline timeline={result.recommendationTimeline} cardSoftStyle={cardSoftStyle} isMobile={isMobile} />
-          ) : null}
           {showDetails ? (
             <DetailCards
               result={result}

@@ -67,6 +67,7 @@ async function dispatchDigest(prefRow, options = {}) {
       to: addr,
       subject: digest.subject,
       text: digest.plain,
+      html: digest.html,
     });
   } else if (channel === 'sms') {
     const phone = prefRow.digest_phone;

@@ -6,7 +6,7 @@ function smtpConfigured() {
   return hasSendGrid || hasSmtp;
 }
 
-async function sendEmailPlain({ to, subject, text }) {
+async function sendEmailPlain({ to, subject, text, html, replyTo }) {
   const host = process.env.SMTP_HOST || 'smtp.sendgrid.net';
   const port = Number(process.env.SMTP_PORT || '587');
   const secure = String(process.env.SMTP_SECURE || 'false') === 'true';
@@ -29,6 +29,8 @@ async function sendEmailPlain({ to, subject, text }) {
     to,
     subject,
     text,
+    html: html || undefined,
+    replyTo: replyTo || undefined,
   });
 }
 

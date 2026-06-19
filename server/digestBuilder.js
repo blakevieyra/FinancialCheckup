@@ -1,5 +1,6 @@
 const { dbAll, dbGet } = require('./db');
 const { buildBudgetBullets, gradeFromExpenseRatio } = require('./analysis');
+const { buildScoreSummaryEmail } = require('./emailTemplates');
 
 function computeTotalExp(expensesRows) {
   return expensesRows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
@@ -89,11 +90,39 @@ async function digestForUserMonth(userId, month, frequency = 'weekly') {
     '— Financial Checkup · Operon E2I',
   ].filter((line) => line !== null).join('\n');
 
+  const grade = gradeFromExpenseRatio(expenseRatio);
+  const dimPayload = dimensions.map((d) => ({
+    label: d.label,
+    score: d.score,
+    grade: d.grade,
+    summary: d.summary || d.detail || '',
+  }));
+
+  const emailPayload = {
+    username,
+    month,
+    frequencyLabel: freqLabel,
+    overallScore,
+    headline,
+    income,
+    totalExp,
+    balance,
+    expenseRatio,
+    grade,
+    dimensions: dimPayload,
+    topSpending: top,
+    topAction,
+    budgetBullets: bullets,
+  };
+
+  const html = buildScoreSummaryEmail(emailPayload);
+
   return {
     username,
     month,
     subject,
     plain: txt,
+    html,
     overallScore,
   };
 }
