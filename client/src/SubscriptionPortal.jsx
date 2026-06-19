@@ -165,8 +165,8 @@ export default function SubscriptionPortal({
           Your account, plan & subscription
         </h2>
         <p style={{ margin: 0, opacity: 0.88, fontSize: 15, lineHeight: 1.5, maxWidth: 640 }}>
-          Start free. Upgrade to unlock full action plans, score history, AI insights, exports, and monthly tracking —
-          same plans as{' '}
+          Start free with a {subscription?.trialDaysTotal || 7}-day Pro trial on every new account — full AI, exports, and projections.
+          Then upgrade to keep Pro — same plans as{' '}
           <a href="https://operone2i.com/financialcheckup#pricing" target="_blank" rel="noreferrer" style={{ color: '#93c5fd' }}>
             financialcheckup.com
           </a>
@@ -177,6 +177,22 @@ export default function SubscriptionPortal({
       {billingMsg ? (
         <div style={{ ...cardSoftStyle, padding: '0.85rem 1rem', borderLeft: '4px solid #22c55e', fontSize: 14, lineHeight: 1.45 }}>
           {billingMsg}
+        </div>
+      ) : null}
+      {subscription?.welcomeTrial && subscription?.trialDaysRemaining != null ? (
+        <div
+          style={{
+            ...cardSoftStyle,
+            padding: '0.85rem 1rem',
+            borderLeft: '4px solid #4da6ff',
+            fontSize: 14,
+            lineHeight: 1.45,
+            background: 'rgba(37,99,235,0.12)',
+          }}
+        >
+          <strong>Pro trial active</strong> — {subscription.trialDaysRemaining} day
+          {subscription.trialDaysRemaining === 1 ? '' : 's'} left (through {formatDate(subscription.currentPeriodEnd)}).
+          {' '}Subscribe below before it ends to keep unlimited Pro access.
         </div>
       ) : null}
       {billingErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{billingErr}</div> : null}

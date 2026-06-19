@@ -2,7 +2,13 @@ const router = require('express').Router();
 const Stripe = require('stripe');
 const { verifyToken } = require('./auth');
 const { dbGet, dbRun } = require('./db');
-const { STRIPE_PRICES, resolveTier, featuresForTier, tierLabel } = require('./subscriptionTiers');
+const { resolveTier, featuresForTier, tierLabel } = require('./subscriptionTiers');
+const {
+  expireWelcomeTrialIfNeeded,
+  trialDaysRemaining,
+  isWelcomeTrial,
+  TRIAL_DAYS,
+} = require('./subscriptionService');
 const { sendSubscribedEmail, sendDeactivatedEmail } = require('./transactionalEmail');
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
@@ -59,20 +65,21 @@ function fieldsFromStripeSub(sub) {
 }
 
 async function buildStatusJson(userId) {
-  const row = await dbGet(
-    'SELECT status, plan, current_period_end, stripe_customer_id, stripe_subscription_id, cancel_at_period_end, updated_at FROM subscriptions WHERE user_id = ?',
-    [userId],
-  );
+  const row = await expireWelcomeTrialIfNeeded(userId);
   const tier = resolveTier(row);
+  const welcomeTrial = isWelcomeTrial(row);
   const base = {
     tier,
-    tierLabel: tierLabel(tier),
+    tierLabel: tierLabel(tier, row),
     status: row?.status || 'free',
     plan: row?.plan || 'free',
     currentPeriodEnd: row?.current_period_end || null,
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
     hasStripeCustomer: Boolean(row?.stripe_customer_id),
     features: featuresForTier(tier),
+    welcomeTrial,
+    trialDaysRemaining: row?.status === 'trialing' ? trialDaysRemaining(row?.current_period_end) : null,
+    trialDaysTotal: welcomeTrial ? TRIAL_DAYS : null,
     prices: {
       monthly: STRIPE_PRICES.monthly,
       annual: STRIPE_PRICES.annual,
@@ -251,11 +258,14 @@ router.post('/sync', async (req, res) => {
         cancel_at_period_end: sub.cancel_at_period_end ? 1 : 0,
       });
     } else {
-      await upsertSubscription(req.user.id, {
-        status: 'free',
-        plan: 'free',
-        cancel_at_period_end: 0,
-      });
+      const current = await expireWelcomeTrialIfNeeded(req.user.id);
+      if (!(isWelcomeTrial(current) && trialDaysRemaining(current?.current_period_end) > 0)) {
+        await upsertSubscription(req.user.id, {
+          status: 'free',
+          plan: 'free',
+          cancel_at_period_end: 0,
+        });
+      }
     }
 
     res.json(await buildStatusJson(req.user.id));
@@ -291,6 +301,9 @@ router.post('/checkout', async (req, res) => {
       success_url: `${returnBase}&billing=success`,
       cancel_url: `${returnBase}&billing=canceled`,
       metadata: { userId: String(req.user.id), plan },
+      subscription_data: {
+        metadata: { userId: String(req.user.id), plan },
+      },
     });
     res.json({ url: session.url });
   } catch (e) {

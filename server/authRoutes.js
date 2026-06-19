@@ -42,7 +42,8 @@ async function createUserAccount({ username, email, passwordHash }) {
     );
   }
   await dbRun('INSERT INTO checkup_profiles (user_id, snapshot_json) VALUES (?, ?)', [userId, '{}']);
-  await dbRun('INSERT INTO subscriptions (user_id, status, plan) VALUES (?, ?, ?)', [userId, 'free', 'free']);
+  const { grantNewUserProTrial } = require('./subscriptionService');
+  await grantNewUserProTrial(userId);
   await dbRun(
     `INSERT INTO user_preferences (user_id, digest_email, digest_channel, digest_enabled, digest_frequency)
      VALUES (?, ?, 'none', 0, 'weekly')

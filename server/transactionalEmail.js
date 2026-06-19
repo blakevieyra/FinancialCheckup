@@ -83,6 +83,8 @@ async function sendWelcomeEmail(userId) {
 
 Welcome to Financial Checkup! Your account is ready.
 
+You have a ${Number(process.env.PRO_TRIAL_DAYS || 7)}-day Pro trial — AI insights, exports, projections, and full action plans are unlocked now.
+
 Sign in anytime: ${app}
 
 Run your first checkup, track income & spending, and watch your score improve month over month.

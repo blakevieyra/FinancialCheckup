@@ -1,11 +1,9 @@
 const { dbGet } = require('./db');
 const { resolveTier, hasFeature } = require('./subscriptionTiers');
+const { expireWelcomeTrialIfNeeded } = require('./subscriptionService');
 
 async function getUserTier(userId) {
-  const row = await dbGet(
-    'SELECT status, plan FROM subscriptions WHERE user_id = ?',
-    [userId],
-  );
+  const row = await expireWelcomeTrialIfNeeded(userId);
   return resolveTier(row);
 }
 

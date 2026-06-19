@@ -1751,7 +1751,13 @@ export default function App() {
               <span> · Score <strong>{Math.round(lastCheckupScore)}</strong>/100</span>
             ) : null}
             {subscription?.tierLabel ? (
-              <span> · Plan <strong>{subscription.tierLabel}</strong></span>
+              <span>
+                {' '}
+                · Plan <strong>{subscription.tierLabel}</strong>
+                {subscription.welcomeTrial && subscription.trialDaysRemaining != null ? (
+                  <> · <strong>{subscription.trialDaysRemaining}d</strong> trial left</>
+                ) : null}
+              </span>
             ) : null}
           </div>
           {!isMobile ? (

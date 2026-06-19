@@ -42,7 +42,11 @@ function hasFeature(tier, featureKey) {
   return Boolean(f[featureKey]);
 }
 
-function tierLabel(tier) {
+function tierLabel(tier, subscription) {
+  if (tier === 'pro' && subscription?.status === 'trialing') {
+    if (subscription?.plan === 'trial') return 'Pro trial';
+    return 'Pro (trial)';
+  }
   if (tier === 'pro') return 'Pro';
   return 'Free';
 }
