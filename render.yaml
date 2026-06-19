@@ -58,7 +58,7 @@ services:
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
       - key: STRIPE_PRICE_MONTHLY
-        value: price_1TUycJ1HZuIni9E7ytJFBYib
+        value: price_1TkBde1HZuIni9E7tRCdIy2j
       - key: STRIPE_PRICE_ANNUAL
         value: price_1TZwxo1HZuIni9E76TvK70yS
   - type: web

@@ -1,7 +1,7 @@
 /** Feature access by plan — aligned with Financial Checkup subscription tiers. */
 
 const STRIPE_PRICES = {
-  monthly: process.env.STRIPE_PRICE_MONTHLY || 'price_1TUycJ1HZuIni9E7ytJFBYib',
+  monthly: process.env.STRIPE_PRICE_MONTHLY || 'price_1TkBde1HZuIni9E7tRCdIy2j',
   annual: process.env.STRIPE_PRICE_ANNUAL || 'price_1TZwxo1HZuIni9E76TvK70yS',
 };
 
