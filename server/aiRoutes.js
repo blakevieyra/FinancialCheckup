@@ -1,10 +1,11 @@
 const router = require('express').Router();
 const { verifyToken } = require('./auth');
 const { createMessage, stripJsonFence } = require('./anthropicClient');
+const { requireFeature } = require('./requireFeature');
 
 router.use(verifyToken);
 
-router.post('/insights', async (req, res) => {
+router.post('/insights', requireFeature('aiInsights'), async (req, res) => {
   const { income, expenses, totalExpenses, grade, expenseRatio, month, profile } = req.body;
   if (income === undefined || !Array.isArray(expenses)) {
     return res.status(400).json({ error: 'Missing financial data.' });

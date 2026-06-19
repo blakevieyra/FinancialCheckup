@@ -1,8 +1,10 @@
 const router = require('express').Router();
 const { verifyToken } = require('./auth');
 const { dbAll, dbGet, dbRun } = require('./db');
+const { requireFeature } = require('./requireFeature');
 
 router.use(verifyToken);
+router.use(requireFeature('goals'));
 
 function toApi(row) {
   const target = Number(row.target_amount) || 0;

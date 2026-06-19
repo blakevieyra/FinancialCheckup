@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import * as api from './api';
-import { DEFAULT_SNAPSHOT, DIMENSION_LABELS } from './checkupConstants';
+import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, BLANK_SNAPSHOT } from './checkupConstants';
+import {
+  loadExtendedProfile,
+  saveExtendedProfile,
+} from './userStorage';
 import ScoreExplainer from './ScoreExplainer';
 import RecommendationTimeline from './RecommendationTimeline';
 import ImprovementRoadmap from './ImprovementRoadmap';
@@ -86,6 +90,7 @@ function DetailCards({ result, isTablet, cardSoftStyle }) {
 
 export default function CheckupPanel({
   token,
+  userId,
   month,
   isMobile,
   isTablet,
@@ -102,14 +107,7 @@ export default function CheckupPanel({
   showHistory = true,
 }) {
   const isGuest = !token;
-  const [extended, setExtended] = useState(() => {
-    try {
-      const saved = localStorage.getItem('fc-checkup-extended');
-      return saved ? { ...DEFAULT_SNAPSHOT, ...JSON.parse(saved) } : { ...DEFAULT_SNAPSHOT };
-    } catch {
-      return { ...DEFAULT_SNAPSHOT };
-    }
-  });
+  const [extended, setExtended] = useState(() => loadExtendedProfile(userId, isGuest));
   const [guestBudget, setGuestBudget] = useState({ income: DEFAULT_SNAPSHOT.income, monthlyExpenses: DEFAULT_SNAPSHOT.monthlyExpenses });
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -118,12 +116,13 @@ export default function CheckupPanel({
 
   useEffect(() => {
     if (isGuest) return;
-    try {
-      localStorage.setItem('fc-checkup-extended', JSON.stringify(extractExtendedOnly(extended)));
-    } catch {
-      /** ignore */
-    }
-  }, [extended, isGuest]);
+    saveExtendedProfile(userId, extractExtendedOnly(extended));
+  }, [extended, isGuest, userId]);
+
+  useEffect(() => {
+    if (!token || !userId) return;
+    setExtended(loadExtendedProfile(userId, false));
+  }, [userId, token]);
 
   function extractExtendedOnly(s) {
     const {
@@ -182,9 +181,11 @@ export default function CheckupPanel({
   useEffect(() => {
     if (!token) return;
     api.getCheckupPrefill(token, month).then((d) => {
-      if (d?.extended) setExtended((prev) => ({ ...prev, ...d.extended }));
+      if (d?.extended && Object.keys(d.extended).length) {
+        setExtended((prev) => ({ ...BLANK_SNAPSHOT, ...prev, ...d.extended }));
+      }
     }).catch(() => {});
-    api.getCheckupHistory(token).then((d) => setHistory(d.history || [])).catch(() => {});
+    api.getCheckupHistory(token).then((d) => setHistory(d.history || [])).catch(() => setHistory([]));
   }, [token, month]);
 
   function setField(key, value) {

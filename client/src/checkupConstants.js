@@ -70,6 +70,30 @@ export const DEFAULT_SNAPSHOT = {
   excludedFromScore: [],
 };
 
+/** Empty profile for registered users — no demo numbers. */
+export const BLANK_SNAPSHOT = {
+  income: 0,
+  monthlyExpenses: 0,
+  expenses: [],
+  emergencyFund: 0,
+  monthlySavings: 0,
+  debts: [],
+  investmentTotal: 0,
+  stockPct: 0,
+  bondPct: 0,
+  internationalPct: 0,
+  cashPct: 0,
+  feePct: 0,
+  hasLifeInsurance: false,
+  hasDisabilityInsurance: false,
+  hasLiabilityInsurance: false,
+  age: 35,
+  targetRetirementAge: 65,
+  retirementBalance: 0,
+  monthlyRetirementContribution: 0,
+  excludedFromScore: [],
+};
+
 export const DIMENSION_LABELS = [
   { key: 'budget', label: 'Budget' },
   { key: 'debt', label: 'Debt' },

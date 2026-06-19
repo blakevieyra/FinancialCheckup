@@ -200,6 +200,18 @@ async function initDb() {
   `);
   await rawQuery(`CREATE INDEX IF NOT EXISTS idx_checkup_history_user ON checkup_history(user_id, month, created_at DESC)`);
 
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      status TEXT NOT NULL DEFAULT 'free',
+      plan TEXT NOT NULL DEFAULT 'free',
+      current_period_end TEXT,
+      updated_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
+
   console.log('✓ Postgres database ready');
 }
 

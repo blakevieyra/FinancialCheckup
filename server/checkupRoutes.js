@@ -3,6 +3,19 @@ const { verifyToken } = require('./auth');
 const { dbGet, dbAll, dbRun } = require('./db');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
 const { runCheckup, prefillFromLedger, extractExtendedProfile, mergeSnapshotWithLedger } = require('./checkupEngine');
+const { getUserTier } = require('./requireFeature');
+const { hasFeature } = require('./subscriptionTiers');
+const { requireFeature } = require('./requireFeature');
+
+function applyTierToCheckupResult(result, tier) {
+  if (hasFeature(tier, 'improvementRoadmap')) return result;
+  return {
+    ...result,
+    improvementRoadmap: null,
+    recommendationTimeline: [],
+    actionPlan: (result.actionPlan || []).slice(0, 2),
+  };
+}
 
 /** Public preview — no account required (matches landing “free to start”). */
 router.post('/preview', (req, res) => {
@@ -70,6 +83,8 @@ router.post('/run', async (req, res) => {
     const clientExtended = extractExtendedProfile(req.body?.snapshot || req.body || {});
     const merged = mergeSnapshotWithLedger(ledger, { ...savedExtended, ...clientExtended });
     const result = runCheckup(merged);
+    const tier = await getUserTier(req.user.id);
+    const tiered = applyTierToCheckupResult(result, tier);
 
     await dbRun(
       `INSERT INTO checkup_profiles (user_id, snapshot_json, updated_at)
@@ -86,7 +101,7 @@ router.post('/run', async (req, res) => {
       [req.user.id, month, JSON.stringify(result.snapshot), JSON.stringify(result), result.overallScore],
     );
 
-    return res.json({ ok: true, month, ...result });
+    return res.json({ ok: true, month, ...tiered, tier });
   } catch (e) {
     console.error(e);
     return res.status(400).json({ error: e.message || 'Checkup failed.' });
@@ -112,12 +127,15 @@ router.get('/latest', async (req, res) => {
     } catch {
       result = null;
     }
+    const tier = await getUserTier(req.user.id);
+    if (result) result = applyTierToCheckupResult(result, tier);
     return res.json({
       found: true,
       month: row.month,
       overallScore: row.overall_score,
       createdAt: row.created_at,
       result,
+      tier,
     });
   } catch (e) {
     console.error(e);
@@ -125,7 +143,7 @@ router.get('/latest', async (req, res) => {
   }
 });
 
-router.get('/history', async (req, res) => {
+router.get('/history', requireFeature('checkupHistory'), async (req, res) => {
   try {
     const limit = Math.min(36, Math.max(1, Number(req.query.limit) || 24));
     const rows = await dbAll(

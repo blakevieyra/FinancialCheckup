@@ -3,6 +3,7 @@ const { verifyToken } = require('./auth');
 const { dbGet, dbAll } = require('./db');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
 const PDFDocument = require('pdfkit');
+const { requireFeature } = require('./requireFeature');
 
 router.use(verifyToken);
 
@@ -112,7 +113,7 @@ async function buildBusinessDocs(userId, month, windowMonths = 12) {
 }
 
 /** GET /api/reports/csv?month=YYYY-MM */
-router.get('/csv', async (req, res) => {
+router.get('/csv', requireFeature('exports'), async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(month)) {
@@ -162,7 +163,7 @@ router.get('/summary', async (req, res) => {
 });
 
 /** GET /api/reports/executive-pdf?month=YYYY-MM */
-router.get('/executive-pdf', async (req, res) => {
+router.get('/executive-pdf', requireFeature('exports'), async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(month)) {
@@ -246,7 +247,7 @@ router.get('/executive-pdf', async (req, res) => {
 });
 
 /** GET /api/reports/forecast?month=YYYY-MM */
-router.get('/forecast', async (req, res) => {
+router.get('/forecast', requireFeature('forecast'), async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(month)) {
@@ -317,7 +318,7 @@ router.get('/forecast', async (req, res) => {
 });
 
 /** GET /api/reports/business-docs?month=YYYY-MM&months=12 */
-router.get('/business-docs', async (req, res) => {
+router.get('/business-docs', requireFeature('businessDocs'), async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(month)) {
@@ -329,7 +330,7 @@ router.get('/business-docs', async (req, res) => {
 });
 
 /** GET /api/reports/business-docs-pdf?month=YYYY-MM&months=12 */
-router.get('/business-docs-pdf', async (req, res) => {
+router.get('/business-docs-pdf', requireFeature('businessDocs'), async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(month)) {
@@ -375,7 +376,7 @@ router.get('/business-docs-pdf', async (req, res) => {
 });
 
 /** GET /api/reports/category-averages?month=YYYY-MM */
-router.get('/category-averages', async (req, res) => {
+router.get('/category-averages', requireFeature('categoryCompare'), async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(month)) {

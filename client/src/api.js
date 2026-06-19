@@ -19,6 +19,7 @@ function clearStaleSession() {
   try {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    localStorage.removeItem('fc-user-id');
   } catch {
     /** Private-mode browsers can throw on localStorage; ignore — the in-memory state still resets. */
   }
@@ -281,5 +282,22 @@ export async function getCheckupHistory(token, limit = 12) {
 
 export async function signupMoneyTips(token, email) {
   return apiFetch('/api/checkup/tips-signup', { method: 'POST', token, body: { email } });
+}
+
+export async function getSubscriptionStatus(token) {
+  return apiFetch('/api/billing/status', { token });
+}
+
+export async function createCheckoutSession(token, plan) {
+  return apiFetch('/api/billing/checkout', { method: 'POST', token, body: { plan } });
+}
+
+export async function createBillingPortalSession(token) {
+  return apiFetch('/api/billing/portal', { method: 'POST', token, body: {} });
+}
+
+export function openExternalUrl(url) {
+  if (!url) return;
+  window.location.href = url;
 }
 

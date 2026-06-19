@@ -3,6 +3,7 @@ const { verifyToken } = require('./auth');
 const { createMessage, stripJsonFence } = require('./anthropicClient');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
 const { buildMacroContextLine } = require('./fredContext');
+const { requireFeature } = require('./requireFeature');
 
 router.use(verifyToken);
 
@@ -11,7 +12,7 @@ router.use(verifyToken);
  * { "month": "YYYY-MM", "profile": "personal" | "business" | "organizational" }
  * Returns expert-style structured JSON recommendations.
  */
-router.post('/briefing', async (req, res) => {
+router.post('/briefing', requireFeature('expertBriefing'), async (req, res) => {
   const month = req.body?.month || new Date().toISOString().slice(0, 7);
   const profile = req.body?.profile || 'personal';
   if (!/^\d{4}-\d{2}$/.test(month)) {

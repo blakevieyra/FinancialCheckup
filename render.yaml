@@ -49,6 +49,14 @@ services:
         value: America/Los_Angeles
       - key: ADMIN_DIGEST_SECRET
         generateValue: true
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_MONTHLY
+        value: price_1TUycJ1HZuIni9E7ytJFBYib
+      - key: STRIPE_PRICE_ANNUAL
+        value: price_1TZwxo1HZuIni9E76TvK70yS
   - type: web
     env: static
     name: financialcheckup-web

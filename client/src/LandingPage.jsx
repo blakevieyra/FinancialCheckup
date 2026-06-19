@@ -42,7 +42,10 @@ export default function LandingPage({
     <div style={shellStyle}>
       <div style={{ ...containerStyle, maxWidth: 960 }}>
         <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: '1.5rem' }}>
-          <div style={{ fontWeight: 800, fontSize: isMobile ? 18 : 20, letterSpacing: '-0.02em' }}>FC · Financial Checkup</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/logo.png" alt="" width={36} height={36} style={{ borderRadius: 8 }} />
+            <div style={{ fontWeight: 800, fontSize: isMobile ? 18 : 20, letterSpacing: '-0.02em' }}>Financial Checkup</div>
+          </div>
           <nav style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 14, opacity: 0.85 }}>
             <a href="#how-it-works" style={{ color: '#93c5fd' }}>How it works</a>
             <a href="#features" style={{ color: '#93c5fd' }}>Features</a>

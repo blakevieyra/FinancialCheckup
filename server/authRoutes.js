@@ -29,7 +29,15 @@ router.post('/register', async (req, res) => {
         [userId, cat, month],
       );
     }
-    res.status(201).json({ token: signToken({ id: userId, username }), username });
+    await dbRun(
+      'INSERT INTO checkup_profiles (user_id, snapshot_json) VALUES (?, ?)',
+      [userId, '{}'],
+    );
+    await dbRun(
+      'INSERT INTO subscriptions (user_id, status, plan) VALUES (?, ?, ?)',
+      [userId, 'free', 'free'],
+    );
+    res.status(201).json({ token: signToken({ id: userId, username }), username, userId });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
 });
 
@@ -39,7 +47,7 @@ router.post('/login', async (req, res) => {
     const user = await dbGet('SELECT id, password_hash FROM users WHERE username = ?', [username]);
     if (!user || !(await bcrypt.compare(password, user.password_hash)))
       return res.status(401).json({ error: 'Invalid credentials.' });
-    res.json({ token: signToken({ id: user.id, username }), username });
+    res.json({ token: signToken({ id: user.id, username }), username, userId: user.id });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
 });
 

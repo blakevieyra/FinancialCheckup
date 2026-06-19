@@ -8,6 +8,14 @@ import ScoreExplainer from './ScoreExplainer';
 import RecommendationTimeline from './RecommendationTimeline';
 import FinancialHistoryPanel from './FinancialHistoryPanel';
 import ImprovementRoadmap from './ImprovementRoadmap';
+import BillingPanel from './BillingPanel';
+import {
+  clearAuthSession,
+  clearCrossUserSessionState,
+  getStoredUserId,
+  persistAuthSession,
+  extendedStorageKey,
+} from './userStorage';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -324,6 +332,11 @@ function TrendDualLineSvg({ series, compact }) {
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('token') || '');
   const [user, setUser] = useState(() => localStorage.getItem('username') || '');
+  const [userId, setUserId] = useState(() => getStoredUserId());
+
+  const [subscription, setSubscription] = useState(null);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingErr, setBillingErr] = useState('');
 
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
   const [username, setUsername] = useState('');
@@ -392,6 +405,56 @@ export default function App() {
   const [goalName, setGoalName] = useState('');
   const [goalType, setGoalType] = useState('retirement');
   const [goalTarget, setGoalTarget] = useState('');
+
+  async function loadSubscription() {
+    if (!token) return;
+    setBillingErr('');
+    try {
+      const data = await api.getSubscriptionStatus(token);
+      setSubscription(data);
+    } catch (e) {
+      setBillingErr(e.message);
+      setSubscription({ tier: 'free', features: {} });
+    }
+  }
+
+  async function startCheckout(plan) {
+    setBillingBusy(true);
+    setBillingErr('');
+    try {
+      const { url } = await api.createCheckoutSession(token, plan);
+      api.openExternalUrl(url);
+    } catch (e) {
+      setBillingErr(e.message);
+    } finally {
+      setBillingBusy(false);
+    }
+  }
+
+  async function openBillingPortal() {
+    setBillingBusy(true);
+    setBillingErr('');
+    try {
+      const { url } = await api.createBillingPortalSession(token);
+      api.openExternalUrl(url);
+    } catch (e) {
+      setBillingErr(e.message);
+    } finally {
+      setBillingBusy(false);
+    }
+  }
+
+  function resetSessionForNewUser() {
+    setCheckupResult(null);
+    setLastCheckupScore(null);
+    setShowGuestCheckup(false);
+    setInsights([]);
+    setExpertData(null);
+    clearCrossUserSessionState();
+  }
+
+  const features = subscription?.features || {};
+  const isPro = subscription?.tier === 'pro';
 
   const [showGuestCheckup, setShowGuestCheckup] = useState(false);
   const [guestEmail, setGuestEmail] = useState('');
@@ -706,10 +769,14 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return undefined;
+    if (features.goals === false) {
+      setGoals([]);
+      return undefined;
+    }
     loadGoals();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, features.goals]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -727,10 +794,32 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return undefined;
+    if (features.categoryCompare === false) {
+      setCategoryAverages({});
+      return undefined;
+    }
     loadCategoryAverages();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, month]);
+  }, [token, month, features.categoryCompare]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    loadSubscription();
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('billing') === 'success') {
+      loadSubscription();
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -738,8 +827,14 @@ export default function App() {
       if (d?.found) {
         setLastCheckupScore(d.overallScore ?? null);
         setCheckupResult(d.result ?? null);
+      } else {
+        setLastCheckupScore(null);
+        setCheckupResult(null);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      setLastCheckupScore(null);
+      setCheckupResult(null);
+    });
     return undefined;
   }, [token, month]);
 
@@ -754,9 +849,9 @@ export default function App() {
     setError('');
     try {
       let excludedFromScore = checkupResult?.excludedFromScore;
-      if (!Array.isArray(excludedFromScore)) {
+      if (!Array.isArray(excludedFromScore) && userId) {
         try {
-          const saved = JSON.parse(localStorage.getItem('fc-checkup-extended') || '{}');
+          const saved = JSON.parse(localStorage.getItem(extendedStorageKey(userId)) || '{}');
           excludedFromScore = Array.isArray(saved.excludedFromScore) ? saved.excludedFromScore : [];
         } catch {
           excludedFromScore = [];
@@ -796,10 +891,11 @@ export default function App() {
     setBusy(true);
     try {
       const res = authMode === 'register' ? await api.register(username, password) : await api.login(username, password);
+      resetSessionForNewUser();
+      persistAuthSession({ token: res.token, username: res.username, userId: res.userId });
       setToken(res.token);
       setUser(res.username);
-      localStorage.setItem('token', res.token);
-      localStorage.setItem('username', res.username);
+      setUserId(res.userId ?? null);
       setPassword('');
       setUsername('');
       try {
@@ -1196,10 +1292,12 @@ export default function App() {
   }
 
   function logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
+    clearAuthSession();
+    clearCrossUserSessionState();
     setToken('');
     setUser('');
+    setUserId(null);
+    setSubscription(null);
     setExpenses([]);
     setIncome(0);
     setInsights([]);
@@ -1350,13 +1448,19 @@ export default function App() {
           flexDirection: isMobile ? 'column' : 'row',
         }}
       >
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, display: 'flex', gap: 12, alignItems: 'center' }}>
+          <img src="/logo.png" alt="" width={isMobile ? 40 : 48} height={isMobile ? 40 : 48} style={{ borderRadius: 10, flexShrink: 0 }} />
+          <div>
           <h1 style={{ marginBottom: 4, fontSize: isMobile ? '1.45rem' : undefined, lineHeight: 1.2 }}>Financial Checkup</h1>
           <div style={{ opacity: 0.85, wordBreak: 'break-word' }}>
             Signed in as <strong>{user}</strong>
             {lastCheckupScore != null ? (
               <span> · Score <strong>{Math.round(lastCheckupScore)}</strong>/100</span>
             ) : null}
+            {subscription?.tierLabel ? (
+              <span> · Plan <strong>{subscription.tierLabel}</strong></span>
+            ) : null}
+          </div>
           </div>
         </div>
         <button
@@ -1435,6 +1539,7 @@ export default function App() {
         {activeSection === 'profile' && (
           <CheckupPanel
             token={token}
+            userId={userId}
             month={month}
             isMobile={isMobile}
             isTablet={isTablet}
@@ -1749,6 +1854,7 @@ export default function App() {
         <CheckupPanel
           key={`history-${month}-${lastCheckupScore ?? 'none'}`}
           token={token}
+          userId={userId}
           month={month}
           isMobile={isMobile}
           isTablet={isTablet}
@@ -1769,13 +1875,30 @@ export default function App() {
 
         {activeSection === 'more' && (
           <>
+        <BillingPanel
+          subscription={subscription}
+          billingBusy={billingBusy}
+          billingErr={billingErr}
+          onSubscribeMonthly={() => startCheckout('monthly')}
+          onSubscribeAnnual={() => startCheckout('annual')}
+          onManageBilling={openBillingPortal}
+          onRefresh={loadSubscription}
+          cardStyle={cardStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          isMobile={isMobile}
+        />
+
         <div style={{ ...cardStyle, display: 'grid', gap: 10 }}>
-          <div style={{ fontWeight: 700 }}>Export reports</div>
+          <div style={{ fontWeight: 700 }}>Export reports {!isPro ? <span style={{ fontWeight: 400, fontSize: 13, opacity: 0.75 }}>(Pro)</span> : null}</div>
+          {!isPro ? (
+            <p style={{ margin: 0, fontSize: 14, opacity: 0.85 }}>Upgrade to Pro above to export CSV and PDF reports.</p>
+          ) : null}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            <button type="button" disabled={exportBusy || busy} onClick={exportMonthCsv} style={btnNeutral}>
+            <button type="button" disabled={!isPro || exportBusy || busy} onClick={exportMonthCsv} style={btnNeutral}>
               {exportBusy ? 'Exporting…' : 'Export CSV'}
             </button>
-            <button type="button" disabled={pdfBusy || busy} onClick={exportExecutivePdf} style={btnNeutral}>
+            <button type="button" disabled={!isPro || pdfBusy || busy} onClick={exportExecutivePdf} style={btnNeutral}>
               {pdfBusy ? 'Building PDF…' : 'Export Executive PDF'}
             </button>
           </div>

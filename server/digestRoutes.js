@@ -5,6 +5,10 @@ const { smtpConfigured } = require('./mailer');
 const { twilioConfigured } = require('./smsTwilio');
 const { dispatchDigest, currentMonthUtc } = require('./digestDeliver');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
+const { requireFeature } = require('./requireFeature');
+
+router.use(verifyToken);
+router.use(requireFeature('digest'));
 
 async function previewForUserMonth(userId, month) {
   const snap = await snapshotForUserMonth(userId, month);

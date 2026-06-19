@@ -2,28 +2,36 @@ const pathEnv = require('path');
 require('dotenv').config({ path: pathEnv.join(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { initDb, closeDb } = require('./db');
 const startDigestScheduler = require('./digestScheduler');
 const { runScheduledDigestsForWeekday } = require('./digestDeliver');
+const { router: billingRouter, stripeWebhook } = require('./billingRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const isProd = process.env.NODE_ENV === 'production';
 
-/**
- * CLIENT_URL accepts a comma-separated list of allowed browser origins.
- * Apex + www of a custom domain count as DIFFERENT origins to the browser, so production
- * typically needs both (e.g. "https://financialcheckup.app,https://www.financialcheckup.app").
- * Localhost dev origin is always allowed so `npm run dev` keeps working.
- */
+if (isProd && !process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET must be set in production.');
+  process.exit(1);
+}
+
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
 
 app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
+app.use(
   cors({
     origin(origin, cb) {
-      /** Same-origin / curl / server-to-server requests have no Origin header — allow them. */
       if (!origin) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
       return cb(new Error(`Origin ${origin} is not in CLIENT_URL allow-list.`));
@@ -31,15 +39,30 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
 
-app.use('/api/auth',      require('./authRoutes'));
+/** Stripe webhook must receive raw body — register before express.json(). */
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
+
+app.use(express.json({ limit: '512kb' }));
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 30 : 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth attempts. Try again later.' },
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+app.use('/api/auth', require('./authRoutes'));
+app.use('/api/billing', billingRouter);
 app.use('/api/me/digest', require('./digestRoutes'));
-app.use('/api/income',   require('./incomeRoutes'));
+app.use('/api/income', require('./incomeRoutes'));
 app.use('/api/expenses', require('./expenseRoutes'));
-app.use('/api/ai',       require('./aiRoutes'));
-app.use('/api/reports',  require('./reportsRoutes'));
-app.use('/api/expert',   require('./expertRoutes'));
+app.use('/api/ai', require('./aiRoutes'));
+app.use('/api/reports', require('./reportsRoutes'));
+app.use('/api/expert', require('./expertRoutes'));
 app.use('/api/rankings', require('./rankingsRoutes'));
 app.use('/api/me/trends', require('./trendsRoutes'));
 app.use('/api/me/financial-advice', require('./financialAdviceRoutes'));
@@ -48,12 +71,17 @@ app.use('/api/checkup', require('./checkupRoutes'));
 app.get('/api/health', (_, res) =>
   res.json({
     status: 'ok',
-    /** Lets clients confirm this process includes weekly-digest routes (GET/PUT /api/me/digest). */
-    features: { weeklyDigest: true, trends: true, leaderboard: true, postgres: true, sixDimensionCheckup: true },
+    features: {
+      weeklyDigest: true,
+      trends: true,
+      leaderboard: true,
+      postgres: true,
+      sixDimensionCheckup: true,
+      stripeBilling: Boolean(process.env.STRIPE_SECRET_KEY),
+    },
   }),
 );
 
-/** Optional VPS/cron bridge: POST { "secret":"<ADMIN_DIGEST_SECRET>" } — never expose secret publicly */
 app.post('/api/internal/digest-run', async (req, res) => {
   const secret = process.env.ADMIN_DIGEST_SECRET;
   if (!secret) return res.status(404).json({ error: 'Not found.' });
@@ -78,7 +106,6 @@ initDb()
       console.log(`✓ FinancialCheckup API → http://localhost:${PORT}`),
     );
 
-    /** Drain pool + close server cleanly on SIGTERM/SIGINT (Render restarts send SIGTERM). */
     const shutdown = async (signal) => {
       console.log(`Received ${signal}, shutting down...`);
       server.close(() => console.log('HTTP server closed.'));
