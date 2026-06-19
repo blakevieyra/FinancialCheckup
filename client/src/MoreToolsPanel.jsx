@@ -89,9 +89,6 @@ export default function MoreToolsPanel({
     bizpdf: onExportBusinessPdf,
     ai: onAiInsights,
     expert: onExpert,
-    forecast: () => { onOpenProjections?.(); onScrollToProjections?.('outcomes'); },
-    longterm: () => { onOpenProjections?.(); onScrollToProjections?.('longterm'); },
-    bizdocs: () => { onOpenProjections?.(); onScrollToProjections?.('bizdocs'); },
   };
 
   const toolBusy = {
@@ -100,9 +97,6 @@ export default function MoreToolsPanel({
     bizpdf: businessPdfBusy,
     ai: aiBusy,
     expert: expertBusy,
-    forecast: forecastBusy,
-    longterm: forecastBusy,
-    bizdocs: forecastBusy,
   };
 
   const toolBusyLabel = {
@@ -111,9 +105,6 @@ export default function MoreToolsPanel({
     bizpdf: 'Building PDF…',
     ai: 'Generating…',
     expert: 'Loading…',
-    forecast: 'Loading…',
-    longterm: 'Loading…',
-    bizdocs: 'Loading…',
   };
 
   return (
@@ -166,6 +157,7 @@ export default function MoreToolsPanel({
             {section.pro ? <ProBadge /> : null}
           </div>
           <p style={{ margin: 0, fontSize: 14, opacity: 0.85, lineHeight: 1.45 }}>{section.intro}</p>
+          {section.tools.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: grid2, gap: 12 }}>
             {section.tools.map((tool) => (
               <ToolCard
@@ -180,6 +172,7 @@ export default function MoreToolsPanel({
               />
             ))}
           </div>
+          ) : null}
           {section.id === 'ai' ? (
             <div style={{ display: 'grid', gap: 12 }}>
               <select value={profile} onChange={(e) => onProfileChange(e.target.value)} style={{ ...inputStyle, maxWidth: 280 }}>
@@ -244,8 +237,11 @@ export default function MoreToolsPanel({
               {forecastErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{forecastErr}</div> : null}
               {!isPro ? (
                 <p style={{ margin: 0, fontSize: 14, opacity: 0.85 }}>
-                  Projections use your trailing history for 3, 6, and 12 month outcomes plus long-term health estimates.
+                  Upgrade in Account to unlock projections. Data loads automatically when you have Pro access.
                 </p>
+              ) : null}
+              {isPro && !forecastBusy && !forecastData && !forecastErr ? (
+                <div style={{ opacity: 0.8, fontSize: 14 }}>Loading your financial outlook…</div>
               ) : null}
               {isPro && forecastData?.outcomes?.length ? (
                 <div id="projections-outcomes" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>

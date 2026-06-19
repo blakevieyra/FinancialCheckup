@@ -5,6 +5,17 @@ const { snapshotForUserMonth } = require('./ledgerSnapshot');
 const { sendReportEmail } = require('./transactionalEmail');
 const PDFDocument = require('pdfkit');
 const { requireFeature } = require('./requireFeature');
+const {
+  BRAND,
+  reportRef,
+  pdfSafeText,
+  money,
+  drawBrandHeader,
+  drawSectionTitle,
+  drawKeyValueTable,
+  drawDataTable,
+  drawLegalDisclosure,
+} = require('./reportBranding');
 
 router.use(verifyToken);
 
@@ -22,18 +33,40 @@ function csvSafeLabel(value) {
     .trim();
 }
 
-function money(n) {
+function moneyPlain(n) {
   const x = Number(n) || 0;
   return x.toFixed(2);
 }
 
 /** PDFKit core font uses WinAnsi; strip unsupported glyphs (e.g., emoji) for clean output. */
-function pdfSafeText(value) {
-  return String(value ?? '')
-    .normalize('NFKD')
-    .replace(/[^\x20-\x7E]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+async function reportContext(userId, month) {
+  const user = await dbGet(
+    `SELECT u.id, u.username, u.email, p.digest_email
+     FROM users u
+     LEFT JOIN user_preferences p ON p.user_id = u.id
+     WHERE u.id = ?`,
+    [userId],
+  );
+  const checkupRow = await dbGet(
+    `SELECT overall_score, result_json FROM checkup_history
+     WHERE user_id = ? AND month = ?
+     ORDER BY created_at DESC LIMIT 1`,
+    [userId, month],
+  );
+  let checkup = null;
+  try {
+    checkup = checkupRow?.result_json ? JSON.parse(checkupRow.result_json) : null;
+  } catch {
+    checkup = null;
+  }
+  const preparedFor = user?.email || user?.digest_email || user?.username || 'Account holder';
+  return {
+    user,
+    preparedFor,
+    ref: reportRef('FC'),
+    checkup,
+    overallScore: checkupRow?.overall_score ?? checkup?.overallScore ?? null,
+  };
 }
 
 function addMonths(yyyyMm, delta) {
@@ -121,26 +154,57 @@ router.get('/csv', requireFeature('exports'), async (req, res) => {
       return res.status(400).json({ error: 'month must be YYYY-MM.' });
     }
 
-    const user = await dbGet('SELECT id, username FROM users WHERE id = ?', [req.user.id]);
+    const user = await dbGet('SELECT id, username, email FROM users WHERE id = ?', [req.user.id]);
     const snap = await snapshotForUserMonth(req.user.id, month);
+    const ctx = await reportContext(req.user.id, month);
+    const sortedExpenses = [...snap.expenses].sort((a, b) => b.amount - a.amount);
+    const savingsRate = snap.income > 0 ? (snap.balance / snap.income) * 100 : 0;
 
     const lines = [
       'sep=,',
-      'FinancialCheckup export',
+      `${BRAND.product} — Confidential data export`,
+      `Report ID,${csvEscape(ctx.ref)}`,
       `Generated,${csvEscape(new Date().toISOString())}`,
-      `Username,${csvEscape(csvSafeLabel(user?.username))}`,
-      `Month,${csvEscape(month)}`,
-      `Income,${money(snap.income)}`,
-      `Total expenses,${money(snap.totalExpenses)}`,
-      `Balance,${money(snap.balance)}`,
-      `Expense ratio %,${snap.expenseRatio.toFixed(1)}`,
-      `Grade,${csvEscape(snap.grade)}`,
+      `Prepared for,${csvEscape(csvSafeLabel(ctx.preparedFor))}`,
+      `Account,${csvEscape(csvSafeLabel(user?.username))}`,
+      `Reporting period,${csvEscape(month)}`,
+      `Support,${csvEscape(BRAND.supportEmail)}`,
       '',
-      'Category,Amount,Month',
-      ...snap.expenses.map(
-        (e) => `${csvEscape(csvSafeLabel(e.category))},${money(e.amount)},${csvEscape(month)}`,
-      ),
-    ];
+      '─── SUMMARY ───',
+      `Income,${moneyPlain(snap.income)}`,
+      `Total expenses,${moneyPlain(snap.totalExpenses)}`,
+      `Net surplus (deficit),${moneyPlain(snap.balance)}`,
+      `Expense ratio %,${snap.expenseRatio.toFixed(1)}`,
+      `Savings rate %,${savingsRate.toFixed(1)}`,
+      `Budget grade,${csvEscape(snap.grade)}`,
+      ctx.overallScore != null ? `Overall checkup score,${Math.round(ctx.overallScore)}` : null,
+      ctx.checkup?.headline ? `Headline,${csvEscape(csvSafeLabel(ctx.checkup.headline))}` : null,
+      '',
+    ].filter(Boolean);
+
+    if (ctx.checkup?.dimensions?.length) {
+      lines.push('─── CHECKUP DIMENSIONS ───', 'Dimension,Score,Grade,Status');
+      ctx.checkup.dimensions.forEach((d) => {
+        lines.push(
+          `${csvEscape(csvSafeLabel(d.label))},${Math.round(d.score || 0)},${csvEscape(d.grade || '')},${csvEscape(d.status || '')}`,
+        );
+      });
+      lines.push('');
+    }
+
+    lines.push('─── EXPENSE DETAIL ───', 'Category,Amount,Share of expenses %,Month');
+    sortedExpenses.forEach((e) => {
+      const pct = snap.totalExpenses > 0 ? ((e.amount / snap.totalExpenses) * 100).toFixed(1) : '0.0';
+      lines.push(`${csvEscape(csvSafeLabel(e.category))},${moneyPlain(e.amount)},${pct},${csvEscape(month)}`);
+    });
+
+    lines.push(
+      '',
+      '─── LEGAL NOTICE ───',
+      `Disclaimer,"${csvEscape('Educational use only. Not investment, tax, legal, or accounting advice. Verify all figures with qualified professionals.')}"`,
+      `Operator,${csvEscape(BRAND.company)}`,
+      `Product,${csvEscape(BRAND.product)}`,
+    );
 
     const filename = `financialcheckup-${month}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -171,77 +235,122 @@ router.get('/executive-pdf', requireFeature('exports'), async (req, res) => {
       return res.status(400).json({ error: 'month must be YYYY-MM.' });
     }
 
-    const user = await dbGet('SELECT id, username FROM users WHERE id = ?', [req.user.id]);
+    const user = await dbGet('SELECT id, username, email FROM users WHERE id = ?', [req.user.id]);
     const snap = await snapshotForUserMonth(req.user.id, month);
+    const ctx = await reportContext(req.user.id, month);
 
     const savingsRate = snap.income > 0 ? (snap.balance / snap.income) * 100 : 0;
-    const topExpenses = [...snap.expenses].sort((a, b) => b.amount - a.amount).slice(0, 5);
+    const sortedExpenses = [...snap.expenses].sort((a, b) => b.amount - a.amount);
 
-    const filename = `financialcheckup-executive-scorecard-${month}.pdf`;
+    const incRows = await dbAll(
+      'SELECT month, MAX(amount) AS amount FROM income WHERE user_id = ? GROUP BY month ORDER BY month ASC',
+      [req.user.id],
+    );
+    const expRows = await dbAll(
+      'SELECT month, SUM(amount) AS total FROM expenses WHERE user_id = ? GROUP BY month ORDER BY month ASC',
+      [req.user.id],
+    );
+    const trendSeries = monthSeries(incRows, expRows).slice(-6);
+
+    const filename = `financialcheckup-executive-${month}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    const doc = new PDFDocument({ size: 'LETTER', margin: 42 });
+    const doc = new PDFDocument({ size: 'LETTER', margin: 48, bufferPages: true });
     doc.pipe(res);
 
-    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const left = doc.page.margins.left;
-
-    doc.fontSize(20).fillColor('#111827').text('FinancialCheckup Executive Scorecard', left, 40);
-    doc
-      .fontSize(11)
-      .fillColor('#4B5563')
-      .text(
-        `User: ${pdfSafeText(user?.username || 'Unknown')}   Month: ${month}   Generated: ${new Date().toISOString().slice(0, 10)}`,
-      );
-
-    doc.moveDown(1.1);
-    doc.fontSize(13).fillColor('#111827').text('Core KPIs', { underline: true });
-    doc.moveDown(0.4);
-
-    const kpis = [
-      ['Income', `$${Number(snap.income).toLocaleString(undefined, { maximumFractionDigits: 2 })}`],
-      ['Total Expenses', `$${Number(snap.totalExpenses).toLocaleString(undefined, { maximumFractionDigits: 2 })}`],
-      ['Net Surplus', `$${Number(snap.balance).toLocaleString(undefined, { maximumFractionDigits: 2 })}`],
-      ['Expense Ratio', `${Number(snap.expenseRatio).toFixed(1)}%`],
-      ['Savings Rate', `${Number(savingsRate).toFixed(1)}%`],
-      ['Budget Grade', String(snap.grade || 'N/A')],
-    ];
-
-    kpis.forEach(([label, value]) => {
-      doc.fontSize(11).fillColor('#111827').text(`${label}: `, { continued: true }).fillColor('#0F766E').text(value);
+    drawBrandHeader(doc, {
+      documentTitle: 'Executive Financial Scorecard',
+      documentSubtitle: `Reporting period: ${month}`,
+      metaLines: [
+        `Report ID: ${ctx.ref}`,
+        `Prepared for: ${ctx.preparedFor}`,
+        `Account: ${user?.username || 'Unknown'}`,
+        `Generated: ${new Date().toISOString().slice(0, 19)} UTC`,
+      ],
     });
 
-    doc.moveDown(1);
-    doc.fontSize(13).fillColor('#111827').text('Top Expense Categories', { underline: true });
-    doc.moveDown(0.4);
-    if (topExpenses.length === 0) {
-      doc.fontSize(11).fillColor('#6B7280').text('No expense lines for this month.');
-    } else {
-      topExpenses.forEach((row, i) => {
-        const pct = snap.totalExpenses > 0 ? (row.amount / snap.totalExpenses) * 100 : 0;
-        doc
-          .fontSize(11)
-          .fillColor('#111827')
-          .text(`${i + 1}. ${pdfSafeText(row.category)}`, { continued: true })
-          .fillColor('#6B7280')
-          .text(`  $${Number(row.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })} (${pct.toFixed(1)}%)`);
+    drawSectionTitle(doc, 'Executive summary');
+    const summaryParts = [
+      ctx.checkup?.headline ? pdfSafeText(ctx.checkup.headline) : null,
+      ctx.overallScore != null
+        ? `Overall financial health score: ${Math.round(ctx.overallScore)}/100 (${pdfSafeText(ctx.checkup?.overallGrade || snap.grade)}).`
+        : null,
+      `Monthly income ${money(snap.income)} against expenses ${money(snap.totalExpenses)} yields a ${snap.balance >= 0 ? 'surplus' : 'deficit'} of ${money(Math.abs(snap.balance))} (${Number(snap.expenseRatio).toFixed(1)}% expense ratio).`,
+    ].filter(Boolean);
+    doc.font('Helvetica').fontSize(10).fillColor('#374151').text(summaryParts.join(' '), { align: 'justify' });
+    doc.moveDown(0.8);
+
+    drawSectionTitle(doc, 'Key performance indicators');
+    drawKeyValueTable(doc, [
+      ['Monthly income', money(snap.income)],
+      ['Total operating expenses', money(snap.totalExpenses)],
+      ['Net surplus / (deficit)', money(snap.balance)],
+      ['Expense-to-income ratio', `${Number(snap.expenseRatio).toFixed(1)}%`],
+      ['Savings rate', `${Number(savingsRate).toFixed(1)}%`],
+      ['Budget grade', String(snap.grade || 'N/A')],
+      ...(ctx.overallScore != null ? [['Overall checkup score', `${Math.round(ctx.overallScore)}/100`]] : []),
+    ]);
+
+    if (ctx.checkup?.dimensions?.length) {
+      drawSectionTitle(doc, 'Six-dimension health scorecard');
+      drawDataTable(doc, {
+        headers: ['Dimension', 'Score', 'Grade', 'Status'],
+        colWidths: [200, 70, 70, 180],
+        rows: ctx.checkup.dimensions.map((d) => [
+          d.label,
+          String(Math.round(d.score || 0)),
+          d.grade || '—',
+          d.status || '—',
+        ]),
       });
     }
 
-    doc.moveDown(1);
-    doc.fontSize(13).fillColor('#111827').text('Actionable Recommendations', { underline: true });
-    doc.moveDown(0.4);
-    (snap.deterministicTips || []).slice(0, 6).forEach((tip, i) => {
-      doc.fontSize(11).fillColor('#111827').text(`• ${pdfSafeText(tip)}`);
-      if (i < 5) doc.moveDown(0.15);
-    });
+    drawSectionTitle(doc, 'Expense analysis — all categories');
+    if (sortedExpenses.length === 0) {
+      doc.font('Helvetica').fontSize(10).fillColor('#6B7280').text('No expense lines recorded for this period.');
+    } else {
+      drawDataTable(doc, {
+        headers: ['Category', 'Amount', 'Share'],
+        colWidths: [240, 100, 80],
+        rows: sortedExpenses.map((row) => {
+          const pct = snap.totalExpenses > 0 ? (row.amount / snap.totalExpenses) * 100 : 0;
+          return [row.category, money(row.amount), `${pct.toFixed(1)}%`];
+        }),
+      });
+    }
 
-    doc.moveDown(1);
-    doc.fontSize(9).fillColor('#6B7280').text(
-      'Educational use only. This report is generated from user-entered data and is not investment, legal, or tax advice.',
-      { width: pageWidth },
-    );
+    if (trendSeries.length >= 2) {
+      drawSectionTitle(doc, 'Trailing monthly trend (up to 6 months)');
+      drawDataTable(doc, {
+        headers: ['Month', 'Income', 'Expenses', 'Net'],
+        colWidths: [90, 110, 110, 110],
+        rows: trendSeries.map((r) => [
+          r.month,
+          money(r.income),
+          money(r.expenses),
+          money(r.balance),
+        ]),
+      });
+    }
+
+    drawSectionTitle(doc, 'Prioritized recommendations');
+    const tips = [
+      ...(ctx.checkup?.actionPlan || []).slice(0, 4).map((p) => (typeof p === 'string' ? p : p.title || p.message || p.action || '')),
+      ...(snap.deterministicTips || []),
+    ].filter(Boolean);
+    const uniqueTips = [...new Set(tips.map((t) => pdfSafeText(t)))].slice(0, 8);
+    if (!uniqueTips.length) {
+      doc.font('Helvetica').fontSize(10).text('Add consistent monthly data to unlock personalized recommendations.');
+    } else {
+      uniqueTips.forEach((tip) => {
+        doc.font('Helvetica').fontSize(10).fillColor('#111827').text(`• ${tip}`);
+        doc.moveDown(0.12);
+      });
+    }
+
+    doc.moveDown(0.6);
+    drawLegalDisclosure(doc, { reportType: 'Executive Financial Scorecard' });
 
     doc.end();
     sendReportEmail(req.user.id, { reportType: 'executive-pdf', month }).catch(() => {});
@@ -340,39 +449,90 @@ router.get('/business-docs-pdf', requireFeature('businessDocs'), async (req, res
     }
     const windowMonths = Math.min(24, Math.max(3, Number(req.query.months) || 12));
     const docs = await buildBusinessDocs(req.user.id, month, windowMonths);
+    const ctx = await reportContext(req.user.id, month);
+    const user = await dbGet('SELECT username FROM users WHERE id = ?', [req.user.id]);
 
-    const filename = `financialcheckup-business-docs-${month}.pdf`;
+    const filename = `financialcheckup-business-statements-${month}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    const doc = new PDFDocument({ size: 'LETTER', margin: 42 });
+    const doc = new PDFDocument({ size: 'LETTER', margin: 48, bufferPages: true });
     doc.pipe(res);
-    doc.fontSize(20).fillColor('#111827').text('FinancialCheckup Business Documents');
-    doc.fontSize(11).fillColor('#4B5563').text(`As of ${month} · Window ${windowMonths} months`);
-    doc.moveDown(1);
 
-    doc.fontSize(13).fillColor('#111827').text('Balance Sheet', { underline: true });
-    doc.fontSize(11).fillColor('#111827').text(`Assets: $${docs.balanceSheet.assets.totalAssets.toLocaleString()}`);
-    doc.text(`Liabilities: $${docs.balanceSheet.liabilities.totalLiabilities.toLocaleString()}`);
-    doc.text(`Equity: $${docs.balanceSheet.equity.totalEquity.toLocaleString()}`);
-    doc.moveDown(0.8);
+    drawBrandHeader(doc, {
+      documentTitle: 'Financial Statements Package',
+      documentSubtitle: `Cash-basis summary · Period ending ${month}`,
+      metaLines: [
+        `Report ID: ${ctx.ref}`,
+        `Prepared for: ${ctx.preparedFor}`,
+        `Entity / account: ${user?.username || 'Unknown'}`,
+        `Analysis window: ${windowMonths} months (${docs.incomeStatement.periodStart} to ${docs.incomeStatement.periodEnd})`,
+        `Generated: ${new Date().toISOString().slice(0, 19)} UTC`,
+      ],
+    });
 
-    doc.fontSize(13).text('Income Statement', { underline: true });
-    doc.fontSize(11).text(`Revenue: $${docs.incomeStatement.revenue.toLocaleString()}`);
-    doc.text(`Operating Expenses: $${docs.incomeStatement.operatingExpenses.toLocaleString()}`);
-    doc.text(`Net Income: $${docs.incomeStatement.netIncome.toLocaleString()}`);
-    doc.text(`Margin: ${docs.incomeStatement.marginPercent.toFixed(2)}%`);
-    doc.moveDown(0.8);
+    drawSectionTitle(doc, 'Table of contents');
+    [
+      '1. Balance Sheet (Statement of Financial Position)',
+      '2. Income Statement (Statement of Operations)',
+      '3. Statement of Cash Flows (Summary)',
+      '4. Notes to Financial Statements',
+      '5. Disclosures & limitations',
+    ].forEach((line) => {
+      doc.font('Helvetica').fontSize(10).fillColor('#374151').text(line);
+      doc.moveDown(0.1);
+    });
+    doc.moveDown(0.6);
 
-    doc.fontSize(13).text('Cash Flow Summary', { underline: true });
-    doc.fontSize(11).text(`Operating Cash Flow: $${docs.cashFlowSummary.operatingCashFlowProxy.toLocaleString()}`);
-    doc.text(`Average Monthly Net Cash Flow: $${docs.cashFlowSummary.averageMonthlyNetCashFlow.toLocaleString()}`);
-    doc.text(`Trend: ${docs.cashFlowSummary.trend}`);
-    doc.moveDown(1);
+    drawSectionTitle(doc, '1. Balance Sheet');
+    doc.font('Helvetica').fontSize(10).fillColor('#374151').text(`As of ${docs.balanceSheet.asOfMonth}`);
+    doc.moveDown(0.35);
+    drawKeyValueTable(doc, [
+      ['ASSETS', ''],
+      ['  Current assets (estimated cash from operations)', money(docs.balanceSheet.assets.currentAssets)],
+      ['  Total assets', money(docs.balanceSheet.assets.totalAssets)],
+      ['', ''],
+      ['LIABILITIES', ''],
+      ['  Current liabilities (estimated)', money(docs.balanceSheet.liabilities.currentLiabilities)],
+      ['  Total liabilities', money(docs.balanceSheet.liabilities.totalLiabilities)],
+      ['', ''],
+      ['EQUITY', ''],
+      ['  Retained earnings (proxy)', money(docs.balanceSheet.equity.retainedEarningsProxy)],
+      ['  Total equity', money(docs.balanceSheet.equity.totalEquity)],
+    ]);
 
-    doc.fontSize(9).fillColor('#6B7280').text(
-      'Professional summary generated from ledger-based cash accounting proxies. For formal reporting, use full accrual accounting systems.',
+    drawSectionTitle(doc, '2. Income Statement');
+    doc.font('Helvetica').fontSize(10).fillColor('#374151').text(
+      `For the period ${docs.incomeStatement.periodStart} through ${docs.incomeStatement.periodEnd}`,
     );
+    doc.moveDown(0.35);
+    drawKeyValueTable(doc, [
+      ['Revenue (total income recorded)', money(docs.incomeStatement.revenue)],
+      ['Operating expenses', money(docs.incomeStatement.operatingExpenses)],
+      ['Net income (loss)', money(docs.incomeStatement.netIncome)],
+      ['Net margin', `${docs.incomeStatement.marginPercent.toFixed(2)}%`],
+    ]);
+
+    drawSectionTitle(doc, '3. Statement of Cash Flows (Summary)');
+    drawKeyValueTable(doc, [
+      ['Net cash from operations (proxy)', money(docs.cashFlowSummary.operatingCashFlowProxy)],
+      ['Average monthly net cash flow', money(docs.cashFlowSummary.averageMonthlyNetCashFlow)],
+      ['Trend direction', docs.cashFlowSummary.trend === 'up' ? 'Improving' : 'Declining'],
+    ]);
+
+    drawSectionTitle(doc, '4. Notes to financial statements');
+    (docs.notes || []).forEach((note, i) => {
+      doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(`${i + 1}. ${pdfSafeText(note)}`, { align: 'justify' });
+      doc.moveDown(0.25);
+    });
+    doc.font('Helvetica').fontSize(9.5).text(
+      `${(docs.notes?.length || 0) + 1}. Figures are derived from user-entered income and expense ledger data in ${BRAND.product}. No independent verification has been performed.`,
+      { align: 'justify' },
+    );
+    doc.moveDown(0.5);
+
+    drawLegalDisclosure(doc, { reportType: 'Financial Statements Package' });
+
     doc.end();
     sendReportEmail(req.user.id, { reportType: 'business-pdf', month }).catch(() => {});
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }

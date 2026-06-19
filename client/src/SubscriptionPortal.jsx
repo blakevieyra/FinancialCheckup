@@ -127,6 +127,7 @@ export default function SubscriptionPortal({
   billingMsg,
   token,
   accountEmail,
+  inputStyle,
   onSubscribeMonthly,
   onSubscribeAnnual,
   onManageBilling,

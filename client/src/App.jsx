@@ -2121,6 +2121,7 @@ export default function App() {
             onSync={syncBilling}
             cardStyle={cardStyle}
             cardSoftStyle={cardSoftStyle}
+            inputStyle={inputStyle}
             btnPrimary={btnPrimary}
             btnNeutral={btnNeutral}
             isMobile={isMobile}

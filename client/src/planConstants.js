@@ -60,12 +60,12 @@ export const MORE_TOOL_SECTIONS = [
   {
     id: 'reports',
     title: 'Reports & exports',
-    intro: 'Download your data for advisors, taxes, or personal records.',
+    intro: 'Professional, branded exports for advisors, taxes, lenders, or personal records — with confidentiality notices and legal disclosures.',
     pro: true,
     tools: [
-      { id: 'csv', label: 'Export CSV', desc: 'Monthly income, expenses, and categories' },
-      { id: 'pdf', label: 'Executive PDF', desc: 'Polished summary with score and trends' },
-      { id: 'bizpdf', label: 'Business docs PDF', desc: 'Balance sheet, income statement & cash flow' },
+      { id: 'csv', label: 'Export CSV', desc: 'Detailed ledger export with scores, categories, and metadata' },
+      { id: 'pdf', label: 'Executive PDF', desc: 'Branded scorecard with KPIs, trends, and legal disclosures' },
+      { id: 'bizpdf', label: 'Business docs PDF', desc: 'Formal balance sheet, income statement & cash flow' },
     ],
   },
   {
@@ -81,13 +81,9 @@ export const MORE_TOOL_SECTIONS = [
   {
     id: 'projections',
     title: 'Projections & long-term health',
-    intro: 'Uses your history to project 3, 6, and 12 months out and estimate long-term financial health.',
+    intro: 'Based on your trailing history — 3, 6, and 12 month outlooks, long-term health status, and generated business statements appear below when you have Pro access.',
     pro: true,
-    tools: [
-      { id: 'forecast', label: 'Outcome projections', desc: 'Income, expenses, and net cash flow' },
-      { id: 'longterm', label: 'Long-term health', desc: 'Trajectory status with recommendations' },
-      { id: 'bizdocs', label: 'Business documents', desc: 'Generated statements from ledger data' },
-    ],
+    tools: [],
   },
 ];
 
