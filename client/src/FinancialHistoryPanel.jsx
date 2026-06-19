@@ -22,7 +22,7 @@ export default function FinancialHistoryPanel({
   if (!months.length) {
     return (
       <div style={{ ...cardStyle, padding: '1rem', opacity: 0.85, fontSize: 14 }}>
-        No income or expense history yet. Enter data on the Money tab each month to build your timeline.
+        No income or expense history yet. Enter data on the Finances tab each month to build your timeline.
       </div>
     );
   }
@@ -32,7 +32,7 @@ export default function FinancialHistoryPanel({
       <div>
         <h2 style={{ marginTop: 0, marginBottom: 6 }}>Income & expense history</h2>
         <p style={{ margin: 0, opacity: 0.85, fontSize: 14, lineHeight: 1.45 }}>
-          Every month you saved on the Money tab. Tap a row to view that month. Scores appear after you run Update score.
+          Every month you save on Finances. Tap a row to view that month. Scores update automatically as you enter data.
         </p>
       </div>
 

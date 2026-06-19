@@ -64,6 +64,7 @@ export default function SpecialistInsightPanel({
   const preview = summary || gaps?.[0]?.label || 'Review your profile data for personalized guidance.';
 
   return (
+    <div id={`specialist-${area}`}>
     <ExpandablePanel title={meta.title} hint={meta.hint} cardSoftStyle={cardSoftStyle}>
       <div style={{ display: 'grid', gap: 12 }}>
         <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.5 }}>{preview}</div>
@@ -120,5 +121,6 @@ export default function SpecialistInsightPanel({
         ) : null}
       </div>
     </ExpandablePanel>
+    </div>
   );
 }

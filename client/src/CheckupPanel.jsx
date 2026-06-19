@@ -170,6 +170,8 @@ export default function CheckupPanel({
   primaryGoal = '',
   isPro = false,
   onGoPlan,
+  autoSync = false,
+  onAutoCheckup,
 }) {
   const isGuest = !token;
   const [extended, setExtended] = useState(() => loadExtendedProfile(userId, isGuest));
@@ -183,6 +185,15 @@ export default function CheckupPanel({
     if (isGuest) return;
     saveExtendedProfile(userId, extractExtendedOnly(extended));
   }, [extended, isGuest, userId]);
+
+  useEffect(() => {
+    if (!autoSync || isGuest || !token) return undefined;
+    const t = setTimeout(() => {
+      runCheckup(true);
+    }, 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extended, autoSync, token, month]);
 
   useEffect(() => {
     if (!token || !userId) return;
@@ -272,9 +283,9 @@ export default function CheckupPanel({
     }));
   }
 
-  async function runCheckup() {
-    setErr('');
-    setBusy(true);
+  async function runCheckup(silent = false) {
+    if (!silent) setErr('');
+    if (!silent) setBusy(true);
     try {
       const payload = isGuest
         ? { ...extractExtendedOnly(extended), ...guestBudget }
@@ -284,14 +295,15 @@ export default function CheckupPanel({
         : await api.previewCheckup(payload);
       setResult(data);
       onResult?.(data);
+      if (token && autoSync) onAutoCheckup?.();
       if (token) {
         const h = await api.getCheckupHistory(token);
         setHistory(h.history || []);
       }
     } catch (e) {
-      setErr(e.message);
+      if (!silent) setErr(e.message);
     } finally {
-      setBusy(false);
+      if (!silent) setBusy(false);
     }
   }
 
@@ -304,17 +316,19 @@ export default function CheckupPanel({
       {showForm ? (
         <>
           <div>
-            <h2 style={{ margin: '0 0 6px' }}>{isGuest ? 'Quick financial checkup' : 'Complete your profile'}</h2>
+            <h2 style={{ margin: '0 0 6px' }}>{isGuest ? 'Quick financial checkup' : 'Debt, savings, investments & insurance'}</h2>
             <p style={{ margin: 0, opacity: 0.88, fontSize: 14, lineHeight: 1.45 }}>
               {isGuest
                 ? 'Enter a snapshot below — no bank login.'
-                : 'Income & spending come from the Money tab. Add debt, savings, investments, insurance, and retirement here.'}
+                : autoSync
+                  ? 'Complete these fields — your score recalculates automatically.'
+                  : 'Add debt, savings, investments, insurance, and retirement details.'}
             </p>
           </div>
 
-          {!isGuest && ledger ? (
+          {!isGuest && ledger && !autoSync ? (
             <div style={{ ...cardSoftStyle, padding: '0.75rem', fontSize: 13, opacity: 0.9 }}>
-              <strong>Money tab ({month}):</strong> ${Number(income || 0).toLocaleString()} income · ${Number(expenses || 0).toLocaleString()} expenses
+              <strong>Ledger ({month}):</strong> ${Number(income || 0).toLocaleString()} income · ${Number(expenses || 0).toLocaleString()} expenses
             </div>
           ) : null}
 
@@ -430,9 +444,14 @@ export default function CheckupPanel({
             </div>
           </div>
 
-          <button type="button" onClick={runCheckup} disabled={busy} style={btnPrimary}>
-            {busy ? 'Calculating score…' : isGuest ? 'Get my score' : 'Save profile & update score'}
-          </button>
+          {autoSync && busy ? (
+            <div style={{ fontSize: 13, opacity: 0.75 }}>Updating score…</div>
+          ) : null}
+          {!autoSync ? (
+            <button type="button" onClick={() => runCheckup(false)} disabled={busy} style={btnPrimary}>
+              {busy ? 'Calculating score…' : isGuest ? 'Get my score' : 'Save profile & update score'}
+            </button>
+          ) : null}
         </>
       ) : null}
 

@@ -5,7 +5,7 @@ export default function AppNav({ active, onChange, isMobile, btnPrimary, btnNeut
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(6, minmax(0, 1fr))',
+        gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))',
         gap: 8,
         padding: isMobile ? 4 : 6,
         borderRadius: 14,

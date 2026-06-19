@@ -94,7 +94,7 @@ export default function ScoreExplainer({ explanation, isMobile, cardSoftStyle, c
                     onClick={() => onGoTab(d.goToTab)}
                     style={{ ...btnNeutral, marginTop: 8, fontSize: 12, padding: '0.35rem 0.6rem' }}
                   >
-                    Open {d.goToTab === 'money' ? 'Money' : 'Profile'} tab →
+                    Open Finances tab →
                   </button>
                 ) : null}
               </>
@@ -105,7 +105,7 @@ export default function ScoreExplainer({ explanation, isMobile, cardSoftStyle, c
 
       {compact ? (
         <div style={{ fontSize: 12, opacity: 0.75 }}>
-          See numbered steps above, or open <strong>Profile</strong> for the full dimension breakdown.
+          See numbered steps above, or open <strong>Finances</strong> for the full dimension breakdown.
         </div>
       ) : null}
     </div>

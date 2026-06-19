@@ -325,12 +325,12 @@ const HORIZON_WEIGHTS = {
 };
 
 const TAB_FOR_DIMENSION = {
-  budget: 'money',
-  savings: 'profile',
-  debt: 'profile',
-  insurance: 'profile',
-  retirement: 'profile',
-  investments: 'profile',
+  budget: 'finances',
+  savings: 'finances',
+  debt: 'finances',
+  insurance: 'finances',
+  retirement: 'finances',
+  investments: 'finances',
 };
 
 function computeOverallScore(dimensions, excludedFromScore = []) {
@@ -539,7 +539,7 @@ function buildImprovementRoadmap(dimensions, snap) {
                   : `Strengthen ${dim.label.toLowerCase()}`,
       why: explainDimension(dim.key, dim, snap),
       actions,
-      goToTab: TAB_FOR_DIMENSION[dim.key] || 'profile',
+      goToTab: TAB_FOR_DIMENSION[dim.key] || 'finances',
       potentialLift: estimateScoreLift(dim.key, dim.score, excluded),
       currentScore: dim.score,
       targetScore: 75,
@@ -674,7 +674,7 @@ function buildScoreExplanation(dimensions, overallScore, snap) {
       improveBy: suggestImprovement(d.key, d, snap),
       actions: concreteActionsForDimension(d.key, d, snap),
       potentialLift: estimateScoreLift(d.key, d.score, excluded),
-      goToTab: TAB_FOR_DIMENSION[d.key] || 'profile',
+      goToTab: TAB_FOR_DIMENSION[d.key] || 'finances',
     })),
     overallScore,
     overallGrade: gradeFromScore(overallScore),

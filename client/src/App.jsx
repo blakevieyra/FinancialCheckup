@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import * as api from './api';
 import LandingPage from './LandingPage';
 import CheckupPanel from './CheckupPanel';
 import OverviewDashboard from './OverviewDashboard';
+import FinancesPage from './FinancesPage';
 import AppNav from './AppNav';
 import RecommendationTimeline from './RecommendationTimeline';
 import FinancialHistoryPanel from './FinancialHistoryPanel';
@@ -18,6 +19,7 @@ import {
   persistAuthSession,
   extendedStorageKey,
 } from './userStorage';
+import { awardXp, loadXp, xpProgressLabel } from './progression';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -431,6 +433,7 @@ export default function App() {
         setCheckupResult(d.result ?? null);
       }
       setActiveSection('overview');
+      if (userId) setUserXp(awardXp(userId, 'onboarding'));
     } finally {
       setAppLoading('');
     }
@@ -508,6 +511,11 @@ export default function App() {
   const [checkupResult, setCheckupResult] = useState(null);
   const [checkupBusy, setCheckupBusy] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
+  const [userXp, setUserXp] = useState(() => loadXp(getStoredUserId()));
+  const skipLedgerAutoSave = useRef(true);
+  const lastXpAwardRef = useRef(0);
+
+  const xpInfo = useMemo(() => xpProgressLabel(userXp), [userXp]);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -520,6 +528,10 @@ export default function App() {
   const isTablet = viewportW < 1024;
   const isMobile = viewportW < 720;
   const isDesktop = viewportW >= 1024;
+
+  useEffect(() => {
+    if (userId) setUserXp(loadXp(userId));
+  }, [userId]);
 
   useEffect(() => {
     const onResize = () => setViewportW(window.innerWidth);
@@ -861,14 +873,23 @@ export default function App() {
     return undefined;
   }, [token, month]);
 
+  function awardXpThrottled(reason, cooldownMs = 120000) {
+    if (!userId) return;
+    const now = Date.now();
+    if (now - lastXpAwardRef.current < cooldownMs) return;
+    lastXpAwardRef.current = now;
+    setUserXp(awardXp(userId, reason));
+  }
+
   function handleCheckupResult(data) {
     setCheckupResult(data);
     setLastCheckupScore(data?.overallScore ?? null);
+    if (data?.overallScore != null) awardXpThrottled('checkup');
   }
 
-  async function updateCheckupScore() {
+  async function refreshCheckupScore(silent = true) {
     if (!token) return;
-    setCheckupBusy(true);
+    if (!silent) setCheckupBusy(true);
     setError('');
     try {
       let excludedFromScore = checkupResult?.excludedFromScore;
@@ -884,29 +905,85 @@ export default function App() {
       handleCheckupResult(data);
       await loadHistory();
     } catch (e) {
-      setError(e.message);
+      if (!silent) setError(e.message);
     } finally {
-      setCheckupBusy(false);
+      if (!silent) setCheckupBusy(false);
+    }
+  }
+
+  function handleAutoCheckupFromProfile() {
+    loadHistory();
+  }
+
+  async function saveLedgerSilent() {
+    if (!token) return;
+    try {
+      await api.setIncome(token, { amount: Number(income), month });
+      const payloadExpenses = expenses.map((e) => ({
+        category: e.category,
+        amount: Number(e.amount) || 0,
+      }));
+      await api.updateExpenses(token, { month, expenses: payloadExpenses });
+      awardXpThrottled('saveData', 60000);
+      await refreshCheckupScore(true);
+    } catch (e) {
+      setError(e.message);
     }
   }
 
   function openHistoryMonth(m) {
     setMonth(m);
-    setActiveSection('money');
+    setActiveSection('finances');
   }
 
   function goAppTab(tab) {
-    if (['money', 'profile', 'overview', 'progress', 'more', 'plan'].includes(tab)) {
-      setActiveSection(tab);
+    const normalized = tab === 'money' || tab === 'profile'
+      ? 'finances'
+      : tab === 'more'
+        ? 'tools'
+        : tab;
+    if (['finances', 'overview', 'progress', 'tools', 'plan'].includes(normalized)) {
+      setActiveSection(normalized);
+    }
+  }
+
+  function handleGuideNavigate(step) {
+    if (step.tab) goAppTab(step.tab);
+    if (step.tool === 'ai-insights') {
+      setActiveSection('tools');
+      setTimeout(() => generateInsights(), 120);
+      return;
+    }
+    if (step.tool?.startsWith('specialist-')) {
+      setActiveSection('finances');
+      const area = step.tool.replace('specialist-', '');
+      setTimeout(() => {
+        document.getElementById(`specialist-${area}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 180);
     }
   }
 
   useEffect(() => {
-    if (!isAuthed) return;
-    loadMonthData();
+    if (!isAuthed) {
+      skipLedgerAutoSave.current = true;
+      return;
+    }
+    skipLedgerAutoSave.current = true;
+    loadMonthData().finally(() => {
+      skipLedgerAutoSave.current = false;
+    });
     loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, isAuthed, profile]);
+
+  useEffect(() => {
+    if (!isAuthed || skipLedgerAutoSave.current) return undefined;
+    const t = setTimeout(() => {
+      saveLedgerSilent();
+    }, 1400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [income, expenses, isAuthed]);
 
   async function submitAuth(e) {
     e.preventDefault();
@@ -1143,6 +1220,7 @@ export default function App() {
       });
 
       setAiPlan(res);
+      awardXpThrottled('aiReport', 60000);
     } catch (e) {
       const msg = e.message || 'AI insights failed.';
       setAiError(
@@ -1480,7 +1558,6 @@ export default function App() {
   return (
     <div style={shellStyle} className="fc-dashboard-shell">
       {appLoading ? <LoadingOverlay message={appLoading} /> : null}
-      {checkupBusy ? <LoadingOverlay message="Updating your score…" submessage="Analyzing all 6 dimensions" /> : null}
       {showOnboarding ? (
         <OnboardingWizard
           token={token}
@@ -1510,6 +1587,9 @@ export default function App() {
           <h1 style={{ marginBottom: 4, fontSize: isMobile ? '1.45rem' : undefined, lineHeight: 1.2 }}>Financial Checkup</h1>
           <div style={{ opacity: 0.85, wordBreak: 'break-word' }}>
             Signed in as <strong>{user}</strong>
+            {userId ? (
+              <span> · Level <strong>{xpInfo.level}</strong> ({xpInfo.current}/{xpInfo.next} XP)</span>
+            ) : null}
             {lastCheckupScore != null ? (
               <span> · Score <strong>{Math.round(lastCheckupScore)}</strong>/100</span>
             ) : null}
@@ -1553,49 +1633,6 @@ export default function App() {
           zIndex: 5,
         }}
       >
-        <div
-          style={{
-            display: isMobile ? 'grid' : 'flex',
-            gap: 10,
-            gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : undefined,
-            flexWrap: isMobile ? undefined : 'wrap',
-            alignItems: isMobile ? 'stretch' : 'end',
-          }}
-        >
-          <label
-            style={{
-              display: 'grid',
-              gap: 4,
-              gridColumn: isMobile ? '1 / -1' : undefined,
-              minWidth: isMobile ? undefined : 0,
-            }}
-          >
-            <span style={{ opacity: 0.8, fontSize: 13 }}>Month</span>
-            <input
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              placeholder="YYYY-MM"
-              style={{ ...inputStyle, marginLeft: 0, width: '100%', maxWidth: isMobile ? 'none' : 160 }}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={loadMonthData}
-            style={btnNeutral}
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            disabled={checkupBusy || busy}
-            onClick={updateCheckupScore}
-            style={btnPrimary}
-          >
-            {checkupBusy ? 'Updating score…' : 'Update score'}
-          </button>
-        </div>
-
         {error ? <div style={{ color: '#ffb3b3' }}>{error}</div> : null}
 
         <AppNav
@@ -1606,11 +1643,10 @@ export default function App() {
           btnNeutral={btnNeutral}
         />
 
-        {activeSection === 'profile' && (
-          <CheckupPanel
-            token={token}
-            userId={userId}
-            month={month}
+        {activeSection === 'finances' && (
+          <FinancesPage
+            profile={profile}
+            onProfileChange={setProfile}
             isMobile={isMobile}
             isTablet={isTablet}
             cardStyle={cardStyle}
@@ -1618,16 +1654,27 @@ export default function App() {
             inputStyle={inputStyle}
             btnPrimary={btnPrimary}
             btnNeutral={btnNeutral}
-            ledger={{ income, totalExpenses }}
-            onResult={handleCheckupResult}
-            onGoTab={goAppTab}
-            showForm
-            showDetails
-            showHistory={false}
-            profile={profile}
+            income={income}
+            onIncomeChange={setIncome}
+            expenses={expenses}
+            onExpenseChange={(category, val) => {
+              setExpenses((prev) => prev.map((row) => (row.category === category ? { ...row, amount: val } : row)));
+            }}
+            newCategory={newCategory}
+            onNewCategoryChange={setNewCategory}
+            onAddCategory={addCategory}
+            onDeleteCategory={removeCategory}
+            catBusy={catBusy}
+            busy={busy}
+            month={month}
+            token={token}
+            userId={userId}
             primaryGoal={primaryGoal}
             isPro={isPro}
             onGoPlan={() => setActiveSection('plan')}
+            onResult={handleCheckupResult}
+            onAutoCheckup={handleAutoCheckupFromProfile}
+            totalExpenses={totalExpenses}
           />
         )}
 
@@ -1648,7 +1695,11 @@ export default function App() {
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 6 }}>Spending charts — {month}</h2>
             <div style={{ opacity: 0.85, fontSize: 14 }}>
-              Edit on <button type="button" onClick={() => setActiveSection('money')} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Money</button>, then Update score.
+              Edit on{' '}
+              <button type="button" onClick={() => setActiveSection('finances')} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                Finances
+              </button>
+              {' '}— your score updates automatically.
             </div>
           </div>
 
@@ -1961,7 +2012,7 @@ export default function App() {
           />
         )}
 
-        {activeSection === 'more' && (
+        {activeSection === 'tools' && (
           <MoreToolsPanel
             isPro={isPro}
             isMobile={isMobile}
@@ -2012,167 +2063,19 @@ export default function App() {
             btnPrimary={btnPrimary}
             btnNeutral={btnNeutral}
             checkupBusy={checkupBusy}
-            onUpdateScore={updateCheckupScore}
-            onGoProfile={() => setActiveSection('profile')}
-            onGoMoney={() => setActiveSection('money')}
+            onGoFinances={() => setActiveSection('finances')}
             onGoTab={goAppTab}
             onGoProgress={() => setActiveSection('progress')}
+            onGuideNavigate={handleGuideNavigate}
+            primaryGoal={primaryGoal}
             savingsAmount={savingsAmount}
             savingsRate={savingsRate}
             trajectory={trendsData?.improvement?.direction}
             topCategory={topCategory?.category}
+            userLevel={xpInfo.level}
+            xpLabel={`${xpInfo.current} / ${xpInfo.next} XP to next level`}
           />
         )}
-
-        {activeSection === 'money' && (
-          <div style={{ ...cardStyle, display: 'grid', gap: 14 }}>
-            <div>
-              <h2 style={{ marginTop: 0, marginBottom: 6 }}>Income & spending</h2>
-              <p style={{ margin: 0, opacity: 0.85, fontSize: 14 }}>
-                This is the single place to enter income and expenses. Your budget dimension updates when you tap Update score.
-              </p>
-            </div>
-            <div id="income-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
-              <h2 style={{ marginTop: 0, marginBottom: 8 }}>Income</h2>
-              <label
-                style={{
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: isMobile ? 'stretch' : 'center',
-                  flexDirection: isMobile ? 'column' : 'row',
-                }}
-              >
-                <span style={{ width: isMobile ? undefined : 90, opacity: 0.9 }}>Amount</span>
-                <input
-                  type="number"
-                  value={income}
-                  step="0.01"
-                  onChange={(e) => setIncome(e.target.value)}
-                  style={{ flex: 1, width: '100%', minWidth: 0, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: '#0b0f14', color: '#fff' }}
-                />
-              </label>
-              <div style={{ marginTop: 10 }}>
-                <button type="button" onClick={saveIncomeOnly} disabled={busy} style={btnPrimary}>
-                  {busy ? 'Saving…' : 'Save Income'}
-                </button>
-              </div>
-            </div>
-
-            <div id="expenses-panel" style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem' }}>
-              <h2 style={{ marginTop: 0, marginBottom: 8 }}>Expenses (editable)</h2>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 10,
-                  flexWrap: 'wrap',
-                  marginBottom: 12,
-                  alignItems: isMobile ? 'stretch' : 'flex-end',
-                  flexDirection: isMobile ? 'column' : 'row',
-                }}
-              >
-                <label style={{ display: 'grid', gap: 6, flex: isMobile ? undefined : '1 1 220px', minWidth: isMobile ? undefined : 160 }}>
-                  <span style={{ opacity: 0.85, fontSize: 14 }}>Add category</span>
-                  <input
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    placeholder="e.g. Health"
-                    style={{
-                      width: isMobile ? '100%' : 220,
-                      maxWidth: '100%',
-                      padding: 10,
-                      borderRadius: 8,
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      background: '#0b0f14',
-                      color: '#fff',
-                    }}
-                    disabled={catBusy}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={addCategory}
-                  disabled={catBusy || !newCategory.trim()}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    cursor: 'pointer',
-                    background: '#134',
-                    color: '#fff',
-                    borderRadius: 8,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    alignSelf: isMobile ? 'stretch' : undefined,
-                  }}
-                >
-                  {catBusy ? 'Adding…' : 'Add'}
-                </button>
-                {catError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{catError}</div> : null}
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', opacity: 0.85 }}>
-                      <th style={{ padding: '6px 8px' }}>Category</th>
-                      <th style={{ padding: '6px 8px' }}>Amount</th>
-                      <th style={{ padding: '6px 8px', width: 80 }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expenses.map((e) => (
-                      <tr key={e.id ?? e.category}>
-                        <td style={{ padding: '6px 8px', whiteSpace: isMobile ? 'normal' : 'nowrap', wordBreak: isMobile ? 'break-word' : undefined }}>{e.category}</td>
-                        <td style={{ padding: '6px 8px' }}>
-                          <input
-                            type="number"
-                            value={e.amount}
-                            step="0.01"
-                            onChange={(ev) => {
-                              const val = ev.target.value;
-                              setExpenses((prev) =>
-                                prev.map((row) => (row.id === e.id ? { ...row, amount: val } : row))
-                              );
-                            }}
-                            style={{
-                              width: isMobile ? '100%' : 140,
-                              maxWidth: isMobile ? 200 : undefined,
-                              padding: 8,
-                              borderRadius: 8,
-                              border: '1px solid rgba(255,255,255,0.2)',
-                              background: '#0b0f14',
-                              color: '#fff',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                        </td>
-                        <td style={{ padding: '6px 8px' }}>
-                          <button
-                            type="button"
-                            onClick={() => removeCategory(e.category)}
-                            disabled={catBusy}
-                            style={{ padding: '0.35rem 0.6rem', cursor: 'pointer', background: '#321', color: '#fff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)' }}
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {expenses.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} style={{ padding: 10, opacity: 0.8 }}>
-                          No expenses loaded.
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ marginTop: 10 }}>
-                <button type="button" onClick={saveExpensesOnly} disabled={busy || catBusy} style={btnPrimary}>
-                  {busy ? 'Saving…' : 'Save Expenses'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
         <div style={{ marginTop: 16, textAlign: 'center', opacity: 0.65, fontSize: 12 }}>
           Operon E2I

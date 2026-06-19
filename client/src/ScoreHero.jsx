@@ -8,23 +8,20 @@ export default function ScoreHero({
   budgetGrade,
   isMobile,
   cardSoftStyle,
-  btnPrimary,
-  onUpdateScore,
-  updateBusy,
-  onGoProfile,
-  onGoMoney,
+  checkupBusy,
+  onGoFinances,
 }) {
   if (!result) {
     return (
       <div style={{ ...cardSoftStyle, padding: '1.25rem', display: 'grid', gap: 12 }}>
         <div style={{ fontWeight: 800, fontSize: isMobile ? 17 : 20 }}>Your financial score</div>
         <p style={{ margin: 0, opacity: 0.88, fontSize: 14, lineHeight: 1.45, maxWidth: 560 }}>
-          Enter data on <button type="button" onClick={onGoMoney} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Money</button>
-          {' '}and <button type="button" onClick={onGoProfile} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Profile</button>, then calculate.
+          Enter your data on{' '}
+          <button type="button" onClick={onGoFinances} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+            Finances
+          </button>
+          {' '}— your score will appear here automatically.
         </p>
-        <button type="button" onClick={onUpdateScore} disabled={updateBusy} style={{ ...btnPrimary, justifySelf: 'start' }}>
-          {updateBusy ? 'Calculating…' : 'Calculate my score'}
-        </button>
       </div>
     );
   }
@@ -39,11 +36,13 @@ export default function ScoreHero({
     summary: d.summary || d.detail,
   }));
 
-  const sec = result.scoreExplanation?.securityScore ?? result.improvementRoadmap?.securityScore;
-  const wealth = result.scoreExplanation?.wealthScore ?? result.improvementRoadmap?.wealthScore;
-
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gap: 10 }}>
+      {checkupBusy ? (
+        <div style={{ fontSize: 12, color: '#93c5fd', opacity: 0.9 }}>Recalculating score…</div>
+      ) : (
+        <div style={{ fontSize: 12, opacity: 0.65 }}>Live score — updates as you edit Finances</div>
+      )}
       <ScoreBreakdownShowcase
         overallScore={result.overallScore}
         headline={result.headline}
@@ -57,37 +56,19 @@ export default function ScoreHero({
               {dim.label}{' '}
               <span style={{ color: scoreBarColor(dim.score) }}>{Math.round(dim.score)}</span>
               {dim.grade ? <span style={{ fontWeight: 400, opacity: 0.65, fontSize: 13 }}> ({dim.grade})</span> : null}
-              {dim.excluded ? (
-                <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.65 }}>excluded from total</span>
-              ) : null}
             </div>
             {dim.summary ? (
               <p style={{ margin: 0, fontSize: 14, opacity: 0.88, lineHeight: 1.5 }}>{dim.summary}</p>
             ) : null}
             <div style={{ fontSize: 13, opacity: 0.8 }}>
-              Budget ledger: ${Number(income || 0).toLocaleString()} in · ${Number(totalExpenses || 0).toLocaleString()} out · grade <strong>{budgetGrade}</strong>
+              Ledger: ${Number(income || 0).toLocaleString()} in · ${Number(totalExpenses || 0).toLocaleString()} out · grade <strong>{budgetGrade}</strong>
             </div>
+            <button type="button" onClick={onGoFinances} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 13 }}>
+              Improve this in Finances →
+            </button>
           </div>
         )}
       />
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 13 }}>
-          {sec != null ? (
-            <span style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.28)' }}>
-              Security <strong>{Math.round(sec)}</strong>
-            </span>
-          ) : null}
-          {wealth != null ? (
-            <span style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.28)' }}>
-              Long-term <strong>{Math.round(wealth)}</strong>
-            </span>
-          ) : null}
-        </div>
-        <button type="button" onClick={onUpdateScore} disabled={updateBusy} style={{ ...btnPrimary }}>
-          {updateBusy ? 'Updating…' : 'Update score'}
-        </button>
-      </div>
     </div>
   );
 }

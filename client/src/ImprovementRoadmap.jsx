@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { scoreBarColor } from './theme';
 
 const TAB_LABELS = {
-  money: 'Money',
-  profile: 'Profile',
+  finances: 'Finances',
   overview: 'Overview',
   progress: 'Progress',
+  tools: 'Tools',
+  plan: 'Plan',
 };
 
 function StepChip({ step, selected, onSelect }) {
