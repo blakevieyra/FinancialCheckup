@@ -5,18 +5,25 @@ function dimColor(score) {
   return '#ef4444';
 }
 
-export default function ScoreExplainer({ explanation, isMobile, cardSoftStyle, compact, onGoTab, btnNeutral }) {
+export default function ScoreExplainer({ explanation, isMobile, cardSoftStyle, compact, onGoTab, btnNeutral, bare }) {
   if (!explanation) return null;
 
   const dims = explanation.dimensions || [];
 
   return (
-    <div style={{ ...cardSoftStyle, padding: '0.85rem', display: 'grid', gap: 12 }}>
+    <div style={bare ? { display: 'grid', gap: 12 } : { ...cardSoftStyle, padding: '0.85rem', display: 'grid', gap: 12 }}>
+      {!bare ? (
       <div>
         <div style={{ fontWeight: 800, fontSize: isMobile ? 15 : 17 }}>How your score works</div>
         <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.88, lineHeight: 1.5 }}>{explanation.summary}</p>
         <p style={{ margin: '8px 0 0', fontSize: 12, opacity: 0.72, lineHeight: 1.45 }}>{explanation.formula}</p>
       </div>
+      ) : (
+        <>
+          <p style={{ margin: 0, fontSize: 14, opacity: 0.88, lineHeight: 1.5 }}>{explanation.summary}</p>
+          <p style={{ margin: 0, fontSize: 12, opacity: 0.72, lineHeight: 1.45 }}>{explanation.formula}</p>
+        </>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
         <div style={{ padding: '0.65rem', borderRadius: 8, border: '1px solid rgba(56,189,248,0.35)', background: 'rgba(56,189,248,0.08)' }}>

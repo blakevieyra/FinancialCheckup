@@ -15,12 +15,12 @@ const fieldGrid = (isMobile) => ({
   gap: 10,
 });
 
-function ActionPlanBlock({ actionPlan, cardSoftStyle, compact }) {
+function ActionPlanBlock({ actionPlan, cardSoftStyle, compact, bare }) {
   const items = (actionPlan || []).slice(0, compact ? 3 : 6);
   if (!items.length) return null;
   return (
-    <div style={{ ...cardSoftStyle, padding: '0.85rem' }}>
-      <div style={{ fontWeight: 700, marginBottom: 10 }}>Top priorities right now</div>
+    <div style={bare ? { display: 'grid', gap: 10 } : { ...cardSoftStyle, padding: '0.85rem' }}>
+      {!bare ? <div style={{ fontWeight: 700, marginBottom: 10 }}>Top priorities right now</div> : null}
       <div style={{ display: 'grid', gap: 10 }}>
         {items.map((item, i) => (
           <div key={`${item.title}-${i}`} style={{ borderLeft: `3px solid ${item.priority === 'HIGH' ? '#ef4444' : '#f59e0b'}`, paddingLeft: 10 }}>

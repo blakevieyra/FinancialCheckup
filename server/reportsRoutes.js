@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { verifyToken } = require('./auth');
 const { dbGet, dbAll } = require('./db');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
+const { sendReportEmail } = require('./transactionalEmail');
 const PDFDocument = require('pdfkit');
 const { requireFeature } = require('./requireFeature');
 
@@ -144,8 +145,8 @@ router.get('/csv', requireFeature('exports'), async (req, res) => {
     const filename = `financialcheckup-${month}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    /** Excel on Windows expects BOM for UTF-8 emoji/category labels. */
     res.send(`\uFEFF${lines.join('\r\n')}`);
+    sendReportEmail(req.user.id, { reportType: 'csv', month }).catch(() => {});
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
 });
 
@@ -243,10 +244,8 @@ router.get('/executive-pdf', requireFeature('exports'), async (req, res) => {
     );
 
     doc.end();
+    sendReportEmail(req.user.id, { reportType: 'executive-pdf', month }).catch(() => {});
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
-});
-
-/** GET /api/reports/forecast?month=YYYY-MM */
 router.get('/forecast', requireFeature('forecast'), async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
@@ -372,6 +371,7 @@ router.get('/business-docs-pdf', requireFeature('businessDocs'), async (req, res
       'Professional summary generated from ledger-based cash accounting proxies. For formal reporting, use full accrual accounting systems.',
     );
     doc.end();
+    sendReportEmail(req.user.id, { reportType: 'business-pdf', month }).catch(() => {});
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
 });
 

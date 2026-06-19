@@ -1,7 +1,33 @@
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 
+/** Retired 2026-06 — use current Sonnet. Override with ANTHROPIC_MODEL on Render. */
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
+
+const RETIRED_MODELS = new Set([
+  'claude-sonnet-4-20250514',
+  'claude-opus-4-20250514',
+  'claude-3-7-sonnet-20250219',
+  'claude-3-5-sonnet-20241022',
+  'claude-3-5-sonnet-20240620',
+]);
+
+function modelCandidates() {
+  const env = (process.env.ANTHROPIC_MODEL || '').trim();
+  const list = [];
+  if (env && !RETIRED_MODELS.has(env)) list.push(env);
+  if (!list.includes(DEFAULT_MODEL)) list.push(DEFAULT_MODEL);
+  list.push('claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001');
+  return [...new Set(list)];
+}
+
 function modelName() {
-  return process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+  const [first] = modelCandidates();
+  return first || DEFAULT_MODEL;
+}
+
+function isModelError(message) {
+  const m = String(message || '').toLowerCase();
+  return m.includes('model') && (m.includes('not found') || m.includes('retired') || m.includes('invalid') || m.includes('does not exist'));
 }
 
 /**
@@ -12,33 +38,46 @@ function modelName() {
  */
 async function createMessage({ userContent, maxTokens = 2048, system }) {
   const key = process.env.ANTHROPIC_API_KEY || '';
-  if (!key) throw new Error('ANTHROPIC_API_KEY is not set.');
+  if (!key) throw new Error('AI is not configured on the server. Add ANTHROPIC_API_KEY in Render.');
 
-  const body = {
-    model: modelName(),
-    max_tokens: maxTokens,
-    messages: [{ role: 'user', content: userContent }],
-  };
-  if (system) body.system = system;
+  const candidates = modelCandidates();
+  let lastError = null;
 
-  const res = await fetch(ANTHROPIC_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(body),
-  });
+  for (const model of candidates) {
+    const body = {
+      model,
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: userContent }],
+    };
+    if (system) body.system = system;
 
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (res.ok) {
+      const text = data.content?.[0]?.text;
+      if (!text) throw new Error('Empty response from Anthropic.');
+      return text;
+    }
+
     const msg = data?.error?.message || data?.message || `Anthropic API error (${res.status})`;
-    throw new Error(msg);
+    lastError = new Error(msg);
+    if (isModelError(msg) && model !== candidates[candidates.length - 1]) {
+      console.warn(`Anthropic model ${model} unavailable, trying fallback…`);
+      continue;
+    }
+    throw lastError;
   }
-  const text = data.content?.[0]?.text;
-  if (!text) throw new Error('Empty response from Anthropic.');
-  return text;
+
+  throw lastError || new Error('Anthropic request failed.');
 }
 
 function stripJsonFence(text) {

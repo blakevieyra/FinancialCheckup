@@ -4,5 +4,6 @@ export const APP_SECTIONS = [
   { id: 'money', label: 'Money', hint: 'Income & spending' },
   { id: 'profile', label: 'Profile', hint: 'Debt, savings & retirement' },
   { id: 'progress', label: 'Progress', hint: 'History, charts & goals' },
-  { id: 'more', label: 'More', hint: 'Reports & tools' },
+  { id: 'plan', label: 'Plan', hint: 'Pricing & billing' },
+  { id: 'more', label: 'More', hint: 'Reports & AI tools' },
 ];

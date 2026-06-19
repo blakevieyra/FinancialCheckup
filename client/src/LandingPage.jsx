@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import ScoreBreakdownShowcase from './ScoreBreakdownShowcase';
 import {
   CHECKUP_PROCESS,
   CHECKUP_FEATURES,
   CHECKUP_STATS,
   CHECKUP_FAQ,
   DEMO_ACTION_PLAN,
+  DEMO_LANDING_DIMENSIONS,
 } from './checkupConstants';
 
 export default function LandingPage({
@@ -24,6 +26,10 @@ export default function LandingPage({
   password,
   setPassword,
   authError,
+  authFieldErrors,
+  registerEmail,
+  setRegisterEmail,
+  authNotice,
   busy,
   submitAuth,
   onStartCheckup,
@@ -40,7 +46,7 @@ export default function LandingPage({
 
   return (
     <div style={shellStyle}>
-      <div style={{ ...containerStyle, maxWidth: 960 }}>
+      <div style={{ ...containerStyle, maxWidth: isMobile ? '100%' : 1200 }}>
         <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <img src="/logo.png" alt="" width={36} height={36} style={{ borderRadius: 8 }} />
@@ -78,14 +84,27 @@ export default function LandingPage({
           </div>
         </section>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginTop: '1rem' }}>
-          <div style={{ ...cardStyle, textAlign: 'center' }}>
-            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>Your financial score</div>
-            <div style={{ fontSize: 48, fontWeight: 800, color: '#60a5fa' }}>74</div>
-            <div style={{ fontSize: 14, opacity: 0.9 }}>◆ Good — 3 areas to improve</div>
-            <div style={{ marginTop: 8, fontSize: 11, opacity: 0.6 }}>live preview</div>
+        <div style={{ marginTop: '1.25rem' }}>
+          <ScoreBreakdownShowcase
+            overallScore={74}
+            dimensions={DEMO_LANDING_DIMENSIONS}
+            badge="Free financial health score"
+            large
+            isMobile={isMobile}
+            renderDetail={(dim) => (
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{dim.label} — {dim.score}/100</div>
+                <p style={{ margin: 0, fontSize: 14, opacity: 0.88, lineHeight: 1.55, maxWidth: 640 }}>{dim.blurb}</p>
+              </div>
+            )}
+          />
+          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.6, textAlign: 'center' }}>
+            Tap a category to explore — your real score updates as you complete the checkup
           </div>
-          <div style={{ ...cardStyle, fontFamily: 'ui-monospace, monospace', fontSize: 12, lineHeight: 1.55, overflow: 'auto' }}>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginTop: '1rem' }}>
+          <div style={{ ...cardStyle, fontFamily: 'ui-monospace, monospace', fontSize: 12, lineHeight: 1.55, overflow: 'auto', gridColumn: isMobile ? undefined : '1 / -1' }}>
             <div style={{ opacity: 0.65, marginBottom: 6 }}>financialcheckup — step 04 / plan</div>
             <div style={{ color: '#86efac' }}>&gt; financialcheckup plan --priority high</div>
             <div style={{ opacity: 0.85, marginTop: 8 }}>─── Your Personalized Action Plan ───</div>
@@ -177,6 +196,7 @@ export default function LandingPage({
           <p style={{ opacity: 0.88, fontSize: 14, marginTop: 0 }}>
             Register or log in to save scores, run unlimited checkups, and track progress monthly.
           </p>
+          {authNotice ? <div style={{ marginBottom: 10, color: '#86efac', fontSize: 14 }}>{authNotice}</div> : null}
           <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => setAuthMode('login')} style={authMode === 'login' ? btnPrimary : btnNeutral}>
               Login
@@ -185,14 +205,44 @@ export default function LandingPage({
               Register
             </button>
           </div>
-          <form onSubmit={submitAuth} style={{ display: 'grid', gap: 10, maxWidth: 400 }}>
+          <form onSubmit={submitAuth} style={{ display: 'grid', gap: 10, maxWidth: 420 }}>
             <label>
               Username
-              <input value={username} onChange={(e) => setUsername(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                style={{ ...inputStyle, width: '100%', marginTop: 4 }}
+              />
+              {authFieldErrors?.username ? <div style={{ color: '#fca5a5', fontSize: 12, marginTop: 4 }}>{authFieldErrors.username}</div> : null}
             </label>
+            {authMode === 'register' ? (
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={registerEmail}
+                  onChange={(e) => setRegisterEmail(e.target.value)}
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  style={{ ...inputStyle, width: '100%', marginTop: 4 }}
+                />
+                {authFieldErrors?.email ? <div style={{ color: '#fca5a5', fontSize: 12, marginTop: 4 }}>{authFieldErrors.email}</div> : null}
+              </label>
+            ) : null}
             <label>
               Password
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
+                style={{ ...inputStyle, width: '100%', marginTop: 4 }}
+              />
+              {authFieldErrors?.password ? <div style={{ color: '#fca5a5', fontSize: 12, marginTop: 4 }}>{authFieldErrors.password}</div> : null}
+              {authMode === 'register' ? (
+                <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>Min 8 characters with a letter and a number.</div>
+              ) : null}
             </label>
             {authError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{authError}</div> : null}
             <button type="submit" disabled={busy} style={{ ...btnPrimary, marginTop: 6 }}>

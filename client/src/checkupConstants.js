@@ -41,6 +41,15 @@ export const CHECKUP_FAQ = [
   },
 ];
 
+export const DEMO_LANDING_DIMENSIONS = [
+  { key: 'budget', label: 'Budget', score: 82, blurb: 'Spending is well controlled relative to income. Small tweaks to discretionary categories could push you into the excellent range.' },
+  { key: 'savings', label: 'Savings', score: 58, blurb: 'Emergency fund is building but below the 3-month target. Automate a weekly transfer to close the gap faster.' },
+  { key: 'debt', label: 'Debt', score: 71, blurb: 'Debt load is manageable. Focus extra payments on highest-APR balances first (avalanche method).' },
+  { key: 'investments', label: 'Investments', score: 45, blurb: 'Portfolio needs more diversification and international exposure. Review fee drag on active funds.' },
+  { key: 'insurance', label: 'Insurance', score: 90, blurb: 'Strong coverage across life and liability. Disability gap is the main item to review.' },
+  { key: 'retirement', label: 'Retirement', score: 62, blurb: 'On track for a modest retirement. Increasing 401k contributions by 2% would materially improve trajectory.' },
+];
+
 export const DEMO_ACTION_PLAN = [
   { priority: 'HIGH', title: 'Build emergency fund', detail: 'Target: $15,600 (3 months) · Current: $4,200 · Gap: $11,400', timeline: 'Save $380/mo → funded in 30 months' },
   { priority: 'MED', title: 'Rebalance investment portfolio', detail: 'Add 15% international equity exposure · Shift from bonds toward growth ETFs' },

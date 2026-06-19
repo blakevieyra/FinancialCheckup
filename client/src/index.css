@@ -10,12 +10,41 @@ html {
 
 body {
   margin: 0;
-  background: #0b0f14;
-  color: #e6edf3;
+  background: #1a2744;
+  color: #f8fafc;
   line-height: 1.35;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
+}
+
+@keyframes fcFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fc-fade-in {
+  animation: fcFadeIn 420ms ease forwards;
+}
+
+.fc-dim-flow {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.fc-dim-flow::-webkit-scrollbar {
+  height: 6px;
+}
+
+.fc-dim-flow::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 99px;
 }
 
 code {
@@ -104,6 +133,21 @@ table tbody tr:nth-child(even) {
   select,
   textarea {
     font-size: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .fc-dashboard-shell {
+    width: 100%;
+  }
+
+  .fc-dashboard {
+    width: 100%;
+    max-width: none;
+  }
+
+  .fc-score-showcase {
+    min-height: 0;
   }
 }
 

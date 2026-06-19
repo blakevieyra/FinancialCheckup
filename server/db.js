@@ -97,9 +97,18 @@ async function initDb() {
       id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      email TEXT,
+      email_verified INTEGER NOT NULL DEFAULT 0,
+      email_verify_token TEXT,
+      account_status TEXT NOT NULL DEFAULT 'active',
       created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
     )
   `);
+  await rawQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`);
+  await rawQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0`);
+  await rawQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_token TEXT`);
+  await rawQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status TEXT NOT NULL DEFAULT 'active'`);
+  await rawQuery(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email)) WHERE email IS NOT NULL`);
 
   await rawQuery(`
     CREATE TABLE IF NOT EXISTS income (
@@ -208,8 +217,12 @@ async function initDb() {
       status TEXT NOT NULL DEFAULT 'free',
       plan TEXT NOT NULL DEFAULT 'free',
       current_period_end TEXT,
+      cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
     )
+  `);
+  await rawQuery(`
+    ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end INTEGER NOT NULL DEFAULT 0
   `);
 
   console.log('✓ Postgres database ready');

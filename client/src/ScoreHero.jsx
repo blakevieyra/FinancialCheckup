@@ -1,17 +1,11 @@
-function ringColor(score) {
-  const pct = Number(score) || 0;
-  if (pct >= 80) return '#22c55e';
-  if (pct >= 65) return '#60a5fa';
-  if (pct >= 50) return '#f59e0b';
-  return '#ef4444';
-}
+import ScoreBreakdownShowcase from './ScoreBreakdownShowcase';
+import { scoreBarColor } from './theme';
 
 export default function ScoreHero({
   result,
   income,
   totalExpenses,
   budgetGrade,
-  month,
   isMobile,
   cardSoftStyle,
   btnPrimary,
@@ -22,16 +16,11 @@ export default function ScoreHero({
 }) {
   if (!result) {
     return (
-      <div style={{ ...cardSoftStyle, padding: '1rem', display: 'grid', gap: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: isMobile ? 17 : 19 }}>Your financial score</div>
-        <p style={{ margin: 0, opacity: 0.88, fontSize: 14, lineHeight: 1.45 }}>
-          <strong>Step 1:</strong>{' '}
-          <button type="button" onClick={onGoMoney} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Money</button>
-          {' '}→ income & spending.{' '}
-          <strong>Step 2:</strong>{' '}
-          <button type="button" onClick={onGoProfile} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Profile</button>
-          {' '}→ savings, insurance, retirement.{' '}
-          <strong>Step 3:</strong> Update score for your security + long-term plan.
+      <div style={{ ...cardSoftStyle, padding: '1.25rem', display: 'grid', gap: 12 }}>
+        <div style={{ fontWeight: 800, fontSize: isMobile ? 17 : 20 }}>Your financial score</div>
+        <p style={{ margin: 0, opacity: 0.88, fontSize: 14, lineHeight: 1.45, maxWidth: 560 }}>
+          Enter data on <button type="button" onClick={onGoMoney} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Money</button>
+          {' '}and <button type="button" onClick={onGoProfile} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Profile</button>, then calculate.
         </p>
         <button type="button" onClick={onUpdateScore} disabled={updateBusy} style={{ ...btnPrimary, justifySelf: 'start' }}>
           {updateBusy ? 'Calculating…' : 'Calculate my score'}
@@ -40,82 +29,64 @@ export default function ScoreHero({
     );
   }
 
-  const color = ringColor(result.overallScore);
-  const budgetDim = (result.dimensions || []).find((d) => d.key === 'budget');
   const excluded = new Set(result.excludedFromScore || []);
+  const dimensions = (result.dimensions || []).map((d) => ({
+    key: d.key,
+    label: d.label,
+    score: d.score,
+    grade: d.grade,
+    excluded: excluded.has(d.key),
+    summary: d.summary || d.detail,
+  }));
+
   const sec = result.scoreExplanation?.securityScore ?? result.improvementRoadmap?.securityScore;
   const wealth = result.scoreExplanation?.wealthScore ?? result.improvementRoadmap?.wealthScore;
-  const secNa = result.scoreExplanation?.securityScoreNA || result.improvementRoadmap?.securityScoreNA;
-  const wealthNa = result.scoreExplanation?.wealthScoreNA || result.improvementRoadmap?.wealthScoreNA;
 
   return (
-    <div style={{ ...cardSoftStyle, padding: '1rem', display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
-        <div
-          style={{
-            width: isMobile ? 72 : 88,
-            height: isMobile ? 72 : 88,
-            borderRadius: '50%',
-            border: `4px solid ${color}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: isMobile ? 26 : 32,
-            color,
-            flexShrink: 0,
-          }}
-        >
-          {Math.round(result.overallScore)}
-        </div>
-        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <div style={{ fontSize: 12, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Financial Checkup Score (weighted)</div>
-          <div style={{ fontWeight: 800, fontSize: isMobile ? 18 : 22, lineHeight: 1.25 }}>{result.headline}</div>
-          <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6 }}>
-            Budget (from Money): ${Number(income || 0).toLocaleString()} in · ${Number(totalExpenses || 0).toLocaleString()} out · grade <strong>{budgetGrade}</strong>
-            {budgetDim ? <> · budget <strong>{Math.round(budgetDim.score)}</strong></> : null}
-          </div>
-          {sec != null && wealth != null ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, fontSize: 12 }}>
-              <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)' }}>
-                Security <strong>{secNa ? '—' : Math.round(sec)}</strong>
-              </span>
-              <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)' }}>
-                Long-term <strong>{wealthNa ? '—' : Math.round(wealth)}</strong>
-              </span>
-              {excluded.size ? (
-                <span style={{ padding: '3px 8px', borderRadius: 6, opacity: 0.75 }}>
-                  {excluded.size} categor{excluded.size === 1 ? 'y' : 'ies'} excluded from total
-                </span>
+    <div style={{ display: 'grid', gap: 14 }}>
+      <ScoreBreakdownShowcase
+        overallScore={result.overallScore}
+        headline={result.headline}
+        dimensions={dimensions}
+        badge="Financial Checkup Score"
+        large
+        isMobile={isMobile}
+        renderDetail={(dim) => (
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>
+              {dim.label}{' '}
+              <span style={{ color: scoreBarColor(dim.score) }}>{Math.round(dim.score)}</span>
+              {dim.grade ? <span style={{ fontWeight: 400, opacity: 0.65, fontSize: 13 }}> ({dim.grade})</span> : null}
+              {dim.excluded ? (
+                <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.65 }}>excluded from total</span>
               ) : null}
             </div>
+            {dim.summary ? (
+              <p style={{ margin: 0, fontSize: 14, opacity: 0.88, lineHeight: 1.5 }}>{dim.summary}</p>
+            ) : null}
+            <div style={{ fontSize: 13, opacity: 0.8 }}>
+              Budget ledger: ${Number(income || 0).toLocaleString()} in · ${Number(totalExpenses || 0).toLocaleString()} out · grade <strong>{budgetGrade}</strong>
+            </div>
+          </div>
+        )}
+      />
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 13 }}>
+          {sec != null ? (
+            <span style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.28)' }}>
+              Security <strong>{Math.round(sec)}</strong>
+            </span>
+          ) : null}
+          {wealth != null ? (
+            <span style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.28)' }}>
+              Long-term <strong>{Math.round(wealth)}</strong>
+            </span>
           ) : null}
         </div>
-        <button type="button" onClick={onUpdateScore} disabled={updateBusy} style={{ ...btnPrimary, alignSelf: isMobile ? 'stretch' : 'center' }}>
+        <button type="button" onClick={onUpdateScore} disabled={updateBusy} style={{ ...btnPrimary }}>
           {updateBusy ? 'Updating…' : 'Update score'}
         </button>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, minmax(0, 1fr))', gap: 6 }}>
-        {(result.dimensions || []).map((d) => {
-          const isExcluded = excluded.has(d.key);
-          return (
-          <div
-            key={d.key}
-            style={{
-              textAlign: 'center',
-              padding: '0.4rem',
-              borderRadius: 8,
-              background: isExcluded ? 'rgba(15,23,42,0.25)' : 'rgba(15,23,42,0.45)',
-              opacity: isExcluded ? 0.55 : 1,
-              border: isExcluded ? '1px dashed rgba(255,255,255,0.2)' : 'none',
-            }}
-          >
-            <div style={{ fontSize: 10, opacity: 0.75 }}>{d.label}</div>
-            <div style={{ fontWeight: 800 }}>{Math.round(d.score)}</div>
-            {isExcluded ? <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>not in total</div> : null}
-          </div>
-          );
-        })}
       </div>
     </div>
   );

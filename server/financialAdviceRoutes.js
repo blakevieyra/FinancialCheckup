@@ -6,18 +6,30 @@ const { healthScore } = require('./scoring');
 router.use(verifyToken);
 
 async function fetchFreeMoneyAdvice() {
-  try {
-    const res = await fetch('https://api.adviceslip.com/advice/search/money');
-    if (!res.ok) throw new Error(`Advice API ${res.status}`);
-    const data = await res.json();
-    const slips = Array.isArray(data?.slips) ? data.slips : [];
-    return slips
-      .map((s) => String(s?.advice || '').trim())
-      .filter(Boolean)
-      .slice(0, 3);
-  } catch {
-    return [];
+  const urls = [
+    'https://api.adviceslip.com/advice/search/money',
+    'http://api.adviceslip.com/advice/search/money',
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const slips = Array.isArray(data?.slips) ? data.slips : [];
+      const tips = slips
+        .map((s) => String(s?.advice || '').trim())
+        .filter(Boolean)
+        .slice(0, 3);
+      if (tips.length) return tips;
+    } catch {
+      /** try next URL */
+    }
   }
+  return [
+    'Pay yourself first — automate savings on payday before discretionary spending.',
+    'Review subscriptions monthly; cancel anything you have not used in 30 days.',
+    'Build a one-month buffer before aggressively paying down low-APR debt.',
+  ];
 }
 
 router.get('/', async (req, res) => {

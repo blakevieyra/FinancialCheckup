@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as api from './api';
 import LandingPage from './LandingPage';
-import CheckupPanel, { ActionPlanBlock } from './CheckupPanel';
+import CheckupPanel from './CheckupPanel';
+import OverviewDashboard from './OverviewDashboard';
 import AppNav from './AppNav';
-import ScoreHero from './ScoreHero';
-import ScoreExplainer from './ScoreExplainer';
 import RecommendationTimeline from './RecommendationTimeline';
 import FinancialHistoryPanel from './FinancialHistoryPanel';
-import ImprovementRoadmap from './ImprovementRoadmap';
-import BillingPanel from './BillingPanel';
+import MoreToolsPanel from './MoreToolsPanel';
+import SubscriptionPortal from './SubscriptionPortal';
 import {
   clearAuthSession,
   clearCrossUserSessionState,
@@ -348,7 +347,7 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
 
   const [profile, setProfile] = useState('personal'); // personal | business | organizational
-  const [insights, setInsights] = useState([]);
+  const [aiPlan, setAiPlan] = useState(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState('');
 
@@ -396,9 +395,7 @@ export default function App() {
   const [digestMsg, setDigestMsg] = useState('');
   const [digestErr, setDigestErr] = useState('');
   const [digestPreview, setDigestPreview] = useState(null);
-  const [adviceData, setAdviceData] = useState(null);
-  const [adviceBusy, setAdviceBusy] = useState(false);
-  const [adviceErr, setAdviceErr] = useState('');
+  const [accountEmail, setAccountEmail] = useState('');
   const [goals, setGoals] = useState([]);
   const [goalsBusy, setGoalsBusy] = useState(false);
   const [goalsErr, setGoalsErr] = useState('');
@@ -444,11 +441,24 @@ export default function App() {
     }
   }
 
+  async function syncBilling() {
+    setBillingBusy(true);
+    setBillingErr('');
+    try {
+      await api.syncSubscriptionStatus(token);
+      await loadSubscription();
+    } catch (e) {
+      setBillingErr(e.message);
+    } finally {
+      setBillingBusy(false);
+    }
+  }
+
   function resetSessionForNewUser() {
     setCheckupResult(null);
     setLastCheckupScore(null);
     setShowGuestCheckup(false);
-    setInsights([]);
+    setAiPlan(null);
     setExpertData(null);
     clearCrossUserSessionState();
   }
@@ -476,6 +486,7 @@ export default function App() {
   const isAuthed = useMemo(() => Boolean(token), [token]);
   const isTablet = viewportW < 1024;
   const isMobile = viewportW < 720;
+  const isDesktop = viewportW >= 1024;
 
   useEffect(() => {
     const onResize = () => setViewportW(window.innerWidth);
@@ -492,7 +503,7 @@ export default function App() {
       setUser('');
       setExpenses([]);
       setIncome(0);
-      setInsights([]);
+      setAiPlan(null);
       setExpertData(null);
       setRankData(null);
       setTrendsData(null);
@@ -571,21 +582,6 @@ export default function App() {
       applyDigestPrefs(p);
     } catch (e) {
       setDigestErr(e.message);
-    }
-  }
-
-  async function loadFinancialAdvice() {
-    if (!token) return;
-    setAdviceErr('');
-    setAdviceBusy(true);
-    try {
-      const d = await api.getFinancialAdvice(token, month);
-      setAdviceData(d);
-    } catch (e) {
-      setAdviceErr(e.message);
-      setAdviceData(null);
-    } finally {
-      setAdviceBusy(false);
     }
   }
 
@@ -762,13 +758,6 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return undefined;
-    loadFinancialAdvice();
-    return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, month]);
-
-  useEffect(() => {
-    if (!token) return undefined;
     if (features.goals === false) {
       setGoals([]);
       return undefined;
@@ -873,7 +862,7 @@ export default function App() {
   }
 
   function goAppTab(tab) {
-    if (tab === 'money' || tab === 'profile' || tab === 'overview' || tab === 'progress' || tab === 'more') {
+    if (['money', 'profile', 'overview', 'progress', 'more', 'plan'].includes(tab)) {
       setActiveSection(tab);
     }
   }
@@ -896,6 +885,7 @@ export default function App() {
       setToken(res.token);
       setUser(res.username);
       setUserId(res.userId ?? null);
+      setAccountEmail(res.email || '');
       setPassword('');
       setUsername('');
       try {
@@ -1090,7 +1080,7 @@ export default function App() {
   async function generateInsights() {
     setAiError('');
     setAiBusy(true);
-    setInsights([]);
+    setAiPlan(null);
     try {
       const payloadExpenses = expenses.map((e) => ({
         category: e.category,
@@ -1105,11 +1095,24 @@ export default function App() {
         expenseRatio: expenseRatio,
         month,
         profile,
+        dimensions: (checkupResult?.dimensions || []).map((d) => ({
+          key: d.key,
+          label: d.label,
+          score: d.score,
+          grade: d.grade,
+        })),
+        overallScore: checkupResult?.overallScore,
+        headline: checkupResult?.headline,
       });
 
-      setInsights(Array.isArray(res.insights) ? res.insights : []);
+      setAiPlan(res);
     } catch (e) {
-      setAiError(e.message);
+      const msg = e.message || 'AI insights failed.';
+      setAiError(
+        /model|anthropic|ANTHROPIC/i.test(msg)
+          ? 'AI model unavailable — set ANTHROPIC_MODEL=claude-sonnet-4-6 on Render if this persists.'
+          : msg,
+      );
     } finally {
       setAiBusy(false);
     }
@@ -1300,7 +1303,7 @@ export default function App() {
     setSubscription(null);
     setExpenses([]);
     setIncome(0);
-    setInsights([]);
+    setAiPlan(null);
     setAiError('');
     setHistoryError('');
     setDigestMsg('');
@@ -1325,16 +1328,17 @@ export default function App() {
     fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
     minHeight: '100vh',
     boxSizing: 'border-box',
+    width: '100%',
     padding: isMobile
       ? `max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left))`
-      : isTablet
-        ? `1.25rem max(1.25rem, env(safe-area-inset-right)) 1.5rem max(1.25rem, env(safe-area-inset-left))`
-        : `2rem max(2rem, env(safe-area-inset-right)) 2rem max(2rem, env(safe-area-inset-left))`,
+      : isDesktop
+        ? `1rem max(1.75rem, env(safe-area-inset-right)) 1.5rem max(1.75rem, env(safe-area-inset-left))`
+        : `1.25rem max(1.25rem, env(safe-area-inset-right)) 1.5rem max(1.25rem, env(safe-area-inset-left))`,
     color: '#e6edf3',
     background:
-      'radial-gradient(1200px 550px at 15% -10%, rgba(59,130,246,0.25), transparent 55%), radial-gradient(900px 450px at 90% 0%, rgba(16,185,129,0.18), transparent 50%), #0a0f1a',
+      'radial-gradient(1600px 700px at 10% -5%, rgba(77,166,255,0.2), transparent 55%), radial-gradient(1200px 550px at 95% 0%, rgba(52,211,153,0.14), transparent 50%), #1a2744',
   };
-  const containerStyle = { maxWidth: 1080, margin: '0 auto', width: '100%', minWidth: 0 };
+  const containerStyle = { width: '100%', maxWidth: '100%', margin: 0, minWidth: 0 };
   const cardStyle = {
     border: '1px solid rgba(148,163,184,0.25)',
     borderRadius: 14,
@@ -1437,8 +1441,8 @@ export default function App() {
   }
 
   return (
-    <div style={shellStyle}>
-      <div style={containerStyle}>
+    <div style={shellStyle} className="fc-dashboard-shell">
+      <div style={containerStyle} className="fc-dashboard">
       <div
         style={{
           display: 'flex',
@@ -1873,253 +1877,85 @@ export default function App() {
           </>
         )}
 
+        {activeSection === 'plan' && (
+          <SubscriptionPortal
+            subscription={subscription}
+            billingBusy={billingBusy}
+            billingErr={billingErr}
+            onSubscribeMonthly={() => startCheckout('monthly')}
+            onSubscribeAnnual={() => startCheckout('annual')}
+            onManageBilling={openBillingPortal}
+            onSync={syncBilling}
+            cardStyle={cardStyle}
+            cardSoftStyle={cardSoftStyle}
+            btnPrimary={btnPrimary}
+            btnNeutral={btnNeutral}
+            isMobile={isMobile}
+            isTablet={isTablet}
+          />
+        )}
+
         {activeSection === 'more' && (
-          <>
-        <BillingPanel
-          subscription={subscription}
-          billingBusy={billingBusy}
-          billingErr={billingErr}
-          onSubscribeMonthly={() => startCheckout('monthly')}
-          onSubscribeAnnual={() => startCheckout('annual')}
-          onManageBilling={openBillingPortal}
-          onRefresh={loadSubscription}
-          cardStyle={cardStyle}
-          btnPrimary={btnPrimary}
-          btnNeutral={btnNeutral}
-          isMobile={isMobile}
-        />
-
-        <div style={{ ...cardStyle, display: 'grid', gap: 10 }}>
-          <div style={{ fontWeight: 700 }}>Export reports {!isPro ? <span style={{ fontWeight: 400, fontSize: 13, opacity: 0.75 }}>(Pro)</span> : null}</div>
-          {!isPro ? (
-            <p style={{ margin: 0, fontSize: 14, opacity: 0.85 }}>Upgrade to Pro above to export CSV and PDF reports.</p>
-          ) : null}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            <button type="button" disabled={!isPro || exportBusy || busy} onClick={exportMonthCsv} style={btnNeutral}>
-              {exportBusy ? 'Exporting…' : 'Export CSV'}
-            </button>
-            <button type="button" disabled={!isPro || pdfBusy || busy} onClick={exportExecutivePdf} style={btnNeutral}>
-              {pdfBusy ? 'Building PDF…' : 'Export Executive PDF'}
-            </button>
-          </div>
-        </div>
-
-        <details id="insights-panel" style={cardStyle}>
-          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>Optional AI & advice tools</summary>
-          <div style={{ marginTop: 12, display: 'grid', gap: 14 }}>
-            <select value={profile} onChange={(e) => setProfile(e.target.value)} style={{ ...inputStyle, maxWidth: 280 }}>
-              <option value="personal">Personal</option>
-              <option value="business">Business</option>
-              <option value="organizational">Organizational</option>
-            </select>
-            <button type="button" disabled={aiBusy} onClick={generateInsights} style={btnNeutral}>
-              {aiBusy ? 'Generating…' : 'Get AI insights'}
-            </button>
-            {aiError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{aiError}</div> : null}
-            {insights && insights.length ? (
-              <div style={{ display: 'grid', gap: 8 }}>
-                {insights.map((ins, idx) => (
-                  <div key={`${ins.title}-${idx}`} style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
-                    <div style={{ fontWeight: 700 }}>{ins.title}</div>
-                    <div style={{ marginTop: 4, opacity: 0.9, fontSize: 14 }}>{ins.message}</div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <button type="button" onClick={loadFinancialAdvice} disabled={adviceBusy} style={btnNeutral}>
-              {adviceBusy ? 'Loading…' : 'Refresh money tips feed'}
-            </button>
-            {adviceErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{adviceErr}</div> : null}
-            <button type="button" disabled={expertBusy} onClick={loadExpertBriefing} style={btnNeutral}>
-              {expertBusy ? 'Loading…' : 'Generate expert briefing'}
-            </button>
-            {expertError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{expertError}</div> : null}
-            {expertData?.expert?.headline ? (
-              <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.45 }}>
-                <strong>{expertData.expert.headline}</strong> — {expertData.expert.executiveVerdict}
-              </div>
-            ) : null}
-          </div>
-        </details>
-
-        <details id="projections-panel" style={cardStyle}>
-          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
-            Projections, long-term health & business documents
-          </summary>
-          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-            <p style={{ margin: 0, opacity: 0.86, lineHeight: 1.45, fontSize: 14 }}>
-              Uses your trailing history to project <strong>3 / 6 / 12 month outcomes</strong>, estimate <strong>long-term financial health</strong>, and generate
-              simplified <strong>business accounting statements</strong> from current ledger data.
-            </p>
-            {forecastBusy ? <div style={{ opacity: 0.8 }}>Building financial outlook…</div> : null}
-            {forecastErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{forecastErr}</div> : null}
-
-            {forecastData?.outcomes?.length ? (
-              <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>Projected outcomes</div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-                  {forecastData.outcomes.map((o) => (
-                    <div key={o.months} style={{ ...cardSoftStyle, padding: '0.6rem' }}>
-                      <div style={{ fontWeight: 700 }}>{o.months}-month</div>
-                      <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>to {o.endMonth}</div>
-                      <div style={{ marginTop: 6, fontSize: 13 }}>Income: <strong>${Number(o.projectedIncome).toLocaleString()}</strong></div>
-                      <div style={{ fontSize: 13 }}>Expenses: <strong>${Number(o.projectedExpenses).toLocaleString()}</strong></div>
-                      <div style={{ fontSize: 13 }}>Net: <strong>${Number(o.projectedNet).toLocaleString()}</strong></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {forecastData?.longTermHealth ? (
-              <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700 }}>
-                  Long-term health: <span style={{ textTransform: 'capitalize' }}>{forecastData.longTermHealth.status}</span>
-                </div>
-                <div style={{ fontSize: 14, opacity: 0.9, marginTop: 6 }}>{forecastData.longTermHealth.summary}</div>
-                <ul style={{ margin: '8px 0 0 1.25rem', opacity: 0.88, lineHeight: 1.4 }}>
-                  {(forecastData.longTermHealth.recommendations || []).map((r, i) => (
-                    <li key={`${i}-${r.slice(0, 24)}`}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {businessDocs ? (
-              <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span>Business accounting documents (generated)</span>
-                  <button type="button" onClick={exportBusinessDocsPdf} disabled={businessPdfBusy} style={btnNeutral}>
-                    {businessPdfBusy ? 'Building business PDF…' : 'Export Business Docs PDF'}
-                  </button>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : '1fr 1fr 1fr', gap: 12, fontSize: 13 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Balance Sheet</div>
-                    <div>Assets: <strong>${Number(businessDocs.balanceSheet?.assets?.totalAssets || 0).toLocaleString()}</strong></div>
-                    <div>Liabilities: <strong>${Number(businessDocs.balanceSheet?.liabilities?.totalLiabilities || 0).toLocaleString()}</strong></div>
-                    <div>Equity: <strong>${Number(businessDocs.balanceSheet?.equity?.totalEquity || 0).toLocaleString()}</strong></div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Income Statement</div>
-                    <div>Revenue: <strong>${Number(businessDocs.incomeStatement?.revenue || 0).toLocaleString()}</strong></div>
-                    <div>Expenses: <strong>${Number(businessDocs.incomeStatement?.operatingExpenses || 0).toLocaleString()}</strong></div>
-                    <div>Net Income: <strong>${Number(businessDocs.incomeStatement?.netIncome || 0).toLocaleString()}</strong></div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Cash Flow Summary</div>
-                    <div>Operating CF: <strong>${Number(businessDocs.cashFlowSummary?.operatingCashFlowProxy || 0).toLocaleString()}</strong></div>
-                    <div>Avg Monthly CF: <strong>${Number(businessDocs.cashFlowSummary?.averageMonthlyNetCashFlow || 0).toLocaleString()}</strong></div>
-                    <div>Trend: <strong>{businessDocs.cashFlowSummary?.trend || 'n/a'}</strong></div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </details>
-
-        <details id="resources-panel" style={cardStyle}>
-          <summary style={{ cursor: 'pointer', fontWeight: 700, outline: 'none' }}>
-            Resources (authoritative help for people & businesses)
-          </summary>
-          <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-            <p style={{ margin: 0, opacity: 0.88, lineHeight: 1.45, fontSize: 14 }}>
-              Trusted financial education and support links. Always verify local/state eligibility and current guidance.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: 12 }}>
-              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Personal finance support</div>
-                <ul style={{ margin: '0 0 0 1.2rem', lineHeight: 1.45 }}>
-                  <li><a href="https://www.consumerfinance.gov/" target="_blank" rel="noreferrer">Consumer Financial Protection Bureau (CFPB)</a></li>
-                  <li><a href="https://www.usa.gov/money" target="_blank" rel="noreferrer">USA.gov Money & Credit</a></li>
-                  <li><a href="https://www.ftc.gov/" target="_blank" rel="noreferrer">Federal Trade Commission (FTC) fraud resources</a></li>
-                  <li><a href="https://www.annualcreditreport.com/" target="_blank" rel="noreferrer">AnnualCreditReport.com (official credit reports)</a></li>
-                  <li><a href="https://www.irs.gov/" target="_blank" rel="noreferrer">IRS tax guidance & payment plans</a></li>
-                </ul>
-              </div>
-              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Business & organizational resources</div>
-                <ul style={{ margin: '0 0 0 1.2rem', lineHeight: 1.45 }}>
-                  <li><a href="https://www.sba.gov/" target="_blank" rel="noreferrer">U.S. Small Business Administration (SBA)</a></li>
-                  <li><a href="https://www.score.org/" target="_blank" rel="noreferrer">SCORE mentoring for businesses</a></li>
-                  <li><a href="https://www.irs.gov/businesses" target="_blank" rel="noreferrer">IRS business tax center</a></li>
-                  <li><a href="https://www.grants.gov/" target="_blank" rel="noreferrer">Grants.gov (official grant listings)</a></li>
-                  <li><a href="https://www.sba.gov/local-assistance/resource-partners/small-business-development-centers-sbdc" target="_blank" rel="noreferrer">SBDC local business development centers</a></li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </details>
-          </>
+          <MoreToolsPanel
+            isPro={isPro}
+            isMobile={isMobile}
+            isTablet={isTablet}
+            cardStyle={cardStyle}
+            cardSoftStyle={cardSoftStyle}
+            inputStyle={inputStyle}
+            btnPrimary={btnPrimary}
+            btnNeutral={btnNeutral}
+            onGoPlan={() => setActiveSection('plan')}
+            exportBusy={exportBusy}
+            pdfBusy={pdfBusy}
+            businessPdfBusy={businessPdfBusy}
+            busy={busy}
+            onExportCsv={exportMonthCsv}
+            onExportPdf={exportExecutivePdf}
+            onExportBusinessPdf={exportBusinessDocsPdf}
+            profile={profile}
+            onProfileChange={setProfile}
+            aiBusy={aiBusy}
+            onAiInsights={generateInsights}
+            aiError={aiError}
+            aiPlan={aiPlan}
+            token={token}
+            userEmail={accountEmail || digestEmail}
+            onAccountDeleted={logout}
+            expertBusy={expertBusy}
+            onExpert={loadExpertBriefing}
+            expertError={expertError}
+            expertData={expertData}
+            forecastBusy={forecastBusy}
+            forecastErr={forecastErr}
+            forecastData={forecastData}
+            businessDocs={businessDocs}
+            onOpenProjections={loadForecastAndDocs}
+          />
         )}
 
         {activeSection === 'overview' && (
-          <div style={{ display: 'grid', gap: 16 }}>
-            <ScoreHero
-              result={checkupResult}
-              income={income}
-              totalExpenses={totalExpenses}
-              budgetGrade={grade}
-              month={month}
-              isMobile={isMobile}
-              cardSoftStyle={cardSoftStyle}
-              btnPrimary={btnPrimary}
-              onUpdateScore={updateCheckupScore}
-              updateBusy={checkupBusy}
-              onGoProfile={() => setActiveSection('profile')}
-              onGoMoney={() => setActiveSection('money')}
-            />
-            {checkupResult?.improvementRoadmap ? (
-              <ImprovementRoadmap
-                roadmap={checkupResult.improvementRoadmap}
-                compact
-                cardSoftStyle={cardSoftStyle}
-                onGoTab={goAppTab}
-                btnNeutral={btnNeutral}
-              />
-            ) : null}
-            {checkupResult ? (
-              <ActionPlanBlock actionPlan={checkupResult.actionPlan} cardSoftStyle={cardSoftStyle} compact />
-            ) : null}
-            {checkupResult?.scoreExplanation ? (
-              <ScoreExplainer
-                explanation={checkupResult.scoreExplanation}
-                isMobile={isMobile}
-                cardSoftStyle={cardSoftStyle}
-                compact
-                onGoTab={goAppTab}
-                btnNeutral={btnNeutral}
-              />
-            ) : null}
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
-              <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
-                <div style={{ opacity: 0.7, fontSize: 12 }}>Net surplus</div>
-                <div style={{ fontWeight: 800, marginTop: 2 }}>${savingsAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-              </div>
-              <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
-                <div style={{ opacity: 0.7, fontSize: 12 }}>Savings rate</div>
-                <div style={{ fontWeight: 800, marginTop: 2 }}>{savingsRate.toFixed(1)}%</div>
-              </div>
-              <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
-                <div style={{ opacity: 0.7, fontSize: 12 }}>Trajectory</div>
-                <div style={{ fontWeight: 800, marginTop: 2, fontSize: 14 }}>{trendsData?.improvement?.direction || '—'}</div>
-              </div>
-              <div style={{ ...cardSoftStyle, padding: '0.65rem' }}>
-                <div style={{ opacity: 0.7, fontSize: 12 }}>Largest category</div>
-                <div style={{ fontWeight: 800, marginTop: 2, fontSize: 14 }}>
-                  {topCategory ? `${topCategory.category}` : 'N/A'}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <button type="button" onClick={() => setActiveSection('profile')} style={{ ...btnNeutral, fontSize: 13 }}>
-                Full score breakdown →
-              </button>
-              <button type="button" onClick={() => setActiveSection('progress')} style={{ ...btnNeutral, fontSize: 13 }}>
-                History & charts →
-              </button>
-            </div>
-          </div>
+          <OverviewDashboard
+            isMobile={isMobile}
+            isDesktop={isDesktop}
+            checkupResult={checkupResult}
+            income={income}
+            totalExpenses={totalExpenses}
+            budgetGrade={grade}
+            cardSoftStyle={cardSoftStyle}
+            btnPrimary={btnPrimary}
+            btnNeutral={btnNeutral}
+            checkupBusy={checkupBusy}
+            onUpdateScore={updateCheckupScore}
+            onGoProfile={() => setActiveSection('profile')}
+            onGoMoney={() => setActiveSection('money')}
+            onGoTab={goAppTab}
+            onGoProgress={() => setActiveSection('progress')}
+            savingsAmount={savingsAmount}
+            savingsRate={savingsRate}
+            trajectory={trendsData?.improvement?.direction}
+            topCategory={topCategory?.category}
+          />
         )}
 
         {activeSection === 'money' && (

@@ -42,6 +42,10 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-6
+      - key: API_PUBLIC_URL
+        sync: false
+      - key: MAIL_FROM
         sync: false
       - key: FRED_API_KEY
         sync: false

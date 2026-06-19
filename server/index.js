@@ -58,6 +58,7 @@ app.use('/api/auth/register', authLimiter);
 app.use('/api/auth', require('./authRoutes'));
 app.use('/api/billing', billingRouter);
 app.use('/api/me/digest', require('./digestRoutes'));
+app.use('/api/me', require('./dataRoutes'));
 app.use('/api/income', require('./incomeRoutes'));
 app.use('/api/expenses', require('./expenseRoutes'));
 app.use('/api/ai', require('./aiRoutes'));
@@ -78,6 +79,9 @@ app.get('/api/health', (_, res) =>
       postgres: true,
       sixDimensionCheckup: true,
       stripeBilling: Boolean(process.env.STRIPE_SECRET_KEY),
+      anthropicAi: Boolean(process.env.ANTHROPIC_API_KEY),
+      anthropicModel: require('./anthropicClient').modelName(),
+      emailConfigured: require('./mailer').smtpConfigured(),
     },
   }),
 );

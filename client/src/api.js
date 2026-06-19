@@ -74,10 +74,10 @@ export async function health() {
   return apiFetch('/api/health');
 }
 
-export async function register(username, password) {
+export async function register(username, password, email) {
   return apiFetch('/api/auth/register', {
     method: 'POST',
-    body: { username, password },
+    body: { username, password, email },
   });
 }
 
@@ -86,6 +86,10 @@ export async function login(username, password) {
     method: 'POST',
     body: { username, password },
   });
+}
+
+export async function resendVerifyEmail(token) {
+  return apiFetch('/api/auth/resend-verify', { method: 'POST', token, body: {} });
 }
 
 export async function getIncome(token, month) {
@@ -237,9 +241,12 @@ export async function getMyTrends(token, months = 12) {
   return apiFetch(`/api/me/trends?months=${encodeURIComponent(months)}`, { token });
 }
 
-export async function getFinancialAdvice(token, month) {
-  const m = encodeURIComponent(month);
-  return apiFetch(`/api/me/financial-advice?month=${m}`, { token });
+export async function exportMyData(token) {
+  return apiFetch('/api/me/data-export', { token });
+}
+
+export async function deleteMyAccount(token, password) {
+  return apiFetch('/api/me/account', { method: 'DELETE', token, body: { password } });
 }
 
 export async function getGoals(token) {
@@ -294,6 +301,10 @@ export async function createCheckoutSession(token, plan) {
 
 export async function createBillingPortalSession(token) {
   return apiFetch('/api/billing/portal', { method: 'POST', token, body: {} });
+}
+
+export async function syncSubscriptionStatus(token) {
+  return apiFetch('/api/billing/sync', { method: 'POST', token, body: {} });
 }
 
 export function openExternalUrl(url) {
