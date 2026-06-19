@@ -49,12 +49,13 @@ async function toApi(row, userId) {
     digestEmail: row.digest_email || '',
     digestPhone: row.digest_phone || '',
     digestWeekday: Number(row.digest_weekday ?? 1),
+    digestFrequency: row.digest_frequency || 'weekly',
     lastSentStamp: row.digest_last_sent_at || null,
     smtpReady: smtpConfigured(),
     smsReady: twilioConfigured(),
     cronTimezone: process.env.WEEKLY_DIGEST_TZ || 'America/Los_Angeles',
     note:
-      'Digest uses your ledger month as YYYY-MM (same as the app). Each week you get a reminder + snapshot.',
+      'Score summaries include your overall score, category breakdown, ledger snapshot, and top priority action.',
     preview: await previewForUserMonth(userId, month),
   };
 }
@@ -76,7 +77,12 @@ router.put('/', async (req, res) => {
       digestEmail,
       digestPhone,
       digestWeekday,
+      digestFrequency,
     } = req.body ?? {};
+
+    if (digestFrequency !== undefined && !['daily', 'weekly', 'monthly'].includes(String(digestFrequency))) {
+      return res.status(400).json({ error: 'digestFrequency must be daily, weekly, or monthly.' });
+    }
 
     if (digestChannel !== undefined && !['none', 'email', 'sms'].includes(String(digestChannel))) {
       return res.status(400).json({ error: 'digestChannel must be none, email, or sms.' });
@@ -117,7 +123,8 @@ router.put('/', async (req, res) => {
          digest_channel = ?,
          digest_email = ?,
          digest_phone = ?,
-         digest_weekday = COALESCE(?, digest_weekday)
+         digest_weekday = COALESCE(?, digest_weekday),
+         digest_frequency = COALESCE(?, digest_frequency)
        WHERE user_id = ?`,
       [
         enabledRaw ? 1 : 0,
@@ -125,6 +132,7 @@ router.put('/', async (req, res) => {
         email !== undefined ? email || null : row.digest_email,
         phone !== undefined ? phone || null : row.digest_phone,
         wd !== undefined ? wd : null,
+        digestFrequency !== undefined ? String(digestFrequency) : null,
         req.user.id,
       ],
     );

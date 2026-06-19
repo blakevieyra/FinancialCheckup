@@ -23,6 +23,7 @@ export default function OnboardingWizard({
   btnPrimary,
   btnNeutral,
   isMobile,
+  accountEmail,
   onComplete,
 }) {
   const [step, setStep] = useState(0);
@@ -30,6 +31,8 @@ export default function OnboardingWizard({
   const [data, setData] = useState({ ...BLANK_SNAPSHOT });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [emailSummary, setEmailSummary] = useState(true);
+  const [summaryFreq, setSummaryFreq] = useState('weekly');
 
   const grid = { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 };
 
@@ -73,6 +76,15 @@ export default function OnboardingWizard({
       };
       await api.runCheckup(token, { month, snapshot });
       await api.setOnboarding(token, { complete: true, primaryGoal: goal });
+      if (emailSummary && accountEmail) {
+        await api.updateDigestPrefs(token, {
+          digestEnabled: true,
+          digestChannel: 'email',
+          digestEmail: accountEmail,
+          digestFrequency: summaryFreq,
+          digestWeekday: 1,
+        });
+      }
       onComplete?.();
     } catch (e) {
       setErr(e.message || 'Setup failed.');
@@ -220,6 +232,27 @@ export default function OnboardingWizard({
                 <p style={{ margin: 0, opacity: 0.8, fontSize: 13 }}>
                   Tap finish to calculate your score and open your dashboard.
                 </p>
+                <div style={{ marginTop: 12, padding: '0.85rem', borderRadius: 10, border: '1px solid rgba(148,163,184,0.2)', display: 'grid', gap: 10 }}>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input type="checkbox" checked={emailSummary} onChange={(e) => setEmailSummary(e.target.checked)} />
+                    Email me score summaries
+                  </label>
+                  {emailSummary ? (
+                    <>
+                      <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                        How often
+                        <select value={summaryFreq} onChange={(e) => setSummaryFreq(e.target.value)} style={inputStyle}>
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
+                      </label>
+                      <div style={{ fontSize: 12, opacity: 0.75 }}>
+                        Sent to <strong>{accountEmail || 'your account email'}</strong> — includes score, categories, and top action.
+                      </div>
+                    </>
+                  ) : null}
+                </div>
               </div>
             ) : null}
 

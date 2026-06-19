@@ -155,6 +155,10 @@ table tbody tr:nth-child(even) {
   .fc-score-showcase {
     min-height: 0;
   }
+
+  .fc-landing-shell {
+    min-height: 100vh;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

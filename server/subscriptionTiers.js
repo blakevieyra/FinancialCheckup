@@ -17,7 +17,7 @@ const FREE_FEATURES = {
   expertBriefing: false,
   exports: false,
   goals: false,
-  digest: false,
+  digest: true,
   leaderboard: true,
   businessDocs: false,
   forecast: false,

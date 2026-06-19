@@ -34,17 +34,29 @@ function ymdInTz(timeZone, date = new Date()) {
 function digestAlreadySentForLocalCalendarDay(prefRow, timeZone, now = new Date()) {
   const ymd = ymdInTz(timeZone, now);
   if (!prefRow.digest_last_sent_at) return false;
-  /** We store DATE-only stamps (YYYY-MM-DD) after automated sends — avoid duplicate same local day */
   const prev = String(prefRow.digest_last_sent_at).slice(0, 10);
   return prev === ymd;
 }
 
+function digestAlreadySentThisMonth(prefRow, timeZone, now = new Date()) {
+  const ym = ymdInTz(timeZone, now).slice(0, 7);
+  if (!prefRow.digest_last_sent_at) return false;
+  return String(prefRow.digest_last_sent_at).slice(0, 7) === ym;
+}
 
+function shouldSendForFrequency(prefRow, timeZone, now = new Date()) {
+  const freq = prefRow.digest_frequency || 'weekly';
+  if (freq === 'daily') return true;
+  if (freq === 'weekly') return Number(prefRow.digest_weekday ?? 1) === weekdayInTz(timeZone, now);
+  if (freq === 'monthly') return Number(ymdInTz(timeZone, now).slice(8, 10)) === 1;
+  return false;
+}
 
 async function dispatchDigest(prefRow, options = {}) {
   const tz = options.tz || process.env.WEEKLY_DIGEST_TZ || 'America/Los_Angeles';
   const month = options.monthOverride || currentMonthUtc();
-  const digest = await digestForUserMonth(prefRow.user_id, month);
+  const frequency = options.frequencyOverride || prefRow.digest_frequency || 'weekly';
+  const digest = await digestForUserMonth(prefRow.user_id, month, frequency);
 
   const channel = options.channelOverride || prefRow.digest_channel || 'none';
 
@@ -81,14 +93,11 @@ async function dispatchDigest(prefRow, options = {}) {
 
 async function runScheduledDigestsForWeekday(now = new Date()) {
   const tz = process.env.WEEKLY_DIGEST_TZ || 'America/Los_Angeles';
-  const todayWd = weekdayInTz(tz, now);
 
   const rows = await dbAll(
     `SELECT * FROM user_preferences
      WHERE digest_enabled = 1
-       AND digest_channel IN ('email','sms')
-       AND digest_weekday = ?`,
-    [todayWd],
+       AND digest_channel IN ('email','sms')`,
   );
 
   let sent = 0;
@@ -96,7 +105,15 @@ async function runScheduledDigestsForWeekday(now = new Date()) {
 
   for (const r of rows) {
     try {
-      if (digestAlreadySentForLocalCalendarDay(r, tz, now)) continue;
+      if (!shouldSendForFrequency(r, tz, now)) continue;
+
+      const freq = r.digest_frequency || 'weekly';
+      if (freq === 'monthly') {
+        if (digestAlreadySentThisMonth(r, tz, now)) continue;
+      } else if (digestAlreadySentForLocalCalendarDay(r, tz, now)) {
+        continue;
+      }
+
       await dispatchDigest(r, {
         isAutomation: true,
         isTestSend: false,
@@ -108,7 +125,7 @@ async function runScheduledDigestsForWeekday(now = new Date()) {
     }
   }
 
-  return { todayWeekday: todayWd, candidates: rows.length, sent, errors };
+  return { todayWeekday: weekdayInTz(tz, now), candidates: rows.length, sent, errors };
 }
 
 module.exports = {

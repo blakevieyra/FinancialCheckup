@@ -171,6 +171,7 @@ async function initDb() {
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_last_sent_at TEXT`,
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS onboarding_complete INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS primary_goal TEXT`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_frequency TEXT NOT NULL DEFAULT 'weekly'`,
   ];
   for (const stmt of prefMigrations) await rawQuery(stmt);
 
@@ -226,6 +227,19 @@ async function initDb() {
   await rawQuery(`
     ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end INTEGER NOT NULL DEFAULT 0
   `);
+
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS registration_pending (
+      id SERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      email TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      verify_code TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
+  await rawQuery(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registration_pending_email ON registration_pending (LOWER(email))`);
 
   console.log('✓ Postgres database ready');
 }

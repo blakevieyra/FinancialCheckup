@@ -20,6 +20,7 @@ import {
   extendedStorageKey,
 } from './userStorage';
 import { awardXp, loadXp, xpProgressLabel } from './progression';
+import { validateRegisterForm } from './authValidation';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -345,6 +346,12 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPhase, setRegisterPhase] = useState('form'); // form | code
+  const [verifyCode, setVerifyCode] = useState('');
+  const [authFieldErrors, setAuthFieldErrors] = useState({});
+  const [authNotice, setAuthNotice] = useState('');
+  const [resendBusy, setResendBusy] = useState(false);
   const [authError, setAuthError] = useState('');
 
   const [month, setMonth] = useState(currentMonth());
@@ -392,6 +399,7 @@ export default function App() {
   const [digestEmail, setDigestEmail] = useState('');
   const [digestPhone, setDigestPhone] = useState('');
   const [digestWeekday, setDigestWeekday] = useState(1);
+  const [digestFrequency, setDigestFrequency] = useState('weekly');
   const [digestSmtpReady, setDigestSmtpReady] = useState(false);
   const [digestSmsReady, setDigestSmsReady] = useState(false);
   const [digestCronTz, setDigestCronTz] = useState('America/Los_Angeles');
@@ -426,7 +434,7 @@ export default function App() {
     setShowOnboarding(false);
     setAppLoading('Building your dashboard…');
     try {
-      await Promise.all([loadMonthData(), loadHistory(), loadSubscription()]);
+      await Promise.all([loadMonthData(), loadHistory(), loadSubscription(), loadDigestSettings()]);
       const d = await api.getCheckupLatest(token, month);
       if (d?.found) {
         setLastCheckupScore(d.overallScore ?? null);
@@ -614,6 +622,7 @@ export default function App() {
     setDigestEmail(p.digestEmail || '');
     setDigestPhone(p.digestPhone || '');
     setDigestWeekday(Number(p.digestWeekday ?? 1));
+    setDigestFrequency(p.digestFrequency || 'weekly');
     setDigestSmtpReady(Boolean(p.smtpReady));
     setDigestSmsReady(Boolean(p.smsReady));
     setDigestCronTz(p.cronTimezone || 'America/Los_Angeles');
@@ -707,14 +716,15 @@ export default function App() {
     try {
       await api.updateDigestPrefs(token, {
         digestEnabled,
-        digestChannel: digestEnabled ? digestChannel : 'none',
-        digestEmail: digestEmail.trim(),
+        digestChannel: digestEnabled ? 'email' : 'none',
+        digestEmail: (digestEmail.trim() || accountEmail || '').trim(),
         digestPhone: digestPhone.trim(),
         digestWeekday,
+        digestFrequency: digestEnabled ? digestFrequency : 'weekly',
       });
       const p = await api.getDigestPrefs(token);
       applyDigestPrefs(p);
-      setDigestMsg('Weekly digest settings saved.');
+      setDigestMsg('Email summary preferences saved.');
     } catch (e) {
       setDigestErr(e.message);
     } finally {
@@ -725,19 +735,19 @@ export default function App() {
   async function sendWeeklyDigestTest() {
     setDigestErr('');
     setDigestMsg('');
-    if (digestChannel !== 'email' && digestChannel !== 'sms') {
-      setDigestErr('Choose Email or SMS as the delivery channel first.');
+    if (!digestEmail.trim() && !accountEmail) {
+      setDigestErr('Add an email address first.');
       return;
     }
     setDigestTestBusy(true);
     try {
       await api.sendDigestTest(token, {
-        channel: digestChannel,
-        digestEmail: digestEmail.trim(),
+        channel: 'email',
+        digestEmail: (digestEmail.trim() || accountEmail).trim(),
         digestPhone: digestPhone.trim(),
         month,
       });
-      setDigestMsg(digestChannel === 'sms' ? 'Test SMS sent.' : 'Test email sent. Check your inbox (and spam folder).');
+      setDigestMsg('Test score summary email sent. Check your inbox (and spam folder).');
     } catch (e) {
       setDigestErr(e.message);
     } finally {
@@ -841,6 +851,7 @@ export default function App() {
     if (!token) return undefined;
     loadSubscription();
     loadOnboardingStatus();
+    loadDigestSettings();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -985,36 +996,95 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [income, expenses, isAuthed]);
 
+  async function completeAuthSession(res) {
+    resetSessionForNewUser();
+    persistAuthSession({ token: res.token, username: res.username, userId: res.userId });
+    setToken(res.token);
+    setUser(res.username);
+    setUserId(res.userId ?? null);
+    setAccountEmail(res.email || registerEmail.trim() || '');
+    setPassword('');
+    setUsername('');
+    setRegisterEmail('');
+    setVerifyCode('');
+    setRegisterPhase('form');
+    setAuthFieldErrors({});
+    setAuthNotice('');
+    if (res.email) setDigestEmail(res.email);
+    try {
+      const pendingTips = localStorage.getItem('fc-tips-email');
+      if (pendingTips) {
+        await api.signupMoneyTips(res.token, pendingTips);
+        localStorage.removeItem('fc-tips-email');
+      }
+    } catch {
+      /** tips signup is best-effort */
+    }
+  }
+
   async function submitAuth(e) {
     e.preventDefault();
     setAuthError('');
+    setAuthFieldErrors({});
+
+    if (authMode === 'register') {
+      if (registerPhase === 'code') {
+        if (!verifyCode.trim() || verifyCode.trim().length < 6) {
+          setAuthError('Enter the 6-digit code from your email.');
+          return;
+        }
+        setBusy(true);
+        try {
+          const res = await api.verifyRegister(registerEmail.trim(), verifyCode.trim());
+          await completeAuthSession(res);
+          setShowOnboarding(true);
+        } catch (e2) {
+          setAuthError(e2.message);
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
+
+      const v = validateRegisterForm({ username, email: registerEmail, password });
+      if (!v.valid) {
+        setAuthFieldErrors({ username: v.username, email: v.email, password: v.password });
+        return;
+      }
+      setBusy(true);
+      try {
+        await api.sendRegisterCode(username, password, registerEmail.trim());
+        setRegisterPhase('code');
+        setAuthNotice(`We sent a 6-digit code to ${registerEmail.trim()}.`);
+      } catch (e2) {
+        setAuthError(e2.message);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     setBusy(true);
     try {
-      const res = authMode === 'register' ? await api.register(username, password) : await api.login(username, password);
-      resetSessionForNewUser();
-      persistAuthSession({ token: res.token, username: res.username, userId: res.userId });
-      setToken(res.token);
-      setUser(res.username);
-      setUserId(res.userId ?? null);
-      setAccountEmail(res.email || '');
-      setPassword('');
-      setUsername('');
-      if (authMode === 'register') {
-        setShowOnboarding(true);
-      }
-      try {
-        const pendingTips = localStorage.getItem('fc-tips-email');
-        if (pendingTips) {
-          await api.signupMoneyTips(res.token, pendingTips);
-          localStorage.removeItem('fc-tips-email');
-        }
-      } catch {
-        /** tips signup is best-effort */
-      }
+      const res = await api.login(username, password);
+      await completeAuthSession(res);
     } catch (e2) {
       setAuthError(e2.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function resendRegisterCode() {
+    setAuthError('');
+    setResendBusy(true);
+    try {
+      await api.sendRegisterCode(username, password, registerEmail.trim());
+      setAuthNotice(`New code sent to ${registerEmail.trim()}.`);
+    } catch (e) {
+      setAuthError(e.message);
+    } finally {
+      setResendBusy(false);
     }
   }
 
@@ -1492,30 +1562,36 @@ export default function App() {
       <>
         <LandingPage
           shellStyle={shellStyle}
-          containerStyle={containerStyle}
           cardStyle={cardStyle}
           cardSoftStyle={cardSoftStyle}
           inputStyle={inputStyle}
           btnPrimary={btnPrimary}
           btnNeutral={btnNeutral}
           isMobile={isMobile}
-          isTablet={isTablet}
           authMode={authMode}
-          setAuthMode={setAuthMode}
+          setAuthMode={(mode) => {
+            setAuthMode(mode);
+            setRegisterPhase('form');
+            setAuthError('');
+            setAuthFieldErrors({});
+            setAuthNotice('');
+          }}
           username={username}
           setUsername={setUsername}
           password={password}
           setPassword={setPassword}
+          registerEmail={registerEmail}
+          setRegisterEmail={setRegisterEmail}
+          registerPhase={registerPhase}
+          verifyCode={verifyCode}
+          setVerifyCode={setVerifyCode}
           authError={authError}
+          authFieldErrors={authFieldErrors}
+          authNotice={authNotice}
           busy={busy}
           submitAuth={submitAuth}
-          onStartCheckup={() => setShowGuestCheckup(true)}
-          guestEmail={guestEmail}
-          setGuestEmail={setGuestEmail}
-          tipsMsg={tipsMsg}
-          tipsErr={tipsErr}
-          onTipsSignup={handleTipsSignup}
-          tipsBusy={tipsBusy}
+          onResendCode={resendRegisterCode}
+          resendBusy={resendBusy}
         />
         {showGuestCheckup ? (
           <div
@@ -1568,6 +1644,7 @@ export default function App() {
           btnPrimary={btnPrimary}
           btnNeutral={btnNeutral}
           isMobile={isMobile}
+          accountEmail={accountEmail}
           onComplete={completeOnboarding}
         />
       ) : null}
@@ -1675,6 +1752,23 @@ export default function App() {
             onResult={handleCheckupResult}
             onAutoCheckup={handleAutoCheckupFromProfile}
             totalExpenses={totalExpenses}
+            accountEmail={accountEmail}
+            digestEnabled={digestEnabled}
+            onDigestEnabledChange={setDigestEnabled}
+            digestFrequency={digestFrequency}
+            onDigestFrequencyChange={setDigestFrequency}
+            digestEmail={digestEmail}
+            onDigestEmailChange={setDigestEmail}
+            digestWeekday={digestWeekday}
+            onDigestWeekdayChange={setDigestWeekday}
+            digestMsg={digestMsg}
+            digestErr={digestErr}
+            digestPreview={digestPreview}
+            digestSmtpReady={digestSmtpReady}
+            digestSaveBusy={digestSaveBusy}
+            digestTestBusy={digestTestBusy}
+            onSaveDigest={saveDigestSettings}
+            onTestDigest={sendWeeklyDigestTest}
           />
         )}
 

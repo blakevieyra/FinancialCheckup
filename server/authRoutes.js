@@ -5,8 +5,10 @@ const { signToken, verifyToken } = require('./auth');
 const { validateRegistration, validateLogin } = require('./authValidation');
 const {
   generateVerifyToken,
+  generateOtpCode,
   sendWelcomeEmail,
   sendConfirmEmail,
+  sendRegistrationOtpEmail,
   smtpConfigured,
 } = require('./transactionalEmail');
 
@@ -21,7 +23,142 @@ function clientBaseUrl() {
   return (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
 }
 
+function otpExpiresAt() {
+  return new Date(Date.now() + 15 * 60 * 1000).toISOString();
+}
+
+async function createUserAccount({ username, email, passwordHash }) {
+  const { lastInsertRowid: userId } = await dbRun(
+    `INSERT INTO users (username, password_hash, email, email_verified, email_verify_token, account_status)
+     VALUES (?, ?, ?, 1, NULL, 'active')`,
+    [username, passwordHash, email],
+  );
+
+  const month = new Date().toISOString().slice(0, 7);
+  for (const cat of DEFAULT_CATS) {
+    await dbRun(
+      'INSERT INTO expenses (user_id, category, amount, month) VALUES (?, ?, 0, ?)',
+      [userId, cat, month],
+    );
+  }
+  await dbRun('INSERT INTO checkup_profiles (user_id, snapshot_json) VALUES (?, ?)', [userId, '{}']);
+  await dbRun('INSERT INTO subscriptions (user_id, status, plan) VALUES (?, ?, ?)', [userId, 'free', 'free']);
+  await dbRun(
+    `INSERT INTO user_preferences (user_id, digest_email, digest_channel, digest_enabled, digest_frequency)
+     VALUES (?, ?, 'none', 0, 'weekly')
+     ON CONFLICT (user_id) DO UPDATE SET digest_email = EXCLUDED.digest_email`,
+    [userId, email],
+  );
+
+  sendWelcomeEmail(userId).catch(() => {});
+  return { userId, username, email };
+}
+
+router.post('/register/send-code', async (req, res) => {
+  try {
+    const username = String(req.body?.username || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = req.body?.password;
+
+    const v = validateRegistration({ username, password, email });
+    if (!v.ok) {
+      const first = Object.values(v.errors)[0];
+      return res.status(400).json({ error: first, errors: v.errors });
+    }
+
+    if (await dbGet('SELECT id FROM users WHERE username = ?', [username])) {
+      return res.status(409).json({ error: 'Username already taken.' });
+    }
+    if (await dbGet('SELECT id FROM users WHERE LOWER(email) = ?', [email])) {
+      return res.status(409).json({ error: 'An account with this email already exists.' });
+    }
+
+    if (!smtpConfigured()) {
+      return res.status(503).json({ error: 'Email verification is not configured on the server yet. Contact support@operone2i.com.' });
+    }
+
+    const hash = await bcrypt.hash(password, 12);
+    const code = generateOtpCode();
+    const expires = otpExpiresAt();
+
+    await dbRun('DELETE FROM registration_pending WHERE LOWER(email) = ?', [email]);
+    await dbRun(
+      `INSERT INTO registration_pending (username, email, password_hash, verify_code, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [username, email, hash, code, expires],
+    );
+
+    const sent = await sendRegistrationOtpEmail(email, username, code);
+    if (!sent.sent) {
+      return res.status(502).json({ error: sent.reason || 'Could not send verification email.' });
+    }
+
+    res.json({ ok: true, message: 'Verification code sent. Check your inbox (and spam folder).' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+router.post('/register/verify', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const code = String(req.body?.code || '').trim();
+
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and verification code are required.' });
+    }
+
+    const pending = await dbGet(
+      'SELECT * FROM registration_pending WHERE LOWER(email) = ? AND verify_code = ?',
+      [email, code],
+    );
+    if (!pending) {
+      return res.status(400).json({ error: 'Invalid verification code.' });
+    }
+    if (new Date(pending.expires_at).getTime() < Date.now()) {
+      await dbRun('DELETE FROM registration_pending WHERE id = ?', [pending.id]);
+      return res.status(400).json({ error: 'Code expired. Request a new one.' });
+    }
+
+    if (await dbGet('SELECT id FROM users WHERE username = ?', [pending.username])) {
+      return res.status(409).json({ error: 'Username already taken.' });
+    }
+    if (await dbGet('SELECT id FROM users WHERE LOWER(email) = ?', [email])) {
+      return res.status(409).json({ error: 'An account with this email already exists.' });
+    }
+
+    const { userId, username } = await createUserAccount({
+      username: pending.username,
+      email: pending.email,
+      passwordHash: pending.password_hash,
+    });
+
+    await dbRun('DELETE FROM registration_pending WHERE id = ?', [pending.id]);
+
+    res.status(201).json({
+      token: signToken({ id: userId, username }),
+      username,
+      userId,
+      email: pending.email,
+      emailVerified: true,
+      message: 'Account created.',
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+/** Legacy one-step register — redirects clients to OTP flow when SMTP is configured. */
 router.post('/register', async (req, res) => {
+  if (smtpConfigured()) {
+    return res.status(400).json({
+      error: 'Use email verification. Submit the form to receive a one-time code.',
+      code: 'OTP_REQUIRED',
+    });
+  }
+
   try {
     const username = String(req.body?.username || '').trim();
     const email = String(req.body?.email || '').trim().toLowerCase();
@@ -41,43 +178,15 @@ router.post('/register', async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 12);
-    const verifyToken = generateVerifyToken();
-    const { lastInsertRowid: userId } = await dbRun(
-      `INSERT INTO users (username, password_hash, email, email_verified, email_verify_token, account_status)
-       VALUES (?, ?, ?, 0, ?, 'active')`,
-      [username, hash, email, verifyToken],
-    );
-
-    const month = new Date().toISOString().slice(0, 7);
-    for (const cat of DEFAULT_CATS) {
-      await dbRun(
-        'INSERT INTO expenses (user_id, category, amount, month) VALUES (?, ?, 0, ?)',
-        [userId, cat, month],
-      );
-    }
-    await dbRun('INSERT INTO checkup_profiles (user_id, snapshot_json) VALUES (?, ?)', [userId, '{}']);
-    await dbRun('INSERT INTO subscriptions (user_id, status, plan) VALUES (?, ?, ?)', [userId, 'free', 'free']);
-    await dbRun(
-      `INSERT INTO user_preferences (user_id, digest_email) VALUES (?, ?)
-       ON CONFLICT (user_id) DO UPDATE SET digest_email = EXCLUDED.digest_email`,
-      [userId, email],
-    );
-
-    sendConfirmEmail(userId, verifyToken).catch(() => {});
-    if (!smtpConfigured()) {
-      await dbRun('UPDATE users SET email_verified = 1, email_verify_token = NULL WHERE id = ?', [userId]);
-      sendWelcomeEmail(userId).catch(() => {});
-    }
+    const { userId, username: uname } = await createUserAccount({ username, email, passwordHash: hash });
 
     res.status(201).json({
-      token: signToken({ id: userId, username }),
-      username,
+      token: signToken({ id: userId, username: uname }),
+      username: uname,
       userId,
       email,
-      emailVerified: !smtpConfigured(),
-      message: smtpConfigured()
-        ? 'Account created. Check your email to confirm your address.'
-        : 'Account created.',
+      emailVerified: true,
+      message: 'Account created.',
     });
   } catch (e) {
     console.error(e);

@@ -1,7 +1,12 @@
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
 /** Auth paths where a 401 is an expected user-input error (wrong creds), not a stale-session signal. */
-const AUTH_PATH_PREFIXES = ['/api/auth/login', '/api/auth/register'];
+const AUTH_PATH_PREFIXES = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/register/send-code',
+  '/api/auth/register/verify',
+];
 
 function isAuthPath(path) {
   return AUTH_PATH_PREFIXES.some((p) => path.startsWith(p));
@@ -78,6 +83,20 @@ export async function register(username, password, email) {
   return apiFetch('/api/auth/register', {
     method: 'POST',
     body: { username, password, email },
+  });
+}
+
+export async function sendRegisterCode(username, password, email) {
+  return apiFetch('/api/auth/register/send-code', {
+    method: 'POST',
+    body: { username, password, email },
+  });
+}
+
+export async function verifyRegister(email, code) {
+  return apiFetch('/api/auth/register/verify', {
+    method: 'POST',
+    body: { email, code },
   });
 }
 

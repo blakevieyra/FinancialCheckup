@@ -19,6 +19,28 @@ function generateVerifyToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function generateOtpCode() {
+  return String(crypto.randomInt(100000, 999999));
+}
+
+async function sendRegistrationOtpEmail(email, username, code) {
+  return sendIfConfigured(
+    email,
+    'Your Financial Checkup verification code',
+    `Hi ${username},
+
+Your one-time verification code is:
+
+${code}
+
+Enter this code in the app to finish creating your account. It expires in 15 minutes.
+
+If you did not request this, you can ignore this email.
+
+— Financial Checkup`,
+  );
+}
+
 async function sendIfConfigured(to, subject, text) {
   if (!to || !smtpConfigured()) return { sent: false, reason: 'no_email_or_smtp' };
   try {
@@ -192,9 +214,11 @@ If you did not request this export, please sign in and review your account secur
 
 module.exports = {
   generateVerifyToken,
+  generateOtpCode,
   verifyLink,
   sendWelcomeEmail,
   sendConfirmEmail,
+  sendRegistrationOtpEmail,
   sendSubscribedEmail,
   sendDeactivatedEmail,
   sendReportEmail,
