@@ -426,7 +426,11 @@ export default function App() {
     try {
       const o = await api.getOnboarding(token);
       setPrimaryGoal(o.primaryGoal || '');
-      if (!o.complete) setShowOnboarding(true);
+      if (!o.complete) {
+        setCheckupResult(null);
+        setLastCheckupScore(null);
+        setShowOnboarding(true);
+      }
     } catch {
       /** best-effort */
     }
@@ -916,7 +920,7 @@ export default function App() {
   }, [token]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!token || showOnboarding) return undefined;
     api.getCheckupLatest(token, month).then((d) => {
       if (d?.found) {
         setLastCheckupScore(d.overallScore ?? null);
@@ -930,7 +934,7 @@ export default function App() {
       setCheckupResult(null);
     });
     return undefined;
-  }, [token, month]);
+  }, [token, month, showOnboarding]);
 
   function awardXpThrottled(reason, cooldownMs = 120000) {
     if (!userId || !token) return;
@@ -954,7 +958,7 @@ export default function App() {
   }
 
   async function refreshCheckupScore(silent = true) {
-    if (!token) return;
+    if (!token || showOnboarding) return;
     if (!silent) setCheckupBusy(true);
     setError('');
     try {
@@ -982,7 +986,7 @@ export default function App() {
   }
 
   async function saveLedgerSilent() {
-    if (!token) return;
+    if (!token || showOnboarding) return;
     try {
       await api.setIncome(token, { amount: Number(income), month });
       const payloadExpenses = expenses.map((e) => ({
@@ -1030,7 +1034,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!isAuthed) {
+    if (!isAuthed || showOnboarding) {
       skipLedgerAutoSave.current = true;
       return;
     }
@@ -1040,24 +1044,31 @@ export default function App() {
     });
     loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, isAuthed, profile]);
+  }, [month, isAuthed, profile, showOnboarding]);
 
   useEffect(() => {
-    if (!isAuthed || skipLedgerAutoSave.current) return undefined;
+    if (!isAuthed || skipLedgerAutoSave.current || showOnboarding) return undefined;
     const t = setTimeout(() => {
       saveLedgerSilent();
     }, 1400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [income, expenses, isAuthed]);
+  }, [income, expenses, isAuthed, showOnboarding]);
 
-  async function completeAuthSession(res) {
+  async function completeAuthSession(res, { isNewAccount = false } = {}) {
     resetSessionForNewUser();
     persistAuthSession({ token: res.token, username: res.username, userId: res.userId });
     setToken(res.token);
     setUser(res.username);
     setUserId(res.userId ?? null);
     setAccountEmail(res.email || registerEmail.trim() || '');
+    if (isNewAccount) {
+      setIncome(0);
+      setExpenses([]);
+      setCheckupResult(null);
+      setLastCheckupScore(null);
+      setUserXp(0);
+    }
     setPassword('');
     setUsername('');
     setRegisterEmail('');
@@ -1091,7 +1102,7 @@ export default function App() {
         setBusy(true);
         try {
           const res = await api.verifyRegister(registerEmail.trim(), verifyCode.trim());
-          await completeAuthSession(res);
+          await completeAuthSession(res, { isNewAccount: true });
           setShowOnboarding(true);
         } catch (e2) {
           setAuthError(e2.message);
@@ -1608,7 +1619,7 @@ export default function App() {
     border: '1px solid rgba(148,163,184,0.35)',
     transition: 'all 120ms ease',
   };
-  const btnPrimary = { ...btnBase, background: 'linear-gradient(135deg, #2563eb, #0ea5e9)' };
+  const btnPrimary = { ...btnBase, background: 'linear-gradient(135deg, #2563eb, #0ea5e9)', border: 'none' };
   const btnNeutral = { ...btnBase, background: '#101827' };
   const btnDanger = { ...btnBase, background: 'linear-gradient(135deg, #7f1d1d, #991b1b)' };
 
@@ -1779,6 +1790,8 @@ export default function App() {
       >
         {error ? <div style={{ color: '#ffb3b3' }}>{error}</div> : null}
 
+        {!showOnboarding ? (
+        <>
         <AppNav
           active={activeSection}
           onChange={setActiveSection}
@@ -2215,6 +2228,8 @@ export default function App() {
             xpLabel={`${xpInfo.current} / ${xpInfo.next} XP to next level`}
           />
         )}
+        </>
+        ) : null}
         <AppFooter />
       </div>
       </div>

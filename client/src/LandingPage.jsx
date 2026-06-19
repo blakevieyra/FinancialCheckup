@@ -1,7 +1,7 @@
 const EXPECT = [
-  { icon: '📊', title: '6-dimension score', detail: 'Budget, debt, savings, investments, insurance, and retirement — updated as you enter data.' },
-  { icon: '🎯', title: 'Personalized guide', detail: 'See what to fix next and jump straight to the right tool in the app.' },
-  { icon: '🔒', title: 'Your data stays yours', detail: 'No bank login. Export or delete everything anytime.' },
+  { title: '6-dimension score', detail: 'Budget, debt, savings, investments, insurance, and retirement — updated as you enter data.' },
+  { title: 'Personalized guide', detail: 'See what to fix next and jump straight to the right tool in the app.' },
+  { title: 'Your data stays yours', detail: 'No bank login. Export or delete everything anytime.' },
 ];
 
 export default function LandingPage({
@@ -77,12 +77,9 @@ export default function LandingPage({
               What to expect
             </div>
             {EXPECT.map((item) => (
-              <div key={item.title} style={{ ...cardSoftStyle, padding: '0.85rem 1rem', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{item.title}</div>
-                  <div style={{ fontSize: 13, opacity: 0.82, marginTop: 4, lineHeight: 1.45 }}>{item.detail}</div>
-                </div>
+              <div key={item.title} style={{ ...cardSoftStyle, padding: '0.85rem 1rem' }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{item.title}</div>
+                <div style={{ fontSize: 13, opacity: 0.82, marginTop: 4, lineHeight: 1.45 }}>{item.detail}</div>
               </div>
             ))}
           </div>
@@ -106,14 +103,14 @@ export default function LandingPage({
             <button
               type="button"
               onClick={() => setAuthMode('login')}
-              style={{ ...(authMode === 'login' ? btnPrimary : btnNeutral), flex: 1, padding: '0.5rem 0.75rem' }}
+              style={{ ...(authMode === 'login' ? btnPrimary : { ...btnNeutral, border: 'none', background: 'rgba(15,23,42,0.85)' }), flex: 1, padding: '0.5rem 0.75rem' }}
             >
               Login
             </button>
             <button
               type="button"
               onClick={() => setAuthMode('register')}
-              style={{ ...(authMode === 'register' ? btnPrimary : btnNeutral), flex: 1, padding: '0.5rem 0.75rem' }}
+              style={{ ...(authMode === 'register' ? btnPrimary : { ...btnNeutral, border: 'none', background: 'rgba(15,23,42,0.85)' }), flex: 1, padding: '0.5rem 0.75rem' }}
             >
               Register
             </button>
@@ -136,7 +133,7 @@ export default function LandingPage({
                 <button type="submit" disabled={busy || verifyCode.length < 6} style={btnPrimary}>
                   {busy ? 'Verifying…' : 'Verify & create account'}
                 </button>
-                <button type="button" onClick={onResendCode} disabled={resendBusy || busy} style={btnNeutral}>
+                <button type="button" onClick={onResendCode} disabled={resendBusy || busy} style={{ ...btnNeutral, border: 'none', background: 'rgba(15,23,42,0.85)' }}>
                   {resendBusy ? 'Sending…' : 'Resend code'}
                 </button>
                 {authError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{authError}</div> : null}

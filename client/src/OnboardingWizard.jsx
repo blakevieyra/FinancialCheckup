@@ -111,7 +111,7 @@ export default function OnboardingWizard({
           position: 'fixed',
           inset: 0,
           zIndex: 90,
-          background: 'rgba(8,12,22,0.94)',
+          background: 'rgb(8,12,22)',
           overflowY: 'auto',
           padding: isMobile ? '1rem' : '2rem',
         }}
@@ -154,15 +154,19 @@ export default function OnboardingWizard({
                     type="button"
                     onClick={() => setGoal(g.id)}
                     style={{
-                      ...btnNeutral,
                       textAlign: 'left',
                       padding: '0.85rem 1rem',
-                      border: goal === g.id ? '2px solid #4da6ff' : undefined,
-                      background: goal === g.id ? 'rgba(77,166,255,0.12)' : undefined,
+                      cursor: 'pointer',
+                      color: '#fff',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: goal === g.id
+                        ? 'linear-gradient(135deg, #2563eb, #0ea5e9)'
+                        : '#101827',
                     }}
                   >
                     <div style={{ fontWeight: 700 }}>{g.label}</div>
-                    <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4 }}>{g.desc}</div>
+                    <div style={{ fontSize: 13, opacity: goal === g.id ? 0.95 : 0.8, marginTop: 4 }}>{g.desc}</div>
                   </button>
                 ))}
               </div>
@@ -260,7 +264,12 @@ export default function OnboardingWizard({
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {step > 0 ? (
-                <button type="button" onClick={() => setStep((s) => s - 1)} style={btnNeutral} disabled={busy}>
+                <button
+                  type="button"
+                  onClick={() => setStep((s) => s - 1)}
+                  style={{ ...btnNeutral, border: 'none', background: 'rgba(15,23,42,0.85)' }}
+                  disabled={busy}
+                >
                   Back
                 </button>
               ) : null}
