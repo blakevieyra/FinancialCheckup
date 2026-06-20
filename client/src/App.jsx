@@ -4,6 +4,7 @@ import LandingPage from './LandingPage';
 import CheckupPanel from './CheckupPanel';
 import OverviewDashboard from './OverviewDashboard';
 import FinancesPage from './FinancesPage';
+import ProgressGoalsPanel from './ProgressGoalsPanel';
 import AppNav from './AppNav';
 import FinancialHistoryPanel from './FinancialHistoryPanel';
 import MoreToolsPanel from './MoreToolsPanel';
@@ -1894,6 +1895,34 @@ export default function App() {
 
         {activeSection === 'progress' && (
           <>
+        <ProgressGoalsPanel
+          primaryGoal={primaryGoal}
+          checkupResult={checkupResult}
+          profileSummary={profileSummary}
+          income={income}
+          totalExpenses={totalExpenses}
+          savingsRate={savingsRate}
+          goals={goals}
+          goalsBusy={goalsBusy}
+          goalsErr={goalsErr}
+          goalName={goalName}
+          onGoalNameChange={setGoalName}
+          goalType={goalType}
+          onGoalTypeChange={setGoalType}
+          goalTarget={goalTarget}
+          onGoalTargetChange={setGoalTarget}
+          onCreateGoal={createGoalItem}
+          onDeleteGoal={deleteGoalItem}
+          onAddGoalProgress={addGoalProgress}
+          isMobile={isMobile}
+          cardStyle={cardStyle}
+          cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          btnDanger={btnDanger}
+        />
+
         <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 6 }}>Spending charts — {month}</h2>
@@ -1979,67 +2008,6 @@ export default function App() {
             </div>
           </div>
         </div>
-
-        <ExpandablePanel title="Goals & progress" hint="MRR, ARR, retirement & savings targets" cardSoftStyle={cardSoftStyle}>
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr auto', gap: 8 }}>
-              <input value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="Goal name (e.g. Retirement 2035)" style={inputStyle} />
-              <select value={goalType} onChange={(e) => setGoalType(e.target.value)} style={inputStyle}>
-                <option value="mrr">MRR</option>
-                <option value="arr">ARR</option>
-                <option value="retirement">Retirement</option>
-                <option value="savings">Savings</option>
-                <option value="emergency_fund">Emergency fund</option>
-                <option value="custom">Custom</option>
-              </select>
-              <input type="number" value={goalTarget} onChange={(e) => setGoalTarget(e.target.value)} placeholder="Target $" style={inputStyle} />
-              <button type="button" onClick={createGoalItem} disabled={goalsBusy} style={btnPrimary}>
-                {goalsBusy ? 'Saving…' : 'Add goal'}
-              </button>
-            </div>
-            {goalsErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{goalsErr}</div> : null}
-            {goals.length ? (
-              <div style={{ display: 'grid', gap: 8 }}>
-                {goals.map((g) => (
-                  <div key={g.id} style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.7rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{g.name}</div>
-                        <div style={{ fontSize: 12, opacity: 0.78 }}>
-                          {String(g.goalType || 'custom').toUpperCase()} · target ${Number(g.targetAmount).toLocaleString()} · current $
-                          {Number(g.currentAmount).toLocaleString()}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: 8,
-                          flexDirection: isMobile ? 'column' : 'row',
-                          alignItems: isMobile ? 'stretch' : 'center',
-                        }}
-                      >
-                        <button type="button" onClick={() => addGoalProgress(g)} disabled={goalsBusy} style={btnNeutral}>
-                          Add this month spend
-                        </button>
-                        <button type="button" onClick={() => deleteGoalItem(g.id)} disabled={goalsBusy} style={btnDanger}>
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ height: 10, borderRadius: 999, background: 'rgba(148,163,184,0.25)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${Math.min(100, Number(g.progressPercent) || 0)}%`, background: 'linear-gradient(90deg,#22c55e,#3b82f6)' }} />
-                      </div>
-                      <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>{Number(g.progressPercent).toFixed(1)}% complete</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ opacity: 0.8, fontSize: 14 }}>No goals yet. Add a target above to start tracking progress.</div>
-            )}
-          </div>
-        </ExpandablePanel>
 
         <ExpandablePanel title="Budget trend" hint="Score and expense ratio over time — tap to expand" cardSoftStyle={cardSoftStyle}>
           <div style={{ display: 'grid', gap: 18 }}>
