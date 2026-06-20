@@ -59,14 +59,14 @@ function GoalCard({ primaryGoal, cardSoftStyle }) {
 function ProfileSnapshot({ summary, cardSoftStyle }) {
   const fmt = (n) => `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const insuranceLabel =
-    summary.insuranceCount >= 3 ? 'Full coverage' : summary.insuranceCount > 0 ? `${summary.insuranceCount}/3 types` : 'None set';
+    summary.insuranceCount >= 6 ? 'Full coverage' : summary.insuranceCount > 0 ? `${summary.insuranceCount}/6 types` : 'None set';
 
   const rows = [
     { label: 'Total debt', value: fmt(summary.totalDebt), color: summary.totalDebt > 0 ? '#fca5a5' : '#94a3b8' },
     { label: 'Emergency fund', value: fmt(summary.emergencyFund), color: summary.emergencyFund > 0 ? '#86efac' : '#94a3b8' },
     { label: 'Investments', value: fmt(summary.investmentTotal), color: summary.investmentTotal > 0 ? '#93c5fd' : '#94a3b8' },
     { label: 'Retirement', value: fmt(summary.retirementBalance), color: summary.retirementBalance > 0 ? '#c4b5fd' : '#94a3b8' },
-    { label: 'Insurance', value: insuranceLabel, color: summary.insuranceCount >= 3 ? '#fde68a' : summary.insuranceCount > 0 ? '#fbbf24' : '#94a3b8' },
+    { label: 'Insurance', value: insuranceLabel, color: summary.insuranceCount >= 6 ? '#fde68a' : summary.insuranceCount > 0 ? '#fbbf24' : '#94a3b8' },
   ];
 
   return (

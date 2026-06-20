@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import * as api from './api';
-import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, DIMENSION_IMPORTANCE, DIMENSION_BASICS, BLANK_SNAPSHOT } from './checkupConstants';
+import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, DIMENSION_IMPORTANCE, DIMENSION_BASICS, DEBT_STARTER_TEMPLATES, INSURANCE_COVERAGE_TYPES, BLANK_SNAPSHOT } from './checkupConstants';
 import {
   loadExtendedProfile,
   saveExtendedProfile,
@@ -203,6 +203,113 @@ function BudgetLedgerEditor({
           <div style={{ opacity: 0.75, fontSize: 13 }}>Add a category to start tracking spending.</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div style={{ fontSize: 12, opacity: 0.72, letterSpacing: '0.03em', lineHeight: 1.45, marginBottom: 4 }}>
+      {children}
+    </div>
+  );
+}
+
+function FieldLabel({ children }) {
+  return <div style={{ fontSize: 11, opacity: 0.65, marginBottom: 4 }}>{children}</div>;
+}
+
+function tierColor(tier) {
+  if (tier === 'Essential') return '#fca5a5';
+  if (tier === 'Important') return '#fbbf24';
+  return '#93c5fd';
+}
+
+function DebtEditor({ debts, onChange, onAdd, onRemove, inputStyle, btnNeutral, cardSoftStyle, isMobile }) {
+  const rows = debts || [];
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <SectionLabel>Add each loan or card below — remove any that do not apply, or add another debt.</SectionLabel>
+      {rows.length ? (
+        rows.map((d, i) => (
+          <div
+            key={`debt-${i}-${d.name}`}
+            style={{ ...cardSoftStyle, padding: '0.75rem', display: 'grid', gap: 10 }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              <FieldLabel>Account type</FieldLabel>
+              <button type="button" onClick={() => onRemove(i)} style={{ ...btnNeutral, fontSize: 11, padding: '0.25rem 0.5rem' }}>
+                Remove
+              </button>
+            </div>
+            <input
+              value={d.name}
+              onChange={(e) => onChange(i, 'name', e.target.value)}
+              placeholder="e.g. Mortgage, credit card, auto loan"
+              style={inputStyle}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+              <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                <FieldLabel>Balance ($)</FieldLabel>
+                <input type="number" value={d.balance} onChange={(e) => onChange(i, 'balance', e.target.value)} style={inputStyle} />
+              </label>
+              <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                <FieldLabel>Min payment ($)</FieldLabel>
+                <input type="number" value={d.minPayment} onChange={(e) => onChange(i, 'minPayment', e.target.value)} style={inputStyle} />
+              </label>
+              <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                <FieldLabel>APR %</FieldLabel>
+                <input type="number" step="0.01" value={d.apr} onChange={(e) => onChange(i, 'apr', e.target.value)} style={inputStyle} />
+              </label>
+            </div>
+          </div>
+        ))
+      ) : (
+        <div style={{ fontSize: 13, opacity: 0.75 }}>No debts listed — add a row if you carry balances.</div>
+      )}
+      <button type="button" onClick={onAdd} style={{ ...btnNeutral, fontSize: 12, padding: '0.4rem 0.75rem', justifySelf: 'start' }}>
+        + Add another debt
+      </button>
+    </div>
+  );
+}
+
+function InsuranceEditor({ extended, onToggle, cardSoftStyle }) {
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      <SectionLabel>Check coverage you have today — weighted by importance (essential policies count most toward your score).</SectionLabel>
+      {INSURANCE_COVERAGE_TYPES.map((item) => (
+        <label
+          key={item.field}
+          style={{
+            ...cardSoftStyle,
+            padding: '0.65rem 0.75rem',
+            display: 'grid',
+            gap: 4,
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+            <span style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, fontWeight: 600 }}>
+              <input type="checkbox" checked={Boolean(extended[item.field])} onChange={(e) => onToggle(item.field, e.target.checked)} />
+              {item.label}
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: tierColor(item.tier),
+                opacity: 0.95,
+              }}
+            >
+              {item.tier} · {item.weight}pts
+            </span>
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.4, paddingLeft: 24 }}>{item.hint}</div>
+        </label>
+      ))}
     </div>
   );
 }
@@ -418,6 +525,7 @@ export default function CheckupPanel({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [history, setHistory] = useState([]);
+  const debtSeededRef = useRef(false);
 
   useEffect(() => {
     if (isGuest) return;
@@ -452,6 +560,9 @@ export default function CheckupPanel({
       hasLifeInsurance,
       hasDisabilityInsurance,
       hasLiabilityInsurance,
+      hasHealthInsurance,
+      hasHomeInsurance,
+      hasAutoInsurance,
       age,
       targetRetirementAge,
       retirementBalance,
@@ -471,6 +582,9 @@ export default function CheckupPanel({
       hasLifeInsurance,
       hasDisabilityInsurance,
       hasLiabilityInsurance,
+      hasHealthInsurance,
+      hasHomeInsurance,
+      hasAutoInsurance,
       age,
       targetRetirementAge,
       retirementBalance,
@@ -514,12 +628,31 @@ export default function CheckupPanel({
     });
   }
 
-  function addDebt() {
+  function addDebt(name = 'Other loan') {
     setExtended((prev) => ({
       ...prev,
-      debts: [...(prev.debts || []), { name: 'Debt', balance: 0, minPayment: 0, apr: 18 }],
+      debts: [...(prev.debts || []), { name, balance: 0, minPayment: 0, apr: 18 }],
     }));
   }
+
+  function removeDebt(i) {
+    setExtended((prev) => ({
+      ...prev,
+      debts: (prev.debts || []).filter((_, idx) => idx !== i),
+    }));
+  }
+
+  useEffect(() => {
+    if (!dimensionCardLayout || isGuest || debtSeededRef.current) return;
+    setExtended((prev) => {
+      if ((prev.debts || []).length > 0) {
+        debtSeededRef.current = true;
+        return prev;
+      }
+      debtSeededRef.current = true;
+      return { ...prev, debts: DEBT_STARTER_TEMPLATES.map((d) => ({ ...d })) };
+    });
+  }, [dimensionCardLayout, isGuest]);
 
   async function runCheckup(silent = false) {
     if (!silent) setErr('');
@@ -643,23 +776,16 @@ export default function CheckupPanel({
         btnNeutral={btnNeutral}
         scoreLine={dimScoreLine(result, 'debt')}
       >
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-          <button type="button" onClick={addDebt} style={{ ...btnNeutral, fontSize: 12, padding: '0.3rem 0.6rem' }}>
-            + Add debt
-          </button>
-        </div>
-        {(extended.debts || []).length ? (
-          (extended.debts || []).map((d, i) => (
-            <div key={`debt-${i}`} style={{ ...grid, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
-              <input placeholder="Name" value={d.name} onChange={(e) => setDebt(i, 'name', e.target.value)} style={inputStyle} />
-              <input type="number" placeholder="Balance" value={d.balance} onChange={(e) => setDebt(i, 'balance', e.target.value)} style={inputStyle} />
-              <input type="number" placeholder="Min payment" value={d.minPayment} onChange={(e) => setDebt(i, 'minPayment', e.target.value)} style={inputStyle} />
-              <input type="number" placeholder="APR %" value={d.apr} onChange={(e) => setDebt(i, 'apr', e.target.value)} style={inputStyle} />
-            </div>
-          ))
-        ) : (
-          <div style={{ fontSize: 13, opacity: 0.75 }}>No debts listed — add one if you carry balances.</div>
-        )}
+        <DebtEditor
+          debts={extended.debts}
+          onChange={setDebt}
+          onAdd={() => addDebt()}
+          onRemove={removeDebt}
+          inputStyle={inputStyle}
+          btnNeutral={btnNeutral}
+          cardSoftStyle={cardSoftStyle}
+          isMobile={isMobile}
+        />
       </DimensionCard>
 
       <DimensionCard
@@ -698,20 +824,7 @@ export default function CheckupPanel({
         btnNeutral={btnNeutral}
         scoreLine={dimScoreLine(result, 'insurance')}
       >
-        <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="checkbox" checked={extended.hasLifeInsurance} onChange={(e) => setField('hasLifeInsurance', e.target.checked)} />
-            Life insurance
-          </label>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="checkbox" checked={extended.hasDisabilityInsurance} onChange={(e) => setField('hasDisabilityInsurance', e.target.checked)} />
-            Disability insurance
-          </label>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="checkbox" checked={extended.hasLiabilityInsurance} onChange={(e) => setField('hasLiabilityInsurance', e.target.checked)} />
-            Umbrella liability
-          </label>
-        </div>
+        <InsuranceEditor extended={extended} onToggle={setField} cardSoftStyle={cardSoftStyle} />
       </DimensionCard>
 
       <DimensionCard
@@ -826,18 +939,17 @@ export default function CheckupPanel({
           </div>
 
           <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
-            <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <span>Debts</span>
-              <button type="button" onClick={addDebt} style={{ ...btnNeutral, fontSize: 12, padding: '0.3rem 0.6rem' }}>+ Add</button>
-            </div>
-            {(extended.debts || []).map((d, i) => (
-              <div key={`debt-${i}`} style={{ ...grid, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
-                <input placeholder="Name" value={d.name} onChange={(e) => setDebt(i, 'name', e.target.value)} style={inputStyle} />
-                <input type="number" placeholder="Balance" value={d.balance} onChange={(e) => setDebt(i, 'balance', e.target.value)} style={inputStyle} />
-                <input type="number" placeholder="Min payment" value={d.minPayment} onChange={(e) => setDebt(i, 'minPayment', e.target.value)} style={inputStyle} />
-                <input type="number" placeholder="APR %" value={d.apr} onChange={(e) => setDebt(i, 'apr', e.target.value)} style={inputStyle} />
-              </div>
-            ))}
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Debts</div>
+            <DebtEditor
+              debts={extended.debts}
+              onChange={setDebt}
+              onAdd={() => addDebt()}
+              onRemove={removeDebt}
+              inputStyle={inputStyle}
+              btnNeutral={btnNeutral}
+              cardSoftStyle={{ padding: 0, border: 'none', background: 'transparent' }}
+              isMobile={isMobile}
+            />
           </div>
 
           <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
@@ -859,21 +971,16 @@ export default function CheckupPanel({
           </div>
 
           <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Insurance & retirement</div>
-            <div style={{ display: 'grid', gap: 8, fontSize: 13, marginBottom: 10 }}>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="checkbox" checked={extended.hasLifeInsurance} onChange={(e) => setField('hasLifeInsurance', e.target.checked)} />
-                Life insurance
-              </label>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="checkbox" checked={extended.hasDisabilityInsurance} onChange={(e) => setField('hasDisabilityInsurance', e.target.checked)} />
-                Disability insurance
-              </label>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="checkbox" checked={extended.hasLiabilityInsurance} onChange={(e) => setField('hasLiabilityInsurance', e.target.checked)} />
-                Umbrella liability
-              </label>
-            </div>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Insurance</div>
+            <InsuranceEditor
+              extended={extended}
+              onToggle={setField}
+              cardSoftStyle={{ padding: '0.55rem 0.65rem', border: '1px solid rgba(148,163,184,0.15)', borderRadius: 8, background: 'rgba(15,23,42,0.35)' }}
+            />
+          </div>
+
+          <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Retirement</div>
             <div style={grid}>
               <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Age<input type="number" value={extended.age} onChange={(e) => setField('age', e.target.value)} style={inputStyle} /></label>
               <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Retire at<input type="number" value={extended.targetRetirementAge} onChange={(e) => setField('targetRetirementAge', e.target.value)} style={inputStyle} /></label>

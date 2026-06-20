@@ -138,17 +138,17 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
     case 'insurance': {
       const score = dimScore(checkupResult, 'insurance') ?? 0;
       const covered = summary.insuranceCount ?? 0;
-      const progress = score || (covered / 3) * 100;
+      const progress = score || (covered / 6) * 100;
       return {
         ...base,
         progressPercent: Math.min(100, progress),
-        status: covered >= 3 && score >= 75 ? 'on_track' : progress >= 50 ? 'in_progress' : 'needs_attention',
-        statusLabel: covered >= 3 ? 'Well covered' : progress >= 50 ? 'In progress' : 'Gaps remain',
+        status: covered >= 5 && score >= 75 ? 'on_track' : progress >= 50 ? 'in_progress' : 'needs_attention',
+        statusLabel: covered >= 5 ? 'Well covered' : progress >= 50 ? 'In progress' : 'Gaps remain',
         headline:
           dimSummary(checkupResult, 'insurance') ||
-          `${covered}/3 coverage types on file — life, disability, and liability protect your plan.`,
+          `${covered}/6 coverage types on file — essential: life & disability; also home, health, auto, and umbrella.`,
         metrics: [
-          { label: 'Coverage', value: `${covered}/3 types`, detail: 'Life · disability · liability' },
+          { label: 'Coverage', value: `${covered}/6 types`, detail: 'Weighted by importance' },
           { label: 'Score', value: score || '—', detail: 'Insurance dimension' },
           { label: 'Income', value: `$${inc.toLocaleString()}`, detail: 'Basis for coverage needs' },
         ],

@@ -72,6 +72,9 @@ export const DEFAULT_SNAPSHOT = {
   hasLifeInsurance: true,
   hasDisabilityInsurance: false,
   hasLiabilityInsurance: false,
+  hasHealthInsurance: true,
+  hasHomeInsurance: true,
+  hasAutoInsurance: true,
   age: 35,
   targetRetirementAge: 65,
   retirementBalance: 85000,
@@ -96,6 +99,9 @@ export const BLANK_SNAPSHOT = {
   hasLifeInsurance: false,
   hasDisabilityInsurance: false,
   hasLiabilityInsurance: false,
+  hasHealthInsurance: false,
+  hasHomeInsurance: false,
+  hasAutoInsurance: false,
   age: 35,
   targetRetirementAge: 65,
   retirementBalance: 0,
@@ -131,7 +137,61 @@ export const DIMENSION_BASICS = {
   investments:
     'Enter your total portfolio value, annual fee %, and allocation split (stocks, bonds, international, cash). Start with low-cost index funds in a 401(k) or IRA; capture any employer match first.',
   insurance:
-    'Mark whether you have life insurance (replaces income for dependents), disability insurance (replaces paycheck if you cannot work), and umbrella liability (extra protection above auto/home limits). Employer coverage alone is often incomplete.',
+    'Check each coverage type you carry today — essential policies first (life, disability), then property and liability. Remove checks for anything you do not have.',
   retirement:
     'Enter your age, target retirement age, current balance in 401(k)/IRA accounts, and monthly contributions. A common target is 15% of income including employer match; increase 1% per year if you are behind.',
 };
+
+/** Suggested debt rows for new users — delete any that do not apply. */
+export const DEBT_STARTER_TEMPLATES = [
+  { name: 'Mortgage', balance: 0, minPayment: 0, apr: 6.5 },
+  { name: 'Credit card', balance: 0, minPayment: 0, apr: 22 },
+  { name: 'Auto loan', balance: 0, minPayment: 0, apr: 7 },
+  { name: 'Personal loan', balance: 0, minPayment: 0, apr: 12 },
+];
+
+/** Insurance coverage types ordered by importance (weight sums to 100 on server). */
+export const INSURANCE_COVERAGE_TYPES = [
+  {
+    field: 'hasLifeInsurance',
+    label: 'Life insurance',
+    weight: 25,
+    tier: 'Essential',
+    hint: 'Replaces income for dependents if you pass away.',
+  },
+  {
+    field: 'hasDisabilityInsurance',
+    label: 'Disability insurance',
+    weight: 25,
+    tier: 'Essential',
+    hint: 'Replaces paycheck if illness or injury stops you from working.',
+  },
+  {
+    field: 'hasHealthInsurance',
+    label: 'Health insurance',
+    weight: 15,
+    tier: 'Important',
+    hint: 'Medical coverage beyond catastrophic-only plans.',
+  },
+  {
+    field: 'hasHomeInsurance',
+    label: 'Home / renters insurance',
+    weight: 15,
+    tier: 'Important',
+    hint: 'Protects your home or belongings — required by most lenders/landlords.',
+  },
+  {
+    field: 'hasAutoInsurance',
+    label: 'Auto insurance',
+    weight: 10,
+    tier: 'Recommended',
+    hint: 'Liability and collision coverage if you own or lease a vehicle.',
+  },
+  {
+    field: 'hasLiabilityInsurance',
+    label: 'Umbrella liability',
+    weight: 10,
+    tier: 'Recommended',
+    hint: 'Extra liability above auto and home limits — valuable as net worth grows.',
+  },
+];

@@ -1251,6 +1251,9 @@ export default function App() {
       ext.hasLifeInsurance,
       ext.hasDisabilityInsurance,
       ext.hasLiabilityInsurance,
+      ext.hasHealthInsurance,
+      ext.hasHomeInsurance,
+      ext.hasAutoInsurance,
     ].filter(Boolean).length;
     return {
       totalDebt,

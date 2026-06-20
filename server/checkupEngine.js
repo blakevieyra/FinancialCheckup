@@ -47,6 +47,9 @@ function normalizeSnapshot(raw = {}) {
     hasLifeInsurance: Boolean(raw.hasLifeInsurance),
     hasDisabilityInsurance: Boolean(raw.hasDisabilityInsurance),
     hasLiabilityInsurance: Boolean(raw.hasLiabilityInsurance),
+    hasHealthInsurance: Boolean(raw.hasHealthInsurance),
+    hasHomeInsurance: Boolean(raw.hasHomeInsurance),
+    hasAutoInsurance: Boolean(raw.hasAutoInsurance),
     age: num(raw.age, 35),
     targetRetirementAge: num(raw.targetRetirementAge, 65),
     retirementBalance: num(raw.retirementBalance),
@@ -177,22 +180,51 @@ function scoreInvestments(snap) {
 }
 
 function scoreInsurance(snap) {
-  const { income, hasLifeInsurance, hasDisabilityInsurance, hasLiabilityInsurance } = snap;
+  const { income } = snap;
   let score = 0;
   const gaps = [];
-  if (hasLifeInsurance) score += 34;
-  else gaps.push({ type: 'life', label: 'Life insurance gap', estMonthlyCost: Math.round(income * 0.002) });
-  if (hasDisabilityInsurance) score += 33;
-  else {
-    gaps.push({
-      type: 'disability',
-      label: 'Disability insurance gap',
-      estMonthlyCost: Math.round(income * 0.005),
-      replacesMonthly: Math.round(income * 0.65),
-    });
+  const types = [
+    {
+      key: 'hasLifeInsurance',
+      weight: 25,
+      gap: { type: 'life', label: 'Life insurance gap', estMonthlyCost: Math.round(income * 0.002) },
+    },
+    {
+      key: 'hasDisabilityInsurance',
+      weight: 25,
+      gap: {
+        type: 'disability',
+        label: 'Disability insurance gap',
+        estMonthlyCost: Math.round(income * 0.005),
+        replacesMonthly: Math.round(income * 0.65),
+      },
+    },
+    {
+      key: 'hasHealthInsurance',
+      weight: 15,
+      gap: { type: 'health', label: 'Health insurance gap', estMonthlyCost: Math.round(income * 0.04) },
+    },
+    {
+      key: 'hasHomeInsurance',
+      weight: 15,
+      gap: { type: 'home', label: 'Home / renters insurance gap', estMonthlyCost: 35 },
+    },
+    {
+      key: 'hasAutoInsurance',
+      weight: 10,
+      gap: { type: 'auto', label: 'Auto insurance gap', estMonthlyCost: 45 },
+    },
+    {
+      key: 'hasLiabilityInsurance',
+      weight: 10,
+      gap: { type: 'liability', label: 'Umbrella liability gap', estMonthlyCost: 18 },
+    },
+  ];
+
+  for (const t of types) {
+    if (snap[t.key]) score += t.weight;
+    else gaps.push(t.gap);
   }
-  if (hasLiabilityInsurance) score += 33;
-  else gaps.push({ type: 'liability', label: 'Umbrella liability gap', estMonthlyCost: 18 });
 
   return {
     key: 'insurance',
@@ -917,6 +949,9 @@ const EXTENDED_PROFILE_KEYS = [
   'hasLifeInsurance',
   'hasDisabilityInsurance',
   'hasLiabilityInsurance',
+  'hasHealthInsurance',
+  'hasHomeInsurance',
+  'hasAutoInsurance',
   'age',
   'targetRetirementAge',
   'retirementBalance',
