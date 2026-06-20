@@ -165,8 +165,8 @@ export default function SubscriptionPortal({
           Your account, plan & subscription
         </h2>
         <p style={{ margin: 0, opacity: 0.88, fontSize: 15, lineHeight: 1.5, maxWidth: 640 }}>
-          Start free with a {subscription?.trialDaysTotal || 7}-day Pro trial on every new account — full AI, exports, and projections.
-          Then upgrade to keep Pro — same plans as{' '}
+          Start free — during setup you can pick a 7-day Pro trial (no card), subscribe, or stay on Free.
+          Upgrade anytime from Account — same plans as{' '}
           <a href="https://operone2i.com/financialcheckup#pricing" target="_blank" rel="noreferrer" style={{ color: '#93c5fd' }}>
             financialcheckup.com
           </a>
@@ -234,7 +234,7 @@ export default function SubscriptionPortal({
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
           {[
             { label: 'Status', value: statusLabel(status), color: statusColor(status, tier) },
-            { label: 'Billing', value: plan === 'annual' ? 'Annual ($96/yr)' : plan === 'monthly' ? 'Monthly ($10/mo)' : 'None' },
+            { label: 'Billing', value: plan === 'annual' ? 'Annual ($96/yr)' : plan === 'monthly' ? 'Monthly ($9.99/mo)' : 'None' },
             {
               label: subscription?.cancelAtPeriodEnd ? 'Access until' : isPro ? 'Next billing' : 'Renews',
               value: formatDate(subscription?.currentPeriodEnd),

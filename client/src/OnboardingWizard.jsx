@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import * as api from './api';
 import { BLANK_SNAPSHOT } from './checkupConstants';
-import { saveExtendedProfile } from './userStorage';
+import { PLAN_PRICING } from './planConstants';
 import LoadingOverlay from './LoadingOverlay';
+import {
+  finishOnboardingWithCheckup,
+  persistOnboardingData,
+  saveOnboardingPending,
+  clearOnboardingPending,
+} from './onboardingFinish';
 
 const GOALS = [
   { id: 'emergency_fund', label: 'Build emergency fund', desc: 'Focus on savings & cash reserves' },
@@ -12,7 +18,44 @@ const GOALS = [
   { id: 'insurance', label: 'Fix insurance gaps', desc: 'Life, disability & liability coverage' },
 ];
 
-const STEPS = ['Your goal', 'Income & spending', 'Savings', 'Investments', 'Insurance & finish'];
+const STEPS = ['Your goal', 'Income & spending', 'Savings', 'Investments', 'Insurance', 'Choose your plan'];
+
+const PLAN_OPTIONS = [
+  {
+    id: 'trial',
+    title: '7-day Pro trial',
+    price: 'Free',
+    period: ' · no card',
+    desc: 'Full AI, exports & projections for 7 days',
+    accent: '#4da6ff',
+  },
+  {
+    id: 'monthly',
+    title: PLAN_PRICING.monthly.name,
+    price: PLAN_PRICING.monthly.price,
+    period: PLAN_PRICING.monthly.period,
+    desc: PLAN_PRICING.monthly.tagline,
+    accent: '#4da6ff',
+    badge: PLAN_PRICING.monthly.badge,
+  },
+  {
+    id: 'annual',
+    title: PLAN_PRICING.annual.name,
+    price: PLAN_PRICING.annual.price,
+    period: PLAN_PRICING.annual.period,
+    desc: PLAN_PRICING.annual.tagline,
+    accent: '#22c55e',
+    badge: PLAN_PRICING.annual.badge,
+  },
+  {
+    id: 'free',
+    title: 'Continue free',
+    price: '$0',
+    period: '',
+    desc: 'Keep your score & basics — upgrade anytime from Account',
+    accent: '#94a3b8',
+  },
+];
 
 export default function OnboardingWizard({
   token,
@@ -24,68 +67,59 @@ export default function OnboardingWizard({
   btnNeutral,
   isMobile,
   accountEmail,
+  billingConfigured,
   onComplete,
 }) {
   const [step, setStep] = useState(0);
   const [goal, setGoal] = useState('');
   const [data, setData] = useState({ ...BLANK_SNAPSHOT });
+  const [planChoice, setPlanChoice] = useState('trial');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [emailSummary, setEmailSummary] = useState(true);
   const [summaryFreq, setSummaryFreq] = useState('weekly');
 
   const grid = { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 };
+  const payload = { token, userId, month, goal, data, emailSummary, summaryFreq, accountEmail };
 
   function setField(key, val) {
     setData((p) => ({ ...p, [key]: val }));
   }
 
-  async function finish() {
+  async function completeWithPlan(choice) {
     setErr('');
     setBusy(true);
     try {
-      await api.setOnboarding(token, { primaryGoal: goal });
-      await api.setIncome(token, { amount: Number(data.income) || 0, month });
-      await api.updateExpenses(token, {
-        month,
-        expenses: [{ category: 'General', amount: Number(data.monthlyExpenses) || 0 }],
-      });
-      saveExtendedProfile(userId, {
-        emergencyFund: data.emergencyFund,
-        monthlySavings: data.monthlySavings,
-        debts: data.debts,
-        investmentTotal: data.investmentTotal,
-        stockPct: data.stockPct,
-        bondPct: data.bondPct,
-        internationalPct: data.internationalPct,
-        cashPct: data.cashPct,
-        feePct: data.feePct,
-        hasLifeInsurance: data.hasLifeInsurance,
-        hasDisabilityInsurance: data.hasDisabilityInsurance,
-        hasLiabilityInsurance: data.hasLiabilityInsurance,
-        age: data.age,
-        targetRetirementAge: data.targetRetirementAge,
-        retirementBalance: data.retirementBalance,
-        monthlyRetirementContribution: data.monthlyRetirementContribution,
-        excludedFromScore: [],
-      });
-      const snapshot = {
-        ...data,
-        income: Number(data.income) || 0,
-        monthlyExpenses: Number(data.monthlyExpenses) || 0,
-      };
-      await api.runCheckup(token, { month, snapshot });
-      await api.setOnboarding(token, { complete: true, primaryGoal: goal });
-      if (emailSummary && accountEmail) {
-        await api.updateDigestPrefs(token, {
-          digestEnabled: true,
-          digestChannel: 'email',
-          digestEmail: accountEmail,
-          digestFrequency: summaryFreq,
-          digestWeekday: 1,
-        });
+      if (choice === 'trial') {
+        await persistOnboardingData(payload);
+        await api.startWelcomeTrial(token);
+        const snapshot = {
+          ...data,
+          income: Number(data.income) || 0,
+          monthlyExpenses: Number(data.monthlyExpenses) || 0,
+        };
+        await api.runCheckup(token, { month, snapshot });
+        await api.setOnboarding(token, { complete: true, primaryGoal: goal });
+        clearOnboardingPending();
+        onComplete?.();
+        return;
       }
-      onComplete?.();
+      if (choice === 'free') {
+        await finishOnboardingWithCheckup(payload);
+        onComplete?.();
+        return;
+      }
+      if (choice === 'monthly' || choice === 'annual') {
+        if (!billingConfigured) {
+          setErr('Billing is not configured yet. Choose the free trial or continue free.');
+          return;
+        }
+        await persistOnboardingData(payload);
+        saveOnboardingPending(payload);
+        const { url } = await api.createCheckoutSession(token, choice, { fromOnboarding: true });
+        api.openExternalUrl(url);
+        return;
+      }
     } catch (e) {
       setErr(e.message || 'Setup failed.');
     } finally {
@@ -100,12 +134,17 @@ export default function OnboardingWizard({
     }
     setErr('');
     if (step < STEPS.length - 1) setStep((s) => s + 1);
-    else finish();
+    else completeWithPlan(planChoice);
   }
 
   return (
     <>
-      {busy ? <LoadingOverlay message="Setting up your dashboard…" submessage="Saving profile & calculating score" /> : null}
+      {busy ? (
+        <LoadingOverlay
+          message={planChoice === 'monthly' || planChoice === 'annual' ? 'Opening secure checkout…' : 'Setting up your dashboard…'}
+          submessage={planChoice === 'monthly' || planChoice === 'annual' ? 'You will return here after payment' : 'Calculating your score'}
+        />
+      ) : null}
       <div
         style={{
           position: 'fixed',
@@ -123,7 +162,9 @@ export default function OnboardingWizard({
             </div>
             <h2 style={{ margin: '8px 0 4px', fontSize: isMobile ? '1.35rem' : '1.65rem' }}>{STEPS[step]}</h2>
             <p style={{ margin: 0, opacity: 0.85, fontSize: 14, lineHeight: 1.5 }}>
-              Enter your numbers once — we&apos;ll build your dashboard and personalized score.
+              {step === STEPS.length - 1
+                ? 'Pick how you want to use Pro — or continue free. Your score is calculated next.'
+                : 'Enter your numbers once — we will build your dashboard and personalized score.'}
             </p>
           </div>
 
@@ -233,10 +274,7 @@ export default function OnboardingWizard({
                   <input type="checkbox" checked={data.hasLiabilityInsurance} onChange={(e) => setField('hasLiabilityInsurance', e.target.checked)} />
                   Umbrella liability insurance
                 </label>
-                <p style={{ margin: 0, opacity: 0.8, fontSize: 13 }}>
-                  Tap finish to calculate your score and open your dashboard.
-                </p>
-                <div style={{ marginTop: 12, padding: '0.85rem', borderRadius: 10, border: '1px solid rgba(148,163,184,0.2)', display: 'grid', gap: 10 }}>
+                <div style={{ marginTop: 8, padding: '0.85rem', borderRadius: 10, border: '1px solid rgba(148,163,184,0.2)', display: 'grid', gap: 10 }}>
                   <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <input type="checkbox" checked={emailSummary} onChange={(e) => setEmailSummary(e.target.checked)} />
                     Email me score summaries
@@ -252,11 +290,63 @@ export default function OnboardingWizard({
                         </select>
                       </label>
                       <div style={{ fontSize: 12, opacity: 0.75 }}>
-                        Sent to <strong>{accountEmail || 'your account email'}</strong> — includes score, categories, and top action.
+                        Sent to <strong>{accountEmail || 'your account email'}</strong>
                       </div>
                     </>
                   ) : null}
                 </div>
+              </div>
+            ) : null}
+
+            {step === 5 ? (
+              <div style={{ display: 'grid', gap: 10 }}>
+                {PLAN_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setPlanChoice(opt.id)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '0.9rem 1rem',
+                      cursor: 'pointer',
+                      color: '#fff',
+                      borderRadius: 10,
+                      border: planChoice === opt.id ? `2px solid ${opt.accent}` : '1px solid rgba(148,163,184,0.25)',
+                      background: planChoice === opt.id
+                        ? 'linear-gradient(135deg, rgba(37,99,235,0.22), rgba(15,23,42,0.85))'
+                        : 'rgba(15,23,42,0.55)',
+                      position: 'relative',
+                    }}
+                  >
+                    {opt.badge ? (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 10,
+                          right: 10,
+                          fontSize: 10,
+                          fontWeight: 800,
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          padding: '3px 8px',
+                          borderRadius: 99,
+                          background: opt.id === 'annual' ? 'rgba(34,197,94,0.2)' : 'rgba(77,166,255,0.25)',
+                          color: opt.id === 'annual' ? '#86efac' : '#bfdbfe',
+                        }}
+                      >
+                        {opt.badge}
+                      </span>
+                    ) : null}
+                    <div style={{ fontWeight: 800, color: opt.accent }}>{opt.title}</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 6 }}>
+                      <span style={{ fontSize: 22, fontWeight: 800 }}>{opt.price}</span>
+                      {opt.period ? <span style={{ opacity: 0.7, fontSize: 13 }}>{opt.period}</span> : null}
+                    </div>
+                    <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6, lineHeight: 1.4, paddingRight: opt.badge ? 72 : 0 }}>
+                      {opt.desc}
+                    </div>
+                  </button>
+                ))}
               </div>
             ) : null}
 
@@ -274,7 +364,13 @@ export default function OnboardingWizard({
                 </button>
               ) : null}
               <button type="button" onClick={next} disabled={busy} style={btnPrimary}>
-                {step === STEPS.length - 1 ? (busy ? 'Finishing…' : 'Finish & view dashboard') : 'Continue'}
+                {step === STEPS.length - 1
+                  ? busy
+                    ? 'Working…'
+                    : planChoice === 'monthly' || planChoice === 'annual'
+                      ? 'Continue to checkout'
+                      : 'Finish & view my score'
+                  : 'Continue'}
               </button>
             </div>
           </div>
@@ -287,3 +383,5 @@ export default function OnboardingWizard({
     </>
   );
 }
+
+export { finishOnboardingWithCheckup, readOnboardingPending } from './onboardingFinish';

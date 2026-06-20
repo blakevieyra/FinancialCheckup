@@ -12,7 +12,7 @@ import SupportPanel from './SupportPanel';
 import SubscriptionPortal from './SubscriptionPortal';
 import AppFooter from './AppFooter';
 import LoadingOverlay from './LoadingOverlay';
-import OnboardingWizard from './OnboardingWizard';
+import OnboardingWizard, { finishOnboardingWithCheckup, readOnboardingPending } from './OnboardingWizard';
 import ExpandablePanel from './ExpandablePanel';
 import {
   clearAuthSession,
@@ -913,8 +913,20 @@ export default function App() {
   useEffect(() => {
     if (!token) return undefined;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('billing') === 'success') {
+    const billing = params.get('billing');
+    if (billing === 'success') {
       loadSubscription();
+      const pending = readOnboardingPending();
+      if (params.get('onboarding') === '1' && pending?.token) {
+        setAppLoading('Calculating your score…');
+        finishOnboardingWithCheckup(pending)
+          .then(() => completeOnboarding())
+          .catch((e) => setBillingErr(e.message || 'Could not finish setup after checkout.'))
+          .finally(() => setAppLoading(''));
+      }
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (billing === 'canceled' && params.get('onboarding') === '1') {
+      setBillingErr('Checkout canceled — pick a plan again or continue free.');
       window.history.replaceState({}, '', window.location.pathname);
     }
     return undefined;
@@ -1725,6 +1737,7 @@ export default function App() {
           btnNeutral={btnNeutral}
           isMobile={isMobile}
           accountEmail={accountEmail}
+          billingConfigured={subscription?.billingConfigured}
           onComplete={completeOnboarding}
         />
       ) : null}

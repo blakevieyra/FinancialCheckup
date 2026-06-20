@@ -366,8 +366,16 @@ export async function getSubscriptionStatus(token) {
   return apiFetch('/api/billing/status', { token });
 }
 
-export async function createCheckoutSession(token, plan) {
-  return apiFetch('/api/billing/checkout', { method: 'POST', token, body: { plan } });
+export async function createCheckoutSession(token, plan, options = {}) {
+  return apiFetch('/api/billing/checkout', {
+    method: 'POST',
+    token,
+    body: { plan, fromOnboarding: Boolean(options.fromOnboarding) },
+  });
+}
+
+export async function startWelcomeTrial(token) {
+  return apiFetch('/api/billing/welcome-trial', { method: 'POST', token, body: {} });
 }
 
 export async function createBillingPortalSession(token) {

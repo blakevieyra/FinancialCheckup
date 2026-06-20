@@ -2,11 +2,12 @@ const router = require('express').Router();
 const Stripe = require('stripe');
 const { verifyToken } = require('./auth');
 const { dbGet, dbRun } = require('./db');
-const { resolveTier, featuresForTier, tierLabel } = require('./subscriptionTiers');
+const { resolveTier, featuresForTier, tierLabel, STRIPE_PRICES } = require('./subscriptionTiers');
 const {
   expireWelcomeTrialIfNeeded,
   trialDaysRemaining,
   isWelcomeTrial,
+  grantNewUserProTrial,
   TRIAL_DAYS,
 } = require('./subscriptionService');
 const { sendSubscribedEmail, sendDeactivatedEmail } = require('./transactionalEmail');
@@ -213,6 +214,26 @@ router.get('/status', async (req, res) => {
   }
 });
 
+router.post('/welcome-trial', async (req, res) => {
+  try {
+    const row = await expireWelcomeTrialIfNeeded(req.user.id);
+    if (row?.stripe_subscription_id || row?.status === 'active') {
+      return res.status(400).json({ error: 'You already have a paid subscription.' });
+    }
+    if (isWelcomeTrial(row) && trialDaysRemaining(row?.current_period_end) > 0) {
+      return res.json(await buildStatusJson(req.user.id));
+    }
+    const granted = await grantNewUserProTrial(req.user.id);
+    if (!granted) {
+      return res.status(400).json({ error: 'Could not start trial — subscribe from Account instead.' });
+    }
+    res.json(await buildStatusJson(req.user.id));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
 router.post('/sync', async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Billing not configured on server.' });
   try {
@@ -293,13 +314,15 @@ router.post('/checkout', async (req, res) => {
     }
 
     const returnBase = billingReturnBase(clientUrl);
+    const fromOnboarding = Boolean(req.body?.fromOnboarding);
+    const onboardingQs = fromOnboarding ? '&onboarding=1' : '';
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       client_reference_id: String(req.user.id),
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${returnBase}&billing=success`,
-      cancel_url: `${returnBase}&billing=canceled`,
+      success_url: `${returnBase}&billing=success${onboardingQs}`,
+      cancel_url: `${returnBase}&billing=canceled${onboardingQs}`,
       metadata: { userId: String(req.user.id), plan },
       subscription_data: {
         metadata: { userId: String(req.user.id), plan },

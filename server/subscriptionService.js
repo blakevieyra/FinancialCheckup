@@ -47,11 +47,27 @@ async function expireWelcomeTrialIfNeeded(userId) {
 }
 
 async function grantNewUserProTrial(userId) {
-  await dbRun(
-    `INSERT INTO subscriptions (user_id, status, plan, current_period_end, cancel_at_period_end)
-     VALUES (?, 'trialing', 'trial', ?, 0)`,
-    [userId, trialEndIso()],
-  );
+  const end = trialEndIso();
+  const existing = await dbGet('SELECT user_id, stripe_subscription_id FROM subscriptions WHERE user_id = ?', [userId]);
+  if (existing?.stripe_subscription_id) {
+    return false;
+  }
+  if (existing) {
+    await dbRun(
+      `UPDATE subscriptions
+       SET status = 'trialing', plan = 'trial', current_period_end = ?, cancel_at_period_end = 0,
+           updated_at = to_char((now() AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+       WHERE user_id = ?`,
+      [end, userId],
+    );
+  } else {
+    await dbRun(
+      `INSERT INTO subscriptions (user_id, status, plan, current_period_end, cancel_at_period_end)
+       VALUES (?, 'trialing', 'trial', ?, 0)`,
+      [userId, end],
+    );
+  }
+  return true;
 }
 
 module.exports = {
