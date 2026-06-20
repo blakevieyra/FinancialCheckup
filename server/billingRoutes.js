@@ -2,7 +2,7 @@ const router = require('express').Router();
 const Stripe = require('stripe');
 const { verifyToken } = require('./auth');
 const { dbGet, dbRun } = require('./db');
-const { resolveTier, featuresForTier, tierLabel, STRIPE_PRICES, STRIPE_TRIAL_OFFER } = require('./subscriptionTiers');
+const { resolveTier, featuresForTier, tierLabel, STRIPE_PRICES, STRIPE_PRICE_TRIAL_WEEKLY, STRIPE_TRIAL_OFFER } = require('./subscriptionTiers');
 const {
   expireWelcomeTrialIfNeeded,
   trialDaysRemaining,
@@ -46,8 +46,27 @@ async function upsertSubscription(userId, fields) {
 
 function planFromPriceId(priceId) {
   if (priceId === STRIPE_PRICES.annual) return 'annual';
-  if (priceId === STRIPE_PRICES.monthly) return 'monthly';
+  if (priceId === STRIPE_PRICES.monthly || priceId === STRIPE_PRICE_TRIAL_WEEKLY) return 'monthly';
   return 'monthly';
+}
+
+async function resolveUserIdFromSubscription(sub) {
+  const metaId = Number(sub.metadata?.userId);
+  if (metaId) return metaId;
+  const bySub = await dbGet('SELECT user_id FROM subscriptions WHERE stripe_subscription_id = ?', [sub.id]);
+  if (bySub?.user_id) return bySub.user_id;
+  if (sub.customer) {
+    const byCustomer = await dbGet('SELECT user_id FROM subscriptions WHERE stripe_customer_id = ?', [sub.customer]);
+    if (byCustomer?.user_id) return byCustomer.user_id;
+  }
+  return null;
+}
+
+async function syncSubscriptionForUser(userId, sub, stripeCustomerId) {
+  await upsertSubscription(userId, {
+    stripe_customer_id: stripeCustomerId || sub.customer || null,
+    ...fieldsFromStripeSub(sub),
+  });
 }
 
 function fieldsFromStripeSub(sub) {
@@ -107,6 +126,16 @@ async function buildStatusJson(userId) {
       if (price?.unit_amount) {
         base.nextChargeAmount = price.unit_amount / 100;
         base.lastChargeCurrency = price.currency || 'usd';
+      } else if (sub.status === 'trialing') {
+        try {
+          const monthly = await stripe.prices.retrieve(STRIPE_PRICES.monthly);
+          if (monthly?.unit_amount) {
+            base.nextChargeAmount = monthly.unit_amount / 100;
+            base.lastChargeCurrency = monthly.currency || 'usd';
+          }
+        } catch {
+          /** best-effort */
+        }
       }
       const invoices = await stripe.invoices.list({ subscription: sub.id, limit: 3 });
       const paid = invoices.data.find((inv) => inv.status === 'paid' && inv.amount_paid > 0);
@@ -199,11 +228,8 @@ async function handleWebhookEvent(event) {
       let periodEnd = null;
       if (subId && stripe) {
         const sub = await stripe.subscriptions.retrieve(subId);
-        plan = sub.items?.data?.[0]?.price?.id === STRIPE_PRICES.annual ? 'annual' : 'monthly';
-        await upsertSubscription(userId, {
-          stripe_customer_id: session.customer,
-          ...fieldsFromStripeSub(sub),
-        });
+        plan = planFromPriceId(sub.items?.data?.[0]?.price?.id);
+        await syncSubscriptionForUser(userId, sub, session.customer);
       } else {
         await upsertSubscription(userId, {
           stripe_customer_id: session.customer,
@@ -217,18 +243,18 @@ async function handleWebhookEvent(event) {
       sendSubscribedEmail(userId, plan).catch(() => {});
       break;
     }
+    case 'customer.subscription.created':
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted': {
       const sub = event.data.object;
-      const row = await dbGet(
-        'SELECT user_id FROM subscriptions WHERE stripe_subscription_id = ?',
-        [sub.id],
-      );
-      if (!row) break;
+      const userId = await resolveUserIdFromSubscription(sub);
+      if (!userId) break;
       const fields = fieldsFromStripeSub(sub);
-      await upsertSubscription(row.user_id, fields);
+      await syncSubscriptionForUser(userId, sub, sub.customer);
       if (event.type === 'customer.subscription.deleted' || fields.status === 'canceled') {
-        sendDeactivatedEmail(row.user_id, 'subscription_canceled').catch(() => {});
+        sendDeactivatedEmail(userId, 'subscription_canceled').catch(() => {});
+      } else if (event.type === 'customer.subscription.created' && sub.status === 'trialing') {
+        sendSubscribedEmail(userId, fields.plan || 'monthly').catch(() => {});
       }
       break;
     }

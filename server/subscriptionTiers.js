@@ -5,6 +5,9 @@ const STRIPE_PRICES = {
   annual: process.env.STRIPE_PRICE_ANNUAL || 'price_1TZwxo1HZuIni9E76TvK70yS',
 };
 
+/** $0/week price used during Stripe trial-offer period (prod_UTwVsOv5GXgccr). */
+const STRIPE_PRICE_TRIAL_WEEKLY = process.env.STRIPE_PRICE_TRIAL_WEEKLY || 'price_1TkBcv1HZuIni9E77RYcHPxd';
+
 /** Stripe Trial Offer (to_xxx) — Subscription API only; not supported in Checkout. */
 const STRIPE_TRIAL_OFFER = process.env.STRIPE_TRIAL_OFFER || 'to_1TkD071HZuIni9E78QjISlD2';
 
@@ -53,6 +56,7 @@ function tierLabel(tier, subscription) {
 
 module.exports = {
   STRIPE_PRICES,
+  STRIPE_PRICE_TRIAL_WEEKLY,
   STRIPE_TRIAL_OFFER,
   FREE_FEATURES,
   PRO_FEATURES,

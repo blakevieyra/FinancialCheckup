@@ -63,6 +63,8 @@ services:
         value: price_1TZwxo1HZuIni9E76TvK70yS
       - key: STRIPE_TRIAL_OFFER
         value: to_1TkD071HZuIni9E78QjISlD2
+      - key: STRIPE_PRICE_TRIAL_WEEKLY
+        value: price_1TkBcv1HZuIni9E77RYcHPxd
       - key: STRIPE_TRIAL_DAYS
         value: "7"
   - type: web
