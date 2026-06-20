@@ -1,8 +1,6 @@
-function fmtMoney(n) {
-  return `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-}
+import ExpandablePanel from './ExpandablePanel';
 
-export default function FinancialHistoryPanel({
+function fmtMoney(n) {
   incomeHistory,
   expensesHistory,
   checkupHistory,
@@ -99,18 +97,21 @@ export default function FinancialHistoryPanel({
       </div>
 
       {(checkupHistory || []).some((h) => h.topRecommendations?.length) ? (
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 12 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>Past recommendations (from saved checkups)</div>
+        <ExpandablePanel
+          title="Past recommendations"
+          hint="From saved checkups — tap to expand"
+          cardSoftStyle={{ ...cardStyle, padding: 0 }}
+        >
           <div style={{ display: 'grid', gap: 8 }}>
             {checkupHistory.slice(0, 6).map((h) =>
               h.topRecommendations?.length ? (
-                <div key={`${h.month}-${h.createdAt}`} style={{ fontSize: 13, opacity: 0.88 }}>
+                <div key={`${h.month}-${h.createdAt}`} style={{ fontSize: 13, opacity: 0.88, lineHeight: 1.45 }}>
                   <strong>{h.month}</strong> (score {Math.round(h.overallScore)}): {h.topRecommendations.join(' · ')}
                 </div>
               ) : null,
             )}
           </div>
-        </div>
+        </ExpandablePanel>
       ) : null}
     </div>
   );
