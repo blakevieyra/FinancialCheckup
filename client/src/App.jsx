@@ -1876,17 +1876,6 @@ export default function App() {
 
         {activeSection === 'progress' && (
           <>
-        <FinancialHistoryPanel
-          incomeHistory={incomeHistory}
-          expensesHistory={expensesHistory}
-          checkupHistory={checkupHistory}
-          currentMonth={month}
-          onSelectMonth={openHistoryMonth}
-          isMobile={isMobile}
-          cardStyle={cardStyle}
-          btnNeutral={btnNeutral}
-        />
-
         <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12 }}>
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 6 }}>Spending charts — {month}</h2>
@@ -2161,6 +2150,17 @@ export default function App() {
             ) : null}
           </div>
         </ExpandablePanel>
+
+        <FinancialHistoryPanel
+          incomeHistory={incomeHistory}
+          expensesHistory={expensesHistory}
+          checkupHistory={checkupHistory}
+          currentMonth={month}
+          onSelectMonth={openHistoryMonth}
+          isMobile={isMobile}
+          cardStyle={cardStyle}
+          btnNeutral={btnNeutral}
+        />
           </>
         )}
 
