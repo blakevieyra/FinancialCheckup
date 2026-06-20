@@ -6,6 +6,7 @@ import PrioritiesPanel from './PrioritiesPanel';
 import RecommendationTimeline from './RecommendationTimeline';
 import ExpandablePanel from './ExpandablePanel';
 import BadgeRewardsPanel from './BadgeRewardsPanel';
+import LeaderboardSnapshot from './LeaderboardSnapshot';
 import { goalLabel } from './goalResources';
 
 function LedgerSnapshot({ income, totalExpenses, cardSoftStyle }) {
@@ -99,6 +100,9 @@ export default function OverviewDashboard({
   primaryGoal,
   profileSummary,
   userXp,
+  rankData,
+  rankBusy,
+  rankErr,
 }) {
   const gridOverview = isMobile
     ? '1fr'
@@ -140,6 +144,13 @@ export default function OverviewDashboard({
       <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
 
       {profileSummary ? <ProfileSnapshot summary={profileSummary} cardSoftStyle={cardSoftStyle} /> : null}
+
+      <LeaderboardSnapshot
+        rankData={rankData}
+        busy={rankBusy}
+        error={rankErr}
+        cardSoftStyle={cardSoftStyle}
+      />
     </div>
   );
 

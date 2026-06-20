@@ -2041,85 +2041,8 @@ export default function App() {
           </div>
         </ExpandablePanel>
 
-        <ExpandablePanel title="Leaderboard & budget trend" hint="Compare budget grade and spending trajectory" cardSoftStyle={cardSoftStyle}>
+        <ExpandablePanel title="Budget trend" hint="Score and expense ratio over time — tap to expand" cardSoftStyle={cardSoftStyle}>
           <div style={{ display: 'grid', gap: 18 }}>
-            <p style={{ margin: 0, opacity: 0.86, lineHeight: 1.45, fontSize: 14 }}>
-              Leaderboard ranks <strong>budget score only</strong> (100 − expense ratio). Your main Financial Checkup Score on Overview includes all 6 dimensions.
-            </p>
-
-            <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 14, opacity: 0.9 }}>
-              <input type="checkbox" checked={rankMaskOthers} onChange={(e) => setRankMaskOthers(e.target.checked)} />
-              Mask other usernames on leaderboard
-            </label>
-
-            {rankBusy ? <div style={{ opacity: 0.8 }}>Updating rankings…</div> : null}
-            {rankErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{rankErr}</div> : null}
-            {rankData ? (
-              <div style={{ border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '0.75rem' }}>
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Your standing — {rankData.month}</div>
-                <div style={{ opacity: 0.9, lineHeight: 1.5 }}>
-                  Rank <strong>{rankData.yourRankLabel}</strong> of <strong>{rankData.totalRanked}</strong> scored users{' '}
-                  ({rankData.totalUsers} accounts total).
-                  {!rankData.you?.eligible ? (
-                    <span> Add income for this month to get a ranked score.</span>
-                  ) : null}
-                  {rankData.you?.eligible && !rankData.youInTopSlice ? (
-                    <span>
-                      {' '}
-                      Full leaderboard shows top <strong>{rankData.leaderboard?.length ?? 25}</strong> — you’re still ranked overall.
-                    </span>
-                  ) : null}
-                </div>
-                {rankData.you?.eligible ? (
-                  <div style={{ marginTop: 8, fontSize: 14, opacity: 0.85 }}>
-                    Your score <strong>{Number(rankData.you.healthScore).toFixed(1)}</strong> · ratio{' '}
-                    <strong>{rankData.you.expenseRatio != null ? `${rankData.you.expenseRatio}%` : '—'}</strong> · surplus{' '}
-                    <strong>
-                      ${Number(rankData.you.balance ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </strong>
-                  </div>
-                ) : null}
-                <div style={{ marginTop: 12, overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                    <thead>
-                      <tr style={{ textAlign: 'left', opacity: 0.8 }}>
-                        <th style={{ padding: '6px 8px' }}>#</th>
-                        <th style={{ padding: '6px 8px' }}>User</th>
-                        <th style={{ padding: '6px 8px' }}>Score</th>
-                        <th style={{ padding: '6px 8px' }}>Ratio</th>
-                        <th style={{ padding: '6px 8px' }}>Grade</th>
-                        <th style={{ padding: '6px 8px' }}>Surplus</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(rankData.leaderboard || []).map((row, idx) => (
-                        <tr
-                          key={`${row.rank}-${row.username}-${idx}`}
-                          style={{
-                            background: row.isYou ? 'rgba(59,130,246,0.14)' : 'transparent',
-                          }}
-                        >
-                          <td style={{ padding: '6px 8px' }}>{row.rank}</td>
-                          <td style={{ padding: '6px 8px' }}>
-                            {row.username}
-                            {row.isYou ? ' (you)' : ''}
-                          </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            {row.healthScore != null ? Number(row.healthScore).toFixed(1) : '—'}
-                          </td>
-                          <td style={{ padding: '6px 8px' }}>{row.expenseRatio != null ? `${row.expenseRatio}%` : '—'}</td>
-                          <td style={{ padding: '6px 8px' }}>{row.grade}</td>
-                          <td style={{ padding: '6px 8px' }}>
-                            ${Number(row.surplus ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : null}
-
             {trendsErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{trendsErr}</div> : null}
             {trendsData?.improvement ? (
               <div
@@ -2262,6 +2185,9 @@ export default function App() {
             primaryGoal={primaryGoal}
             profileSummary={profileSummary}
             userXp={userXp}
+            rankData={rankData}
+            rankBusy={rankBusy}
+            rankErr={rankErr}
           />
         )}
         </>
