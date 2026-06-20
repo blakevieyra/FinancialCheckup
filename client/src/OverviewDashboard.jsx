@@ -106,32 +106,26 @@ export default function OverviewDashboard({
       ? 'minmax(0, 1.15fr) minmax(300px, 420px)'
       : '1fr 1fr';
 
-  const contentMaxWidth = isDesktop ? 520 : '100%';
-
   const scoreColumn = (
-    <div style={{ display: 'grid', gap: 16, minWidth: 0, justifyItems: 'center' }}>
-      <div style={{ width: '100%', maxWidth: contentMaxWidth }}>
-        <ScoreHero
-          result={checkupResult}
-          income={income}
-          totalExpenses={totalExpenses}
-          budgetGrade={budgetGrade}
-          isMobile={isMobile}
-          cardSoftStyle={cardSoftStyle}
-          checkupBusy={checkupBusy}
-          onGoFinances={onGoFinances}
-        />
-      </div>
-      <div style={{ width: '100%', maxWidth: contentMaxWidth }}>
-        <GuidePanel
-          checkupResult={checkupResult}
-          primaryGoal={primaryGoal}
-          cardSoftStyle={cardSoftStyle}
-          btnPrimary={btnPrimary}
-          btnNeutral={btnNeutral}
-          onNavigate={onGuideNavigate}
-        />
-      </div>
+    <div style={{ display: 'grid', gap: 16, minWidth: 0, width: '100%' }}>
+      <ScoreHero
+        result={checkupResult}
+        income={income}
+        totalExpenses={totalExpenses}
+        budgetGrade={budgetGrade}
+        isMobile={isMobile}
+        cardSoftStyle={cardSoftStyle}
+        checkupBusy={checkupBusy}
+        onGoFinances={onGoFinances}
+      />
+      <GuidePanel
+        checkupResult={checkupResult}
+        primaryGoal={primaryGoal}
+        cardSoftStyle={cardSoftStyle}
+        btnPrimary={btnPrimary}
+        btnNeutral={btnNeutral}
+        onNavigate={onGuideNavigate}
+      />
     </div>
   );
 
@@ -146,15 +140,6 @@ export default function OverviewDashboard({
       <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
 
       {profileSummary ? <ProfileSnapshot summary={profileSummary} cardSoftStyle={cardSoftStyle} /> : null}
-
-      <div style={{ display: 'grid', gap: 8 }}>
-        <button type="button" onClick={onGoFinances} style={{ ...btnNeutral, width: '100%', textAlign: 'left' }}>
-          Edit finances & profile →
-        </button>
-        <button type="button" onClick={onGoProgress} style={{ ...btnNeutral, width: '100%', textAlign: 'left' }}>
-          History & charts →
-        </button>
-      </div>
     </div>
   );
 

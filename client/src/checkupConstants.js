@@ -120,9 +120,18 @@ export const DIMENSION_IMPORTANCE = {
   debt:
     'Debt payments drain cash flow and compound against you. Understanding balances, interest rates, and payoff order helps you eliminate the costliest debts first and free money for saving and investing.',
   investments:
-    'Investments grow wealth beyond what saving alone can do. Allocation, diversification, and fees determine whether your portfolio supports long-term goals or quietly erodes returns.',
+    'Investments grow wealth beyond what saving alone can do. Over decades, compound growth and a sensible allocation matter more than picking individual stocks. Fees, diversification, and staying invested through market swings determine whether your portfolio supports long-term goals or quietly erodes returns.',
   insurance:
-    'Insurance transfers catastrophic risk you cannot afford to self-fund. Life, disability, and liability gaps can wipe out years of progress in a single event if left uncovered.',
+    'Insurance transfers catastrophic risk you cannot afford to self-fund. A single lawsuit, disability, or early death can wipe out years of savings if coverage gaps remain. The goal is not to insure everything — it is to cover losses that would otherwise force debt or derail your plan.',
   retirement:
-    'Retirement planning ensures today\'s income eventually replaces itself when you stop working. Contribution rate, time horizon, and account growth determine whether you can maintain your lifestyle later.',
+    'Retirement planning ensures today\'s income eventually replaces itself when you stop working. Social Security alone rarely covers a full lifestyle. Your contribution rate, years until retirement, and account growth determine whether you maintain your standard of living or face a shortfall later.',
+};
+
+export const DIMENSION_BASICS = {
+  investments:
+    'Enter your total portfolio value, annual fee %, and allocation split (stocks, bonds, international, cash). Start with low-cost index funds in a 401(k) or IRA; capture any employer match first.',
+  insurance:
+    'Mark whether you have life insurance (replaces income for dependents), disability insurance (replaces paycheck if you cannot work), and umbrella liability (extra protection above auto/home limits). Employer coverage alone is often incomplete.',
+  retirement:
+    'Enter your age, target retirement age, current balance in 401(k)/IRA accounts, and monthly contributions. A common target is 15% of income including employer match; increase 1% per year if you are behind.',
 };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as api from './api';
-import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, DIMENSION_IMPORTANCE, BLANK_SNAPSHOT } from './checkupConstants';
+import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, DIMENSION_IMPORTANCE, DIMENSION_BASICS, BLANK_SNAPSHOT } from './checkupConstants';
 import {
   loadExtendedProfile,
   saveExtendedProfile,
@@ -19,7 +19,7 @@ function dimScoreLine(result, key) {
   return `${Math.round(d.score)}/100 · Grade ${d.grade}`;
 }
 
-function DimensionCard({ title, importance, included, onToggleInclude, cardStyle, btnNeutral, scoreLine, children }) {
+function DimensionCard({ title, importance, basics, included, onToggleInclude, cardStyle, btnNeutral, scoreLine, children }) {
   const [showWhy, setShowWhy] = useState(false);
   return (
     <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
@@ -27,6 +27,12 @@ function DimensionCard({ title, importance, included, onToggleInclude, cardStyle
         <div style={{ flex: 1, minWidth: 180 }}>
           <h3 style={{ margin: 0, fontSize: 17 }}>{title}</h3>
           {scoreLine ? <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>{scoreLine}</div> : null}
+          {basics ? (
+            <div style={{ fontSize: 13, opacity: 0.82, lineHeight: 1.5, marginTop: 8, padding: '0.55rem 0.65rem', borderRadius: 8, background: 'rgba(148,163,184,0.08)' }}>
+              <strong style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', opacity: 0.75 }}>Basics</strong>
+              <div style={{ marginTop: 4 }}>{basics}</div>
+            </div>
+          ) : null}
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 8, cursor: 'pointer' }}>
             <input type="checkbox" checked={included} onChange={onToggleInclude} />
             Include in overall score
@@ -489,6 +495,7 @@ export default function CheckupPanel({
       <DimensionCard
         title="Investments"
         importance={DIMENSION_IMPORTANCE.investments}
+        basics={DIMENSION_BASICS.investments}
         included={isDimIncluded('investments')}
         onToggleInclude={() => toggleScoreDimension('investments')}
         cardStyle={cardStyle}
@@ -514,6 +521,7 @@ export default function CheckupPanel({
       <DimensionCard
         title="Insurance"
         importance={DIMENSION_IMPORTANCE.insurance}
+        basics={DIMENSION_BASICS.insurance}
         included={isDimIncluded('insurance')}
         onToggleInclude={() => toggleScoreDimension('insurance')}
         cardStyle={cardStyle}
@@ -539,6 +547,7 @@ export default function CheckupPanel({
       <DimensionCard
         title="Retirement"
         importance={DIMENSION_IMPORTANCE.retirement}
+        basics={DIMENSION_BASICS.retirement}
         included={isDimIncluded('retirement')}
         onToggleInclude={() => toggleScoreDimension('retirement')}
         cardStyle={cardStyle}

@@ -48,8 +48,37 @@ export default function FinancesPage({
   onSaveDigest,
   onTestDigest,
 }) {
+  const expenseGrid = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
+
   return (
     <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
+        <ScoreSummaryPanel
+          bare
+          cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          accountEmail={accountEmail}
+          digestEnabled={digestEnabled}
+          onDigestEnabledChange={onDigestEnabledChange}
+          digestFrequency={digestFrequency}
+          onDigestFrequencyChange={onDigestFrequencyChange}
+          digestEmail={digestEmail}
+          onDigestEmailChange={onDigestEmailChange}
+          digestWeekday={digestWeekday}
+          onDigestWeekdayChange={onDigestWeekdayChange}
+          digestMsg={digestMsg}
+          digestErr={digestErr}
+          digestPreview={digestPreview}
+          smtpReady={digestSmtpReady}
+          saveBusy={digestSaveBusy}
+          testBusy={digestTestBusy}
+          onSave={onSaveDigest}
+          onTest={onTestDigest}
+        />
+      </div>
+
       <div style={{ ...cardStyle, display: 'grid', gap: 14 }}>
         <div>
           <h2 style={{ margin: '0 0 6px' }}>Finances & profile</h2>
@@ -80,7 +109,7 @@ export default function FinancesPage({
 
         <div id="income-panel" style={{ paddingTop: 4, borderTop: '1px solid rgba(148,163,184,0.15)', display: 'grid', gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>Income & spending</h3>
-          <label style={{ display: 'grid', gap: 6, fontSize: 14 }}>
+          <label style={{ display: 'grid', gap: 6, fontSize: 14, maxWidth: 320 }}>
             Monthly income ($)
             <input
               type="number"
@@ -92,7 +121,7 @@ export default function FinancesPage({
           </label>
           <div>
             <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Expenses by category</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               <input
                 value={newCategory}
                 onChange={(e) => onNewCategoryChange(e.target.value)}
@@ -104,59 +133,44 @@ export default function FinancesPage({
                 Add
               </button>
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <tbody>
+            {expenses?.length ? (
+              <div style={{ display: 'grid', gridTemplateColumns: expenseGrid, gap: 10 }}>
                 {(expenses || []).map((e) => (
-                  <tr key={e.category} style={{ borderTop: '1px solid rgba(148,163,184,0.15)' }}>
-                    <td style={{ padding: '8px 4px' }}>{e.category}</td>
-                    <td style={{ padding: '8px 4px', width: 140 }}>
-                      <input
-                        type="number"
-                        value={e.amount}
-                        step="0.01"
-                        onChange={(ev) => onExpenseChange(e.category, ev.target.value)}
-                        style={{ ...inputStyle, width: '100%', padding: 8 }}
-                      />
-                    </td>
-                    <td style={{ padding: '8px 4px', width: 72 }}>
-                      <button type="button" onClick={() => onDeleteCategory(e.category)} disabled={busy} style={{ ...btnNeutral, fontSize: 12, padding: '0.35rem 0.5rem' }}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
+                  <div
+                    key={e.category}
+                    style={{
+                      ...cardSoftStyle,
+                      padding: '0.75rem',
+                      display: 'grid',
+                      gap: 8,
+                      alignContent: 'start',
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{e.category}</div>
+                    <input
+                      type="number"
+                      value={e.amount}
+                      step="0.01"
+                      onChange={(ev) => onExpenseChange(e.category, ev.target.value)}
+                      style={{ ...inputStyle, width: '100%', padding: 8 }}
+                      aria-label={`${e.category} amount`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onDeleteCategory(e.category)}
+                      disabled={busy}
+                      style={{ ...btnNeutral, fontSize: 12, padding: '0.35rem 0.5rem', justifySelf: 'start' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-            {!expenses?.length ? <div style={{ opacity: 0.75, fontSize: 13, marginTop: 8 }}>Add a category to start tracking spending.</div> : null}
+              </div>
+            ) : (
+              <div style={{ opacity: 0.75, fontSize: 13 }}>Add a category to start tracking spending.</div>
+            )}
           </div>
         </div>
-      </div>
-
-      <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
-        <ScoreSummaryPanel
-          bare
-          cardSoftStyle={cardSoftStyle}
-          inputStyle={inputStyle}
-          btnPrimary={btnPrimary}
-          btnNeutral={btnNeutral}
-          accountEmail={accountEmail}
-          digestEnabled={digestEnabled}
-          onDigestEnabledChange={onDigestEnabledChange}
-          digestFrequency={digestFrequency}
-          onDigestFrequencyChange={onDigestFrequencyChange}
-          digestEmail={digestEmail}
-          onDigestEmailChange={onDigestEmailChange}
-          digestWeekday={digestWeekday}
-          onDigestWeekdayChange={onDigestWeekdayChange}
-          digestMsg={digestMsg}
-          digestErr={digestErr}
-          digestPreview={digestPreview}
-          smtpReady={digestSmtpReady}
-          saveBusy={digestSaveBusy}
-          testBusy={digestTestBusy}
-          onSave={onSaveDigest}
-          onTest={onTestDigest}
-        />
       </div>
 
       <CheckupPanel
