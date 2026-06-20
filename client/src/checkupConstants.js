@@ -111,3 +111,18 @@ export const DIMENSION_LABELS = [
   { key: 'insurance', label: 'Insurance' },
   { key: 'retirement', label: 'Retirement' },
 ];
+
+export const DIMENSION_IMPORTANCE = {
+  budget:
+    'Your budget score shows whether spending stays within income. Controlling the gap between what you earn and what you spend is the foundation every other financial goal builds on.',
+  savings:
+    'Emergency savings protect you from job loss, medical bills, and surprise repairs without going into debt. A strong fund turns crises into inconveniences instead of financial setbacks.',
+  debt:
+    'Debt payments drain cash flow and compound against you. Understanding balances, interest rates, and payoff order helps you eliminate the costliest debts first and free money for saving and investing.',
+  investments:
+    'Investments grow wealth beyond what saving alone can do. Allocation, diversification, and fees determine whether your portfolio supports long-term goals or quietly erodes returns.',
+  insurance:
+    'Insurance transfers catastrophic risk you cannot afford to self-fund. Life, disability, and liability gaps can wipe out years of progress in a single event if left uncovered.',
+  retirement:
+    'Retirement planning ensures today\'s income eventually replaces itself when you stop working. Contribution rate, time horizon, and account growth determine whether you can maintain your lifestyle later.',
+};

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as api from './api';
-import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, BLANK_SNAPSHOT } from './checkupConstants';
+import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, DIMENSION_IMPORTANCE, BLANK_SNAPSHOT } from './checkupConstants';
 import {
   loadExtendedProfile,
   saveExtendedProfile,
@@ -12,6 +12,53 @@ const fieldGrid = (isMobile) => ({
   gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
   gap: 10,
 });
+
+function dimScoreLine(result, key) {
+  const d = result?.dimensions?.find((x) => x.key === key);
+  if (!d) return null;
+  return `${Math.round(d.score)}/100 · Grade ${d.grade}`;
+}
+
+function DimensionCard({ title, importance, included, onToggleInclude, cardStyle, btnNeutral, scoreLine, children }) {
+  const [showWhy, setShowWhy] = useState(false);
+  return (
+    <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <h3 style={{ margin: 0, fontSize: 17 }}>{title}</h3>
+          {scoreLine ? <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>{scoreLine}</div> : null}
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={included} onChange={onToggleInclude} />
+            Include in overall score
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowWhy((v) => !v)}
+          style={{ ...btnNeutral, fontSize: 12, padding: '0.4rem 0.75rem', flexShrink: 0 }}
+        >
+          {showWhy ? 'Hide' : 'Why this matters'}
+        </button>
+      </div>
+      {showWhy ? (
+        <div
+          style={{
+            fontSize: 13,
+            opacity: 0.88,
+            lineHeight: 1.55,
+            padding: '0.65rem 0.75rem',
+            borderRadius: 8,
+            background: 'rgba(59,130,246,0.08)',
+            border: '1px solid rgba(77,166,255,0.2)',
+          }}
+        >
+          {importance}
+        </div>
+      ) : null}
+      {children}
+    </div>
+  );
+}
 
 function ActionPlanBlock({ actionPlan, cardSoftStyle, compact, bare }) {
   const items = (actionPlan || []).slice(0, compact ? 3 : 6);
@@ -214,6 +261,7 @@ export default function CheckupPanel({
   onGoPlan,
   autoSync = false,
   onAutoCheckup,
+  dimensionCardLayout = false,
 }) {
   const isGuest = !token;
   const [extended, setExtended] = useState(() => loadExtendedProfile(userId, isGuest));
@@ -352,10 +400,179 @@ export default function CheckupPanel({
   const grid = fieldGrid(isMobile);
   const income = isGuest ? guestBudget.income : ledger?.income;
   const expenses = isGuest ? guestBudget.monthlyExpenses : ledger?.totalExpenses;
+  const isDimIncluded = (key) => !(extended.excludedFromScore || []).includes(key);
+
+  const dimensionFormCards = dimensionCardLayout ? (
+    <>
+      <DimensionCard
+        title="Budget"
+        importance={DIMENSION_IMPORTANCE.budget}
+        included={isDimIncluded('budget')}
+        onToggleInclude={() => toggleScoreDimension('budget')}
+        cardStyle={cardStyle}
+        btnNeutral={btnNeutral}
+        scoreLine={dimScoreLine(result, 'budget')}
+      >
+        {isGuest ? (
+          <div style={grid}>
+            <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+              Monthly income ($)
+              <input type="number" value={guestBudget.income} onChange={(e) => setGuestBudget((p) => ({ ...p, income: e.target.value }))} style={inputStyle} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+              Monthly expenses ($)
+              <input type="number" value={guestBudget.monthlyExpenses} onChange={(e) => setGuestBudget((p) => ({ ...p, monthlyExpenses: e.target.value }))} style={inputStyle} />
+            </label>
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, opacity: 0.88, lineHeight: 1.5 }}>
+            Income and spending categories are entered in <strong>Finances & profile</strong> above.
+            {ledger ? (
+              <div style={{ marginTop: 8 }}>
+                This month: <strong>${Number(income || 0).toLocaleString()}</strong> income ·{' '}
+                <strong>${Number(expenses || 0).toLocaleString()}</strong> expenses
+              </div>
+            ) : null}
+          </div>
+        )}
+      </DimensionCard>
+
+      <DimensionCard
+        title="Savings"
+        importance={DIMENSION_IMPORTANCE.savings}
+        included={isDimIncluded('savings')}
+        onToggleInclude={() => toggleScoreDimension('savings')}
+        cardStyle={cardStyle}
+        btnNeutral={btnNeutral}
+        scoreLine={dimScoreLine(result, 'savings')}
+      >
+        <div style={grid}>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+            Emergency fund ($)
+            <input type="number" value={extended.emergencyFund} onChange={(e) => setField('emergencyFund', e.target.value)} style={inputStyle} />
+          </label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+            Monthly savings ($)
+            <input type="number" value={extended.monthlySavings} onChange={(e) => setField('monthlySavings', e.target.value)} style={inputStyle} />
+          </label>
+        </div>
+      </DimensionCard>
+
+      <DimensionCard
+        title="Debt"
+        importance={DIMENSION_IMPORTANCE.debt}
+        included={isDimIncluded('debt')}
+        onToggleInclude={() => toggleScoreDimension('debt')}
+        cardStyle={cardStyle}
+        btnNeutral={btnNeutral}
+        scoreLine={dimScoreLine(result, 'debt')}
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button type="button" onClick={addDebt} style={{ ...btnNeutral, fontSize: 12, padding: '0.3rem 0.6rem' }}>
+            + Add debt
+          </button>
+        </div>
+        {(extended.debts || []).length ? (
+          (extended.debts || []).map((d, i) => (
+            <div key={`debt-${i}`} style={{ ...grid, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
+              <input placeholder="Name" value={d.name} onChange={(e) => setDebt(i, 'name', e.target.value)} style={inputStyle} />
+              <input type="number" placeholder="Balance" value={d.balance} onChange={(e) => setDebt(i, 'balance', e.target.value)} style={inputStyle} />
+              <input type="number" placeholder="Min payment" value={d.minPayment} onChange={(e) => setDebt(i, 'minPayment', e.target.value)} style={inputStyle} />
+              <input type="number" placeholder="APR %" value={d.apr} onChange={(e) => setDebt(i, 'apr', e.target.value)} style={inputStyle} />
+            </div>
+          ))
+        ) : (
+          <div style={{ fontSize: 13, opacity: 0.75 }}>No debts listed — add one if you carry balances.</div>
+        )}
+      </DimensionCard>
+
+      <DimensionCard
+        title="Investments"
+        importance={DIMENSION_IMPORTANCE.investments}
+        included={isDimIncluded('investments')}
+        onToggleInclude={() => toggleScoreDimension('investments')}
+        cardStyle={cardStyle}
+        btnNeutral={btnNeutral}
+        scoreLine={dimScoreLine(result, 'investments')}
+      >
+        <div style={grid}>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+            Portfolio ($)
+            <input type="number" value={extended.investmentTotal} onChange={(e) => setField('investmentTotal', e.target.value)} style={inputStyle} />
+          </label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+            Fees %/yr
+            <input type="number" step="0.01" value={extended.feePct} onChange={(e) => setField('feePct', e.target.value)} style={inputStyle} />
+          </label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Stocks %<input type="number" value={extended.stockPct} onChange={(e) => setField('stockPct', e.target.value)} style={inputStyle} /></label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Bonds %<input type="number" value={extended.bondPct} onChange={(e) => setField('bondPct', e.target.value)} style={inputStyle} /></label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Intl %<input type="number" value={extended.internationalPct} onChange={(e) => setField('internationalPct', e.target.value)} style={inputStyle} /></label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Cash %<input type="number" value={extended.cashPct} onChange={(e) => setField('cashPct', e.target.value)} style={inputStyle} /></label>
+        </div>
+      </DimensionCard>
+
+      <DimensionCard
+        title="Insurance"
+        importance={DIMENSION_IMPORTANCE.insurance}
+        included={isDimIncluded('insurance')}
+        onToggleInclude={() => toggleScoreDimension('insurance')}
+        cardStyle={cardStyle}
+        btnNeutral={btnNeutral}
+        scoreLine={dimScoreLine(result, 'insurance')}
+      >
+        <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="checkbox" checked={extended.hasLifeInsurance} onChange={(e) => setField('hasLifeInsurance', e.target.checked)} />
+            Life insurance
+          </label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="checkbox" checked={extended.hasDisabilityInsurance} onChange={(e) => setField('hasDisabilityInsurance', e.target.checked)} />
+            Disability insurance
+          </label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="checkbox" checked={extended.hasLiabilityInsurance} onChange={(e) => setField('hasLiabilityInsurance', e.target.checked)} />
+            Umbrella liability
+          </label>
+        </div>
+      </DimensionCard>
+
+      <DimensionCard
+        title="Retirement"
+        importance={DIMENSION_IMPORTANCE.retirement}
+        included={isDimIncluded('retirement')}
+        onToggleInclude={() => toggleScoreDimension('retirement')}
+        cardStyle={cardStyle}
+        btnNeutral={btnNeutral}
+        scoreLine={dimScoreLine(result, 'retirement')}
+      >
+        <div style={grid}>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Age<input type="number" value={extended.age} onChange={(e) => setField('age', e.target.value)} style={inputStyle} /></label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Retire at<input type="number" value={extended.targetRetirementAge} onChange={(e) => setField('targetRetirementAge', e.target.value)} style={inputStyle} /></label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Retirement $ saved<input type="number" value={extended.retirementBalance} onChange={(e) => setField('retirementBalance', e.target.value)} style={inputStyle} /></label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Monthly 401k/IRA<input type="number" value={extended.monthlyRetirementContribution} onChange={(e) => setField('monthlyRetirementContribution', e.target.value)} style={inputStyle} /></label>
+        </div>
+      </DimensionCard>
+
+      {autoSync && busy ? (
+        <div style={{ fontSize: 13, opacity: 0.75 }}>Updating score…</div>
+      ) : null}
+      {!autoSync ? (
+        <button type="button" onClick={() => runCheckup(false)} disabled={busy} style={btnPrimary}>
+          {busy ? 'Calculating score…' : isGuest ? 'Get my score' : 'Save profile & update score'}
+        </button>
+      ) : null}
+    </>
+  ) : null;
 
   return (
-    <div id="checkup-panel" style={{ ...(cardStyle || {}), display: 'grid', gap: 14 }}>
+    <div
+      id="checkup-panel"
+      style={dimensionCardLayout ? { display: 'grid', gap: 16 } : { ...(cardStyle || {}), display: 'grid', gap: 14 }}
+    >
       {showForm ? (
+        dimensionCardLayout ? (
+          dimensionFormCards
+        ) : (
         <>
           <div>
             <h2 style={{ margin: '0 0 6px' }}>{isGuest ? 'Quick financial checkup' : 'Debt, savings, investments & insurance'}</h2>
@@ -495,6 +712,7 @@ export default function CheckupPanel({
             </button>
           ) : null}
         </>
+        )
       ) : null}
 
       {err ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{err}</div> : null}

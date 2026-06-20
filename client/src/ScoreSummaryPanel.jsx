@@ -26,11 +26,12 @@ export default function ScoreSummaryPanel({
   testBusy,
   onSave,
   onTest,
+  bare = false,
 }) {
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  return (
-    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', display: 'grid', gap: 12 }}>
+  const content = (
+    <>
       <div>
         <div style={{ fontWeight: 800, fontSize: 16 }}>Email score summaries</div>
         <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.85, lineHeight: 1.5, maxWidth: 560 }}>
@@ -117,6 +118,16 @@ export default function ScoreSummaryPanel({
           Preview ({digestPreview.month}): score data uses your latest saved checkup · income ${Number(digestPreview.income || 0).toLocaleString()} · expenses ${Number(digestPreview.totalExpenses || 0).toLocaleString()}
         </div>
       ) : null}
+    </>
+  );
+
+  if (bare) {
+    return <div style={{ display: 'grid', gap: 12 }}>{content}</div>;
+  }
+
+  return (
+    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', display: 'grid', gap: 12 }}>
+      {content}
     </div>
   );
 }

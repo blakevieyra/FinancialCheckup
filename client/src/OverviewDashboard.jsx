@@ -81,22 +81,17 @@ export default function OverviewDashboard({
       : '1fr 1fr';
 
   const scoreColumn = (
-    <ScoreHero
-      result={checkupResult}
-      income={income}
-      totalExpenses={totalExpenses}
-      budgetGrade={budgetGrade}
-      isMobile={isMobile}
-      cardSoftStyle={cardSoftStyle}
-      checkupBusy={checkupBusy}
-      onGoFinances={onGoFinances}
-    />
-  );
-
-  const sideColumn = (
-    <div style={{ display: 'grid', gap: 12, minWidth: 0, alignContent: 'start' }}>
-      <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
-
+    <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
+      <ScoreHero
+        result={checkupResult}
+        income={income}
+        totalExpenses={totalExpenses}
+        budgetGrade={budgetGrade}
+        isMobile={isMobile}
+        cardSoftStyle={cardSoftStyle}
+        checkupBusy={checkupBusy}
+        onGoFinances={onGoFinances}
+      />
       <GuidePanel
         checkupResult={checkupResult}
         primaryGoal={primaryGoal}
@@ -105,10 +100,16 @@ export default function OverviewDashboard({
         btnNeutral={btnNeutral}
         onNavigate={onGuideNavigate}
       />
+    </div>
+  );
 
+  const sideColumn = (
+    <div style={{ display: 'grid', gap: 12, minWidth: 0, alignContent: 'start' }}>
       {userXp != null ? (
         <BadgeRewardsPanel userXp={userXp} cardSoftStyle={cardSoftStyle} />
       ) : null}
+
+      <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr', gap: 10 }}>
         <StatTile label="Savings rate" value={`${savingsRate.toFixed(1)}%`} cardSoftStyle={cardSoftStyle} />
@@ -144,7 +145,7 @@ export default function OverviewDashboard({
           </>
         ) : (
           <>
-            <div style={{ minWidth: 0 }}>{scoreColumn}</div>
+            {scoreColumn}
             {sideColumn}
           </>
         )}
