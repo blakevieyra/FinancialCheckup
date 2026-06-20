@@ -6,15 +6,7 @@ import PrioritiesPanel from './PrioritiesPanel';
 import RecommendationTimeline from './RecommendationTimeline';
 import ExpandablePanel from './ExpandablePanel';
 import BadgeRewardsPanel from './BadgeRewardsPanel';
-
-function StatTile({ label, value, cardSoftStyle, valueColor }) {
-  return (
-    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', minHeight: 72 }}>
-      <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: 22, marginTop: 6, lineHeight: 1.2, color: valueColor }}>{value}</div>
-    </div>
-  );
-}
+import { goalLabel } from './goalResources';
 
 function LedgerSnapshot({ income, totalExpenses, cardSoftStyle }) {
   const inc = Number(income) || 0;
@@ -53,6 +45,42 @@ function LedgerSnapshot({ income, totalExpenses, cardSoftStyle }) {
   );
 }
 
+function GoalCard({ primaryGoal, cardSoftStyle }) {
+  if (!primaryGoal) return null;
+  return (
+    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem' }}>
+      <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Your goal</div>
+      <div style={{ fontWeight: 800, fontSize: 18, marginTop: 6, lineHeight: 1.3 }}>{goalLabel(primaryGoal)}</div>
+    </div>
+  );
+}
+
+function ProfileSnapshot({ summary, cardSoftStyle }) {
+  const fmt = (n) => `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const insuranceLabel =
+    summary.insuranceCount >= 3 ? 'Full coverage' : summary.insuranceCount > 0 ? `${summary.insuranceCount}/3 types` : 'None set';
+
+  const rows = [
+    { label: 'Total debt', value: fmt(summary.totalDebt), color: summary.totalDebt > 0 ? '#fca5a5' : '#94a3b8' },
+    { label: 'Emergency fund', value: fmt(summary.emergencyFund), color: summary.emergencyFund > 0 ? '#86efac' : '#94a3b8' },
+    { label: 'Investments', value: fmt(summary.investmentTotal), color: summary.investmentTotal > 0 ? '#93c5fd' : '#94a3b8' },
+    { label: 'Retirement', value: fmt(summary.retirementBalance), color: summary.retirementBalance > 0 ? '#c4b5fd' : '#94a3b8' },
+    { label: 'Insurance', value: insuranceLabel, color: summary.insuranceCount >= 3 ? '#fde68a' : summary.insuranceCount > 0 ? '#fbbf24' : '#94a3b8' },
+  ];
+
+  return (
+    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', display: 'grid', gap: 8 }}>
+      <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Profile snapshot</div>
+      {rows.map((row) => (
+        <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+          <span style={{ fontSize: 13, opacity: 0.75 }}>{row.label}</span>
+          <span style={{ fontWeight: 800, fontSize: 15, color: row.color, textAlign: 'right' }}>{row.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function OverviewDashboard({
   isMobile,
   isDesktop,
@@ -69,9 +97,7 @@ export default function OverviewDashboard({
   onGoProgress,
   onGuideNavigate,
   primaryGoal,
-  savingsRate,
-  trajectory,
-  topCategory,
+  profileSummary,
   userXp,
 }) {
   const gridOverview = isMobile
@@ -80,26 +106,32 @@ export default function OverviewDashboard({
       ? 'minmax(0, 1.15fr) minmax(300px, 420px)'
       : '1fr 1fr';
 
+  const contentMaxWidth = isDesktop ? 520 : '100%';
+
   const scoreColumn = (
-    <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
-      <ScoreHero
-        result={checkupResult}
-        income={income}
-        totalExpenses={totalExpenses}
-        budgetGrade={budgetGrade}
-        isMobile={isMobile}
-        cardSoftStyle={cardSoftStyle}
-        checkupBusy={checkupBusy}
-        onGoFinances={onGoFinances}
-      />
-      <GuidePanel
-        checkupResult={checkupResult}
-        primaryGoal={primaryGoal}
-        cardSoftStyle={cardSoftStyle}
-        btnPrimary={btnPrimary}
-        btnNeutral={btnNeutral}
-        onNavigate={onGuideNavigate}
-      />
+    <div style={{ display: 'grid', gap: 16, minWidth: 0, justifyItems: 'center' }}>
+      <div style={{ width: '100%', maxWidth: contentMaxWidth }}>
+        <ScoreHero
+          result={checkupResult}
+          income={income}
+          totalExpenses={totalExpenses}
+          budgetGrade={budgetGrade}
+          isMobile={isMobile}
+          cardSoftStyle={cardSoftStyle}
+          checkupBusy={checkupBusy}
+          onGoFinances={onGoFinances}
+        />
+      </div>
+      <div style={{ width: '100%', maxWidth: contentMaxWidth }}>
+        <GuidePanel
+          checkupResult={checkupResult}
+          primaryGoal={primaryGoal}
+          cardSoftStyle={cardSoftStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          onNavigate={onGuideNavigate}
+        />
+      </div>
     </div>
   );
 
@@ -109,20 +141,11 @@ export default function OverviewDashboard({
         <BadgeRewardsPanel userXp={userXp} cardSoftStyle={cardSoftStyle} />
       ) : null}
 
+      <GoalCard primaryGoal={primaryGoal} cardSoftStyle={cardSoftStyle} />
+
       <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr', gap: 10 }}>
-        <StatTile label="Savings rate" value={`${savingsRate.toFixed(1)}%`} cardSoftStyle={cardSoftStyle} />
-        {!isMobile ? (
-          <StatTile label="Top category" value={topCategory || 'N/A'} cardSoftStyle={cardSoftStyle} />
-        ) : null}
-      </div>
-      {isMobile ? (
-        <StatTile label="Top category" value={topCategory || 'N/A'} cardSoftStyle={cardSoftStyle} />
-      ) : null}
-      {trajectory ? (
-        <StatTile label="Trajectory" value={trajectory} cardSoftStyle={cardSoftStyle} />
-      ) : null}
+      {profileSummary ? <ProfileSnapshot summary={profileSummary} cardSoftStyle={cardSoftStyle} /> : null}
 
       <div style={{ display: 'grid', gap: 8 }}>
         <button type="button" onClick={onGoFinances} style={{ ...btnNeutral, width: '100%', textAlign: 'left' }}>
@@ -138,17 +161,8 @@ export default function OverviewDashboard({
   return (
     <div style={{ display: 'grid', gap: isDesktop ? 24 : 18, width: '100%' }}>
       <div style={{ display: 'grid', gridTemplateColumns: gridOverview, gap: isDesktop ? 20 : 16, alignItems: 'start' }}>
-        {isMobile ? (
-          <>
-            {scoreColumn}
-            {sideColumn}
-          </>
-        ) : (
-          <>
-            {scoreColumn}
-            {sideColumn}
-          </>
-        )}
+        {scoreColumn}
+        {sideColumn}
       </div>
 
       {checkupResult?.actionPlan?.length ? (

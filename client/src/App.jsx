@@ -20,6 +20,7 @@ import {
   getStoredUserId,
   persistAuthSession,
   extendedStorageKey,
+  loadExtendedProfile,
 } from './userStorage';
 import { awardXp, loadXp, saveXp, xpProgressLabel } from './progression';
 import { validateRegisterForm } from './authValidation';
@@ -1242,6 +1243,23 @@ export default function App() {
     return (savingsAmount / inc) * 100;
   }, [income, savingsAmount]);
 
+  const profileSummary = useMemo(() => {
+    const ext = loadExtendedProfile(userId, !token);
+    const totalDebt = (ext.debts || []).reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
+    const insuranceCount = [
+      ext.hasLifeInsurance,
+      ext.hasDisabilityInsurance,
+      ext.hasLiabilityInsurance,
+    ].filter(Boolean).length;
+    return {
+      totalDebt,
+      emergencyFund: Number(ext.emergencyFund) || 0,
+      investmentTotal: Number(ext.investmentTotal) || 0,
+      retirementBalance: Number(ext.retirementBalance) || 0,
+      insuranceCount,
+    };
+  }, [userId, token, checkupResult]);
+
   const monthPieData = useMemo(() => {
     // Use top categories only; otherwise pie gets unreadable.
     const rows = expenses
@@ -2242,9 +2260,7 @@ export default function App() {
             onGoProgress={() => setActiveSection('progress')}
             onGuideNavigate={handleGuideNavigate}
             primaryGoal={primaryGoal}
-            savingsRate={savingsRate}
-            trajectory={trendsData?.improvement?.direction}
-            topCategory={topCategory?.category}
+            profileSummary={profileSummary}
             userXp={userXp}
           />
         )}

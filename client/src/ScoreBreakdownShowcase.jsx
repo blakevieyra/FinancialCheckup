@@ -102,7 +102,15 @@ export default function ScoreBreakdownShowcase({
         width: '100%',
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          justifyContent: large ? 'center' : 'space-between',
+          alignItems: 'flex-start',
+        }}
+      >
         <span
           style={{
             display: 'inline-flex',
@@ -130,7 +138,7 @@ export default function ScoreBreakdownShowcase({
         ) : null}
       </div>
 
-      <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
+      <div style={{ textAlign: large || isMobile ? 'center' : 'left' }}>
         <div style={{ fontSize: 11, opacity: 0.65, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           Your financial score
         </div>

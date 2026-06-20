@@ -39,10 +39,8 @@ export default function ScoreHero({
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       {checkupBusy ? (
-        <div style={{ fontSize: 12, color: '#93c5fd', opacity: 0.9 }}>Recalculating score…</div>
-      ) : (
-        <div style={{ fontSize: 12, opacity: 0.65 }}>Live score — updates as you edit Finances</div>
-      )}
+        <div style={{ fontSize: 12, color: '#93c5fd', opacity: 0.9, textAlign: 'center' }}>Recalculating score…</div>
+      ) : null}
       <ScoreBreakdownShowcase
         overallScore={result.overallScore}
         headline={result.headline}
