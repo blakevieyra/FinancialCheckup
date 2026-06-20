@@ -374,10 +374,6 @@ export async function createCheckoutSession(token, plan, options = {}) {
   });
 }
 
-export async function startWelcomeTrial(token) {
-  return apiFetch('/api/billing/welcome-trial', { method: 'POST', token, body: {} });
-}
-
 export async function createBillingPortalSession(token) {
   return apiFetch('/api/billing/portal', { method: 'POST', token, body: {} });
 }

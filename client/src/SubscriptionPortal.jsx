@@ -165,7 +165,7 @@ export default function SubscriptionPortal({
           Your account, plan & subscription
         </h2>
         <p style={{ margin: 0, opacity: 0.88, fontSize: 15, lineHeight: 1.5, maxWidth: 640 }}>
-          Start free — during setup you can pick a 7-day Pro trial (no card), subscribe, or stay on Free.
+          Start free — during setup pick a Stripe 7-day Pro trial, subscribe, or stay on Free.
           Upgrade anytime from Account — same plans as{' '}
           <a href="https://operone2i.com/financialcheckup#pricing" target="_blank" rel="noreferrer" style={{ color: '#93c5fd' }}>
             financialcheckup.com
@@ -179,7 +179,7 @@ export default function SubscriptionPortal({
           {billingMsg}
         </div>
       ) : null}
-      {subscription?.welcomeTrial && subscription?.trialDaysRemaining != null ? (
+      {subscription?.stripeTrial && subscription?.trialDaysRemaining != null ? (
         <div
           style={{
             ...cardSoftStyle,
@@ -192,7 +192,7 @@ export default function SubscriptionPortal({
         >
           <strong>Pro trial active</strong> — {subscription.trialDaysRemaining} day
           {subscription.trialDaysRemaining === 1 ? '' : 's'} left (through {formatDate(subscription.currentPeriodEnd)}).
-          {' '}Subscribe below before it ends to keep unlimited Pro access.
+          {' '}After the trial, Stripe bills $9.99/mo unless you cancel in the billing portal.
         </div>
       ) : null}
       {billingErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{billingErr}</div> : null}

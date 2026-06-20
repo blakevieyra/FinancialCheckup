@@ -5,6 +5,9 @@ const STRIPE_PRICES = {
   annual: process.env.STRIPE_PRICE_ANNUAL || 'price_1TZwxo1HZuIni9E76TvK70yS',
 };
 
+/** Stripe Trial Offer (to_xxx) — Subscription API only; not supported in Checkout. */
+const STRIPE_TRIAL_OFFER = process.env.STRIPE_TRIAL_OFFER || 'to_1TkD071HZuIni9E78QjISlD2';
+
 const FREE_FEATURES = {
   money: true,
   profile: true,
@@ -43,16 +46,14 @@ function hasFeature(tier, featureKey) {
 }
 
 function tierLabel(tier, subscription) {
-  if (tier === 'pro' && subscription?.status === 'trialing') {
-    if (subscription?.plan === 'trial') return 'Pro trial';
-    return 'Pro (trial)';
-  }
+  if (tier === 'pro' && subscription?.status === 'trialing') return 'Pro trial';
   if (tier === 'pro') return 'Pro';
   return 'Free';
 }
 
 module.exports = {
   STRIPE_PRICES,
+  STRIPE_TRIAL_OFFER,
   FREE_FEATURES,
   PRO_FEATURES,
   resolveTier,

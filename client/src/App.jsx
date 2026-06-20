@@ -476,8 +476,12 @@ export default function App() {
     setBillingBusy(true);
     setBillingErr('');
     try {
-      const { url } = await api.createCheckoutSession(token, plan);
-      api.openExternalUrl(url);
+      const result = await api.createCheckoutSession(token, plan);
+      if (result.url) {
+        api.openExternalUrl(result.url);
+      } else if (plan === 'trial') {
+        await loadSubscription();
+      }
     } catch (e) {
       setBillingErr(e.message);
     } finally {
@@ -1767,7 +1771,7 @@ export default function App() {
               <span>
                 {' '}
                 · Plan <strong>{subscription.tierLabel}</strong>
-                {subscription.welcomeTrial && subscription.trialDaysRemaining != null ? (
+                {subscription.stripeTrial && subscription.trialDaysRemaining != null ? (
                   <> · <strong>{subscription.trialDaysRemaining}d</strong> trial left</>
                 ) : null}
               </span>

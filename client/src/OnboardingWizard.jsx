@@ -25,8 +25,8 @@ const PLAN_OPTIONS = [
     id: 'trial',
     title: '7-day Pro trial',
     price: 'Free',
-    period: ' · no card',
-    desc: 'Full AI, exports & projections for 7 days',
+    period: ' · 7 days',
+    desc: 'Stripe-managed trial — full Pro, then $9.99/mo unless you cancel',
     accent: '#4da6ff',
   },
   {
@@ -91,8 +91,12 @@ export default function OnboardingWizard({
     setBusy(true);
     try {
       if (choice === 'trial') {
+        if (!billingConfigured) {
+          setErr('Billing is not configured yet. Choose continue free or try again later.');
+          return;
+        }
         await persistOnboardingData(payload);
-        await api.startWelcomeTrial(token);
+        await api.createCheckoutSession(token, 'trial', { fromOnboarding: true });
         const snapshot = {
           ...data,
           income: Number(data.income) || 0,

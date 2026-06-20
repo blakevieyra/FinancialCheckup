@@ -2,12 +2,11 @@ const router = require('express').Router();
 const Stripe = require('stripe');
 const { verifyToken } = require('./auth');
 const { dbGet, dbRun } = require('./db');
-const { resolveTier, featuresForTier, tierLabel, STRIPE_PRICES } = require('./subscriptionTiers');
+const { resolveTier, featuresForTier, tierLabel, STRIPE_PRICES, STRIPE_TRIAL_OFFER } = require('./subscriptionTiers');
 const {
   expireWelcomeTrialIfNeeded,
   trialDaysRemaining,
-  isWelcomeTrial,
-  grantNewUserProTrial,
+  isStripeTrialing,
   TRIAL_DAYS,
 } = require('./subscriptionService');
 const { sendSubscribedEmail, sendDeactivatedEmail } = require('./transactionalEmail');
@@ -68,7 +67,7 @@ function fieldsFromStripeSub(sub) {
 async function buildStatusJson(userId) {
   const row = await expireWelcomeTrialIfNeeded(userId);
   const tier = resolveTier(row);
-  const welcomeTrial = isWelcomeTrial(row);
+  const stripeTrial = isStripeTrialing(row);
   const base = {
     tier,
     tierLabel: tierLabel(tier, row),
@@ -78,9 +77,9 @@ async function buildStatusJson(userId) {
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
     hasStripeCustomer: Boolean(row?.stripe_customer_id),
     features: featuresForTier(tier),
-    welcomeTrial,
+    stripeTrial,
     trialDaysRemaining: row?.status === 'trialing' ? trialDaysRemaining(row?.current_period_end) : null,
-    trialDaysTotal: welcomeTrial ? TRIAL_DAYS : null,
+    trialDaysTotal: stripeTrial ? TRIAL_DAYS : null,
     prices: {
       monthly: STRIPE_PRICES.monthly,
       annual: STRIPE_PRICES.annual,
@@ -130,6 +129,62 @@ async function buildStatusJson(userId) {
 
 function billingReturnBase(clientUrl) {
   return `${clientUrl}/?section=plan`;
+}
+
+async function ensureStripeCustomer(userId, username) {
+  let row = await dbGet('SELECT stripe_customer_id FROM subscriptions WHERE user_id = ?', [userId]);
+  if (row?.stripe_customer_id) return row.stripe_customer_id;
+  const customer = await stripe.customers.create({
+    metadata: { userId: String(userId), username: username || '' },
+  });
+  await upsertSubscription(userId, { stripe_customer_id: customer.id, status: 'free', plan: 'free' });
+  return customer.id;
+}
+
+/** Stripe Trial Offers require the Subscription API — Checkout cannot attach trial_offer. */
+async function createStripeTrialSubscription(userId, username) {
+  const customerId = await ensureStripeCustomer(userId, username);
+  const existing = await dbGet(
+    'SELECT stripe_subscription_id, status FROM subscriptions WHERE user_id = ?',
+    [userId],
+  );
+  if (existing?.stripe_subscription_id && (existing.status === 'active' || existing.status === 'trialing')) {
+    const err = new Error('You already have an active subscription or trial.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const sub = await stripe.subscriptions.create({
+    customer: customerId,
+    items: [{
+      price: STRIPE_PRICES.monthly,
+      current_trial: { trial_offer: STRIPE_TRIAL_OFFER },
+    }],
+    metadata: { userId: String(userId), plan: 'monthly' },
+  });
+
+  await upsertSubscription(userId, {
+    stripe_customer_id: customerId,
+    ...fieldsFromStripeSub(sub),
+  });
+  return sub;
+}
+
+function buildCheckoutSessionParams({ customerId, userId, plan, priceId, returnBase, onboardingQs }) {
+  const metadata = { userId: String(userId), plan };
+  const subscriptionData = { metadata: { userId: String(userId), plan } };
+  const lineItem = { price: priceId, quantity: 1 };
+
+  return {
+    mode: 'subscription',
+    customer: customerId,
+    client_reference_id: String(userId),
+    line_items: [lineItem],
+    success_url: `${returnBase}&billing=success${onboardingQs}`,
+    cancel_url: `${returnBase}&billing=canceled${onboardingQs}`,
+    metadata,
+    subscription_data: subscriptionData,
+  };
 }
 
 async function handleWebhookEvent(event) {
@@ -214,26 +269,6 @@ router.get('/status', async (req, res) => {
   }
 });
 
-router.post('/welcome-trial', async (req, res) => {
-  try {
-    const row = await expireWelcomeTrialIfNeeded(req.user.id);
-    if (row?.stripe_subscription_id || row?.status === 'active') {
-      return res.status(400).json({ error: 'You already have a paid subscription.' });
-    }
-    if (isWelcomeTrial(row) && trialDaysRemaining(row?.current_period_end) > 0) {
-      return res.json(await buildStatusJson(req.user.id));
-    }
-    const granted = await grantNewUserProTrial(req.user.id);
-    if (!granted) {
-      return res.status(400).json({ error: 'Could not start trial — subscribe from Account instead.' });
-    }
-    res.json(await buildStatusJson(req.user.id));
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error.' });
-  }
-});
-
 router.post('/sync', async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Billing not configured on server.' });
   try {
@@ -279,14 +314,11 @@ router.post('/sync', async (req, res) => {
         cancel_at_period_end: sub.cancel_at_period_end ? 1 : 0,
       });
     } else {
-      const current = await expireWelcomeTrialIfNeeded(req.user.id);
-      if (!(isWelcomeTrial(current) && trialDaysRemaining(current?.current_period_end) > 0)) {
-        await upsertSubscription(req.user.id, {
-          status: 'free',
-          plan: 'free',
-          cancel_at_period_end: 0,
-        });
-      }
+      await upsertSubscription(req.user.id, {
+        status: 'free',
+        plan: 'free',
+        cancel_at_period_end: 0,
+      });
     }
 
     res.json(await buildStatusJson(req.user.id));
@@ -299,39 +331,34 @@ router.post('/sync', async (req, res) => {
 router.post('/checkout', async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Billing not configured on server.' });
   try {
-    const plan = req.body?.plan === 'annual' ? 'annual' : 'monthly';
-    const priceId = STRIPE_PRICES[plan];
+    const rawPlan = String(req.body?.plan || 'monthly');
+    const plan = rawPlan === 'annual' ? 'annual' : rawPlan === 'trial' ? 'trial' : 'monthly';
     const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
-
-    let row = await dbGet('SELECT stripe_customer_id FROM subscriptions WHERE user_id = ?', [req.user.id]);
-    let customerId = row?.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        metadata: { userId: String(req.user.id), username: req.user.username || '' },
-      });
-      customerId = customer.id;
-      await upsertSubscription(req.user.id, { stripe_customer_id: customerId, status: 'free', plan: 'free' });
-    }
-
-    const returnBase = billingReturnBase(clientUrl);
     const fromOnboarding = Boolean(req.body?.fromOnboarding);
     const onboardingQs = fromOnboarding ? '&onboarding=1' : '';
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer: customerId,
-      client_reference_id: String(req.user.id),
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${returnBase}&billing=success${onboardingQs}`,
-      cancel_url: `${returnBase}&billing=canceled${onboardingQs}`,
-      metadata: { userId: String(req.user.id), plan },
-      subscription_data: {
-        metadata: { userId: String(req.user.id), plan },
-      },
-    });
+    const returnBase = billingReturnBase(clientUrl);
+
+    if (plan === 'trial') {
+      await createStripeTrialSubscription(req.user.id, req.user.username);
+      return res.json({ ok: true, plan: 'trial', ...(await buildStatusJson(req.user.id)) });
+    }
+
+    const priceId = STRIPE_PRICES[plan];
+    const customerId = await ensureStripeCustomer(req.user.id, req.user.username);
+    const session = await stripe.checkout.sessions.create(
+      buildCheckoutSessionParams({
+        customerId,
+        userId: req.user.id,
+        plan,
+        priceId,
+        returnBase,
+        onboardingQs,
+      }),
+    );
     res.json({ url: session.url });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: e.message || 'Checkout failed.' });
+    res.status(e.statusCode || 500).json({ error: e.message || 'Checkout failed.' });
   }
 });
 
