@@ -7,11 +7,48 @@ import RecommendationTimeline from './RecommendationTimeline';
 import ExpandablePanel from './ExpandablePanel';
 import BadgeRewardsPanel from './BadgeRewardsPanel';
 
-function StatTile({ label, value, cardSoftStyle }) {
+function StatTile({ label, value, cardSoftStyle, valueColor }) {
   return (
-    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', minHeight: 88 }}>
+    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', minHeight: 72 }}>
       <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: 22, marginTop: 6, lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontWeight: 800, fontSize: 22, marginTop: 6, lineHeight: 1.2, color: valueColor }}>{value}</div>
+    </div>
+  );
+}
+
+function LedgerSnapshot({ income, totalExpenses, cardSoftStyle }) {
+  const inc = Number(income) || 0;
+  const exp = Number(totalExpenses) || 0;
+  const net = inc - exp;
+  const isDeficit = net < 0;
+  const fmt = (n) => `$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  return (
+    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', display: 'grid', gap: 10 }}>
+      <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>This month</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 11, opacity: 0.65 }}>Income</div>
+          <div style={{ fontWeight: 800, fontSize: 20, marginTop: 4, color: '#86efac' }}>{fmt(inc)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, opacity: 0.65 }}>Expenses</div>
+          <div style={{ fontWeight: 800, fontSize: 20, marginTop: 4, color: '#fca5a5' }}>{fmt(exp)}</div>
+        </div>
+      </div>
+      <div style={{ paddingTop: 8, borderTop: '1px solid rgba(148,163,184,0.15)' }}>
+        <div style={{ fontSize: 11, opacity: 0.65 }}>{isDeficit ? 'Deficit' : net > 0 ? 'Surplus' : 'Even'}</div>
+        <div
+          style={{
+            fontWeight: 800,
+            fontSize: 24,
+            marginTop: 4,
+            color: isDeficit ? '#fca5a5' : net > 0 ? '#86efac' : '#94a3b8',
+          }}
+        >
+          {isDeficit ? `−${fmt(net)}` : fmt(net)}
+        </div>
+      </div>
     </div>
   );
 }
@@ -32,56 +69,85 @@ export default function OverviewDashboard({
   onGoProgress,
   onGuideNavigate,
   primaryGoal,
-  savingsAmount,
   savingsRate,
   trajectory,
   topCategory,
   userXp,
 }) {
-  const gridOverview = isMobile ? '1fr' : isDesktop ? 'minmax(0, 1fr) minmax(280px, 340px)' : '1fr';
+  const gridOverview = isMobile
+    ? '1fr'
+    : isDesktop
+      ? 'minmax(0, 1.15fr) minmax(300px, 420px)'
+      : '1fr 1fr';
+
+  const scoreColumn = (
+    <ScoreHero
+      result={checkupResult}
+      income={income}
+      totalExpenses={totalExpenses}
+      budgetGrade={budgetGrade}
+      isMobile={isMobile}
+      cardSoftStyle={cardSoftStyle}
+      checkupBusy={checkupBusy}
+      onGoFinances={onGoFinances}
+    />
+  );
+
+  const sideColumn = (
+    <div style={{ display: 'grid', gap: 12, minWidth: 0, alignContent: 'start' }}>
+      <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
+
+      <GuidePanel
+        checkupResult={checkupResult}
+        primaryGoal={primaryGoal}
+        cardSoftStyle={cardSoftStyle}
+        btnPrimary={btnPrimary}
+        btnNeutral={btnNeutral}
+        onNavigate={onGuideNavigate}
+      />
+
+      {userXp != null ? (
+        <BadgeRewardsPanel userXp={userXp} cardSoftStyle={cardSoftStyle} />
+      ) : null}
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr', gap: 10 }}>
+        <StatTile label="Savings rate" value={`${savingsRate.toFixed(1)}%`} cardSoftStyle={cardSoftStyle} />
+        {!isMobile ? (
+          <StatTile label="Top category" value={topCategory || 'N/A'} cardSoftStyle={cardSoftStyle} />
+        ) : null}
+      </div>
+      {isMobile ? (
+        <StatTile label="Top category" value={topCategory || 'N/A'} cardSoftStyle={cardSoftStyle} />
+      ) : null}
+      {trajectory ? (
+        <StatTile label="Trajectory" value={trajectory} cardSoftStyle={cardSoftStyle} />
+      ) : null}
+
+      <div style={{ display: 'grid', gap: 8 }}>
+        <button type="button" onClick={onGoFinances} style={{ ...btnNeutral, width: '100%', textAlign: 'left' }}>
+          Edit finances & profile →
+        </button>
+        <button type="button" onClick={onGoProgress} style={{ ...btnNeutral, width: '100%', textAlign: 'left' }}>
+          History & charts →
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ display: 'grid', gap: isDesktop ? 24 : 18, width: '100%' }}>
       <div style={{ display: 'grid', gridTemplateColumns: gridOverview, gap: isDesktop ? 20 : 16, alignItems: 'start' }}>
-        <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
-          <ScoreHero
-            result={checkupResult}
-            income={income}
-            totalExpenses={totalExpenses}
-            budgetGrade={budgetGrade}
-            isMobile={isMobile}
-            cardSoftStyle={cardSoftStyle}
-            checkupBusy={checkupBusy}
-            onGoFinances={onGoFinances}
-          />
-
-          <GuidePanel
-            checkupResult={checkupResult}
-            primaryGoal={primaryGoal}
-            cardSoftStyle={cardSoftStyle}
-            btnPrimary={btnPrimary}
-            btnNeutral={btnNeutral}
-            onNavigate={onGuideNavigate}
-          />
-        </div>
-
-        <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
-          {userXp != null ? (
-            <BadgeRewardsPanel userXp={userXp} cardSoftStyle={cardSoftStyle} />
-          ) : null}
-          <StatTile label="Net surplus" value={`$${savingsAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} cardSoftStyle={cardSoftStyle} />
-          <StatTile label="Savings rate" value={`${savingsRate.toFixed(1)}%`} cardSoftStyle={cardSoftStyle} />
-          <StatTile label="Trajectory" value={trajectory || '—'} cardSoftStyle={cardSoftStyle} />
-          <StatTile label="Top category" value={topCategory || 'N/A'} cardSoftStyle={cardSoftStyle} />
-          <div style={{ display: 'grid', gap: 8 }}>
-            <button type="button" onClick={onGoFinances} style={{ ...btnNeutral, width: '100%', textAlign: 'left' }}>
-              Edit finances & profile →
-            </button>
-            <button type="button" onClick={onGoProgress} style={{ ...btnNeutral, width: '100%', textAlign: 'left' }}>
-              History & charts →
-            </button>
-          </div>
-        </div>
+        {isMobile ? (
+          <>
+            {scoreColumn}
+            {sideColumn}
+          </>
+        ) : (
+          <>
+            <div style={{ minWidth: 0 }}>{scoreColumn}</div>
+            {sideColumn}
+          </>
+        )}
       </div>
 
       {checkupResult?.actionPlan?.length ? (

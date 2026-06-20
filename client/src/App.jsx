@@ -2242,7 +2242,6 @@ export default function App() {
             onGoProgress={() => setActiveSection('progress')}
             onGuideNavigate={handleGuideNavigate}
             primaryGoal={primaryGoal}
-            savingsAmount={savingsAmount}
             savingsRate={savingsRate}
             trajectory={trendsData?.improvement?.direction}
             topCategory={topCategory?.category}

@@ -1,6 +1,10 @@
 import ExpandablePanel from './ExpandablePanel';
 
 function fmtMoney(n) {
+  return `$${Math.abs(Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+export default function FinancialHistoryPanel({
   incomeHistory,
   expensesHistory,
   checkupHistory,
