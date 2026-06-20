@@ -19,24 +19,49 @@ function dimScoreLine(result, key) {
   return `${Math.round(d.score)}/100 · Grade ${d.grade}`;
 }
 
-function DimensionCard({ title, importance, basics, included, onToggleInclude, cardStyle, btnNeutral, scoreLine, children }) {
+function DimensionCard({
+  title,
+  importance,
+  basics,
+  included,
+  onToggleInclude,
+  cardStyle,
+  btnNeutral,
+  scoreLine,
+  scoreAtBottom = false,
+  footerExtra,
+  children,
+}) {
   const [showWhy, setShowWhy] = useState(false);
+
+  const scoreBlock = (
+    <>
+      {scoreLine ? <div style={{ fontSize: 13, opacity: 0.85 }}>{scoreLine}</div> : null}
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+        <input type="checkbox" checked={included} onChange={onToggleInclude} />
+        Include in overall score
+      </label>
+    </>
+  );
+
   return (
     <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 180 }}>
           <h3 style={{ margin: 0, fontSize: 17 }}>{title}</h3>
-          {scoreLine ? <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>{scoreLine}</div> : null}
+          {!scoreAtBottom && scoreLine ? <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>{scoreLine}</div> : null}
           {basics ? (
             <div style={{ fontSize: 13, opacity: 0.82, lineHeight: 1.5, marginTop: 8, padding: '0.55rem 0.65rem', borderRadius: 8, background: 'rgba(148,163,184,0.08)' }}>
               <strong style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', opacity: 0.75 }}>Basics</strong>
               <div style={{ marginTop: 4 }}>{basics}</div>
             </div>
           ) : null}
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={included} onChange={onToggleInclude} />
-            Include in overall score
-          </label>
+          {!scoreAtBottom ? (
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={included} onChange={onToggleInclude} />
+              Include in overall score
+            </label>
+          ) : null}
         </div>
         <button
           type="button"
@@ -62,6 +87,122 @@ function DimensionCard({ title, importance, basics, included, onToggleInclude, c
         </div>
       ) : null}
       {children}
+      {scoreAtBottom ? (
+        <div
+          style={{
+            paddingTop: 12,
+            borderTop: '1px solid rgba(148,163,184,0.15)',
+            display: 'grid',
+            gap: 10,
+            fontSize: 13,
+            opacity: 0.9,
+          }}
+        >
+          {scoreBlock}
+          {footerExtra}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function BudgetLedgerEditor({
+  editor,
+  cardSoftStyle,
+  inputStyle,
+  btnNeutral,
+  btnPrimary,
+  isMobile,
+  isTablet,
+}) {
+  const expenseGrid = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
+  const {
+    profile,
+    onProfileChange,
+    month,
+    income,
+    onIncomeChange,
+    expenses,
+    onExpenseChange,
+    newCategory,
+    onNewCategoryChange,
+    onAddCategory,
+    onDeleteCategory,
+    catBusy,
+    busy,
+  } = editor;
+
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        {[
+          { id: 'personal', label: 'Personal' },
+          { id: 'business', label: 'Business' },
+        ].map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onProfileChange(p.id)}
+            style={{
+              ...(profile === p.id ? btnPrimary : btnNeutral),
+              padding: '0.45rem 0.9rem',
+              fontWeight: 700,
+              fontSize: 13,
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+        <span style={{ fontSize: 12, opacity: 0.65 }}>Month: {month}</span>
+      </div>
+
+      <label style={{ display: 'grid', gap: 6, fontSize: 14, maxWidth: 320 }}>
+        Monthly income ($)
+        <input type="number" value={income} step="0.01" onChange={(e) => onIncomeChange(e.target.value)} style={inputStyle} />
+      </label>
+
+      <div>
+        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Expenses by category</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <input
+            value={newCategory}
+            onChange={(e) => onNewCategoryChange(e.target.value)}
+            placeholder="Add category"
+            style={{ ...inputStyle, flex: '1 1 160px', minWidth: 140 }}
+            disabled={catBusy}
+          />
+          <button type="button" onClick={onAddCategory} disabled={catBusy || !newCategory.trim()} style={btnNeutral}>
+            Add
+          </button>
+        </div>
+        {expenses?.length ? (
+          <div style={{ display: 'grid', gridTemplateColumns: expenseGrid, gap: 10 }}>
+            {(expenses || []).map((e) => (
+              <div key={e.category} style={{ ...cardSoftStyle, padding: '0.75rem', display: 'grid', gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{e.category}</div>
+                <input
+                  type="number"
+                  value={e.amount}
+                  step="0.01"
+                  onChange={(ev) => onExpenseChange(e.category, ev.target.value)}
+                  style={{ ...inputStyle, width: '100%', padding: 8 }}
+                  aria-label={`${e.category} amount`}
+                />
+                <button
+                  type="button"
+                  onClick={() => onDeleteCategory(e.category)}
+                  disabled={busy}
+                  style={{ ...btnNeutral, fontSize: 12, padding: '0.35rem 0.5rem', justifySelf: 'start' }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ opacity: 0.75, fontSize: 13 }}>Add a category to start tracking spending.</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -268,6 +409,7 @@ export default function CheckupPanel({
   autoSync = false,
   onAutoCheckup,
   dimensionCardLayout = false,
+  ledgerEditor = null,
 }) {
   const isGuest = !token;
   const [extended, setExtended] = useState(() => loadExtendedProfile(userId, isGuest));
@@ -407,6 +549,28 @@ export default function CheckupPanel({
   const income = isGuest ? guestBudget.income : ledger?.income;
   const expenses = isGuest ? guestBudget.monthlyExpenses : ledger?.totalExpenses;
   const isDimIncluded = (key) => !(extended.excludedFromScore || []).includes(key);
+  const inc = Number(income) || 0;
+  const exp = Number(expenses) || 0;
+  const budgetNet = inc - exp;
+  const budgetRatio = inc > 0 ? ((exp / inc) * 100).toFixed(1) : null;
+
+  const budgetFooter = ledgerEditor ? (
+    <div style={{ display: 'grid', gap: 6, lineHeight: 1.5 }}>
+      <div>
+        This month: <strong>${inc.toLocaleString()}</strong> income · <strong>${exp.toLocaleString()}</strong> expenses
+      </div>
+      <div>
+        {budgetNet < 0 ? (
+          <>Deficit: <strong style={{ color: '#fca5a5' }}>${Math.abs(budgetNet).toLocaleString()}</strong></>
+        ) : budgetNet > 0 ? (
+          <>Surplus: <strong style={{ color: '#86efac' }}>${budgetNet.toLocaleString()}</strong></>
+        ) : (
+          <>Even — no surplus or deficit</>
+        )}
+        {budgetRatio != null ? <> · Expense ratio <strong>{budgetRatio}%</strong></> : null}
+      </div>
+    </div>
+  ) : null;
 
   const dimensionFormCards = dimensionCardLayout ? (
     <>
@@ -418,8 +582,20 @@ export default function CheckupPanel({
         cardStyle={cardStyle}
         btnNeutral={btnNeutral}
         scoreLine={dimScoreLine(result, 'budget')}
+        scoreAtBottom={Boolean(ledgerEditor)}
+        footerExtra={budgetFooter}
       >
-        {isGuest ? (
+        {ledgerEditor ? (
+          <BudgetLedgerEditor
+            editor={ledgerEditor}
+            cardSoftStyle={cardSoftStyle}
+            inputStyle={inputStyle}
+            btnNeutral={btnNeutral}
+            btnPrimary={btnPrimary}
+            isMobile={isMobile}
+            isTablet={isTablet}
+          />
+        ) : isGuest ? (
           <div style={grid}>
             <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
               Monthly income ($)
@@ -432,13 +608,7 @@ export default function CheckupPanel({
           </div>
         ) : (
           <div style={{ fontSize: 13, opacity: 0.88, lineHeight: 1.5 }}>
-            Income and spending categories are entered in <strong>Finances & profile</strong> above.
-            {ledger ? (
-              <div style={{ marginTop: 8 }}>
-                This month: <strong>${Number(income || 0).toLocaleString()}</strong> income ·{' '}
-                <strong>${Number(expenses || 0).toLocaleString()}</strong> expenses
-              </div>
-            ) : null}
+            Enter income and spending categories in this card — your score updates automatically.
           </div>
         )}
       </DimensionCard>
