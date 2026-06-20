@@ -14,7 +14,9 @@ const {
   drawSectionTitle,
   drawKeyValueTable,
   drawDataTable,
+  drawStandaloneStatementPage,
   drawLegalDisclosure,
+  stampAllPageFooters,
 } = require('./reportBranding');
 
 router.use(verifyToken);
@@ -352,6 +354,7 @@ router.get('/executive-pdf', requireFeature('exports'), async (req, res) => {
     doc.moveDown(0.6);
     drawLegalDisclosure(doc, { reportType: 'Executive Financial Scorecard' });
 
+    stampAllPageFooters(doc);
     doc.end();
     sendReportEmail(req.user.id, { reportType: 'executive-pdf', month }).catch(() => {});
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
@@ -459,80 +462,145 @@ router.get('/business-docs-pdf', requireFeature('businessDocs'), async (req, res
     const doc = new PDFDocument({ size: 'LETTER', margin: 48, bufferPages: true });
     doc.pipe(res);
 
+    const sharedMeta = [
+      `Report ID: ${ctx.ref}`,
+      `Prepared for: ${ctx.preparedFor}`,
+      `Entity / account: ${user?.username || 'Unknown'}`,
+      `Analysis window: ${windowMonths} months (${docs.incomeStatement.periodStart} to ${docs.incomeStatement.periodEnd})`,
+      `Generated: ${new Date().toISOString().slice(0, 19)} UTC`,
+    ];
+
     drawBrandHeader(doc, {
       documentTitle: 'Financial Statements Package',
       documentSubtitle: `Cash-basis summary · Period ending ${month}`,
-      metaLines: [
-        `Report ID: ${ctx.ref}`,
-        `Prepared for: ${ctx.preparedFor}`,
-        `Entity / account: ${user?.username || 'Unknown'}`,
-        `Analysis window: ${windowMonths} months (${docs.incomeStatement.periodStart} to ${docs.incomeStatement.periodEnd})`,
-        `Generated: ${new Date().toISOString().slice(0, 19)} UTC`,
-      ],
+      metaLines: sharedMeta,
     });
 
     drawSectionTitle(doc, 'Table of contents');
     [
-      '1. Balance Sheet (Statement of Financial Position)',
-      '2. Income Statement (Statement of Operations)',
-      '3. Statement of Cash Flows (Summary)',
+      'Cover & package overview (this page)',
+      '1. Balance Sheet — Statement of Financial Position',
+      '2. Income Statement — Statement of Operations',
+      '3. Statement of Cash Flows',
       '4. Notes to Financial Statements',
       '5. Disclosures & limitations',
     ].forEach((line) => {
       doc.font('Helvetica').fontSize(10).fillColor('#374151').text(line);
-      doc.moveDown(0.1);
+      doc.moveDown(0.12);
     });
-    doc.moveDown(0.6);
-
-    drawSectionTitle(doc, '1. Balance Sheet');
-    doc.font('Helvetica').fontSize(10).fillColor('#374151').text(`As of ${docs.balanceSheet.asOfMonth}`);
-    doc.moveDown(0.35);
-    drawKeyValueTable(doc, [
-      ['ASSETS', ''],
-      ['  Current assets (estimated cash from operations)', money(docs.balanceSheet.assets.currentAssets)],
-      ['  Total assets', money(docs.balanceSheet.assets.totalAssets)],
-      ['', ''],
-      ['LIABILITIES', ''],
-      ['  Current liabilities (estimated)', money(docs.balanceSheet.liabilities.currentLiabilities)],
-      ['  Total liabilities', money(docs.balanceSheet.liabilities.totalLiabilities)],
-      ['', ''],
-      ['EQUITY', ''],
-      ['  Retained earnings (proxy)', money(docs.balanceSheet.equity.retainedEarningsProxy)],
-      ['  Total equity', money(docs.balanceSheet.equity.totalEquity)],
-    ]);
-
-    drawSectionTitle(doc, '2. Income Statement');
-    doc.font('Helvetica').fontSize(10).fillColor('#374151').text(
-      `For the period ${docs.incomeStatement.periodStart} through ${docs.incomeStatement.periodEnd}`,
+    doc.moveDown(0.5);
+    doc.font('Helvetica').fontSize(9).fillColor(BRAND.muted).text(
+      `Each statement following this page is a standalone document prepared by ${BRAND.company} for informational review. `
+      + 'These are cash-basis estimates — not audited or attested financial statements.',
+      { align: 'justify' },
     );
-    doc.moveDown(0.35);
-    drawKeyValueTable(doc, [
-      ['Revenue (total income recorded)', money(docs.incomeStatement.revenue)],
-      ['Operating expenses', money(docs.incomeStatement.operatingExpenses)],
-      ['Net income (loss)', money(docs.incomeStatement.netIncome)],
-      ['Net margin', `${docs.incomeStatement.marginPercent.toFixed(2)}%`],
-    ]);
+    doc.addPage();
 
-    drawSectionTitle(doc, '3. Statement of Cash Flows (Summary)');
-    drawKeyValueTable(doc, [
-      ['Net cash from operations (proxy)', money(docs.cashFlowSummary.operatingCashFlowProxy)],
-      ['Average monthly net cash flow', money(docs.cashFlowSummary.averageMonthlyNetCashFlow)],
-      ['Trend direction', docs.cashFlowSummary.trend === 'up' ? 'Improving' : 'Declining'],
-    ]);
+    drawStandaloneStatementPage(doc, {
+      documentTitle: 'Balance Sheet',
+      documentSubtitle: 'Statement of Financial Position',
+      metaLines: sharedMeta,
+      periodLine: `As of ${docs.balanceSheet.asOfMonth}`,
+      bodySections: [
+        {
+          title: 'Assets',
+          rows: [
+            ['Current assets (estimated cash from operations)', money(docs.balanceSheet.assets.currentAssets)],
+            ['Total assets', money(docs.balanceSheet.assets.totalAssets)],
+          ],
+        },
+        {
+          title: 'Liabilities',
+          rows: [
+            ['Current liabilities (estimated)', money(docs.balanceSheet.liabilities.currentLiabilities)],
+            ['Total liabilities', money(docs.balanceSheet.liabilities.totalLiabilities)],
+          ],
+        },
+        {
+          title: 'Equity',
+          rows: [
+            ['Retained earnings (proxy)', money(docs.balanceSheet.equity.retainedEarningsProxy)],
+            ['Total equity', money(docs.balanceSheet.equity.totalEquity)],
+          ],
+        },
+      ],
+      statementNotes: [
+        'Assets and liabilities are estimated from monthly income less expenses for the reporting period.',
+        'No separate schedules for fixed assets, intangibles, or long-term debt are included.',
+        `Prepared by ${BRAND.company} using ${BRAND.product} ledger data.`,
+      ],
+    });
 
-    drawSectionTitle(doc, '4. Notes to financial statements');
+    drawStandaloneStatementPage(doc, {
+      documentTitle: 'Income Statement',
+      documentSubtitle: 'Statement of Operations',
+      metaLines: sharedMeta,
+      periodLine: `For the period ${docs.incomeStatement.periodStart} through ${docs.incomeStatement.periodEnd}`,
+      bodySections: [
+        {
+          title: 'Operations',
+          rows: [
+            ['Revenue (total income recorded)', money(docs.incomeStatement.revenue)],
+            ['Operating expenses', money(docs.incomeStatement.operatingExpenses)],
+            ['Net income (loss)', money(docs.incomeStatement.netIncome)],
+            ['Net margin', `${docs.incomeStatement.marginPercent.toFixed(2)}%`],
+          ],
+        },
+      ],
+      statementNotes: [
+        'Revenue reflects total income recorded in the analysis window.',
+        'Operating expenses include all categorized outflows in the ledger.',
+        `Prepared by ${BRAND.company} using ${BRAND.product} ledger data.`,
+      ],
+    });
+
+    drawStandaloneStatementPage(doc, {
+      documentTitle: 'Statement of Cash Flows',
+      documentSubtitle: 'Summary — cash from operations (indirect proxy)',
+      metaLines: sharedMeta,
+      periodLine: `For the period ${docs.incomeStatement.periodStart} through ${docs.incomeStatement.periodEnd}`,
+      bodySections: [
+        {
+          title: 'Cash flows from operating activities',
+          rows: [
+            ['Net cash from operations (proxy)', money(docs.cashFlowSummary.operatingCashFlowProxy)],
+            ['Average monthly net cash flow', money(docs.cashFlowSummary.averageMonthlyNetCashFlow)],
+            ['Trend direction', docs.cashFlowSummary.trend === 'up' ? 'Improving' : 'Declining'],
+          ],
+        },
+      ],
+      statementNotes: [
+        'This summary uses net income/expense surplus as a proxy for operating cash flow.',
+        'Investing and financing activity sections are not populated from ledger-only data.',
+        `Prepared by ${BRAND.company} using ${BRAND.product} ledger data.`,
+      ],
+    });
+
+    drawBrandHeader(doc, {
+      documentTitle: 'Notes to Financial Statements',
+      documentSubtitle: `Package period ending ${month}`,
+      metaLines: sharedMeta,
+    });
+    drawSectionTitle(doc, 'Notes');
     (docs.notes || []).forEach((note, i) => {
       doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(`${i + 1}. ${pdfSafeText(note)}`, { align: 'justify' });
       doc.moveDown(0.25);
     });
     doc.font('Helvetica').fontSize(9.5).text(
-      `${(docs.notes?.length || 0) + 1}. Figures are derived from user-entered income and expense ledger data in ${BRAND.product}. No independent verification has been performed.`,
+      `${(docs.notes?.length || 0) + 1}. Figures are derived from user-entered income and expense ledger data in ${BRAND.product}. `
+      + `${BRAND.company} has not performed independent verification.`,
       { align: 'justify' },
     );
-    doc.moveDown(0.5);
+    doc.addPage();
 
+    drawBrandHeader(doc, {
+      documentTitle: 'Disclosures & Limitations',
+      documentSubtitle: `Financial Statements Package · ${month}`,
+      metaLines: sharedMeta,
+    });
     drawLegalDisclosure(doc, { reportType: 'Financial Statements Package' });
 
+    stampAllPageFooters(doc);
     doc.end();
     sendReportEmail(req.user.id, { reportType: 'business-pdf', month }).catch(() => {});
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }
