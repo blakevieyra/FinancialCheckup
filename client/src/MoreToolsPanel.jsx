@@ -1,4 +1,4 @@
-import { MORE_TOOL_SECTIONS, RESOURCE_LINKS, CHECKUP_DIMENSIONS } from './planConstants';
+import { MORE_TOOL_SECTIONS, RESOURCE_LINKS } from './planConstants';
 
 function ProBadge() {
   return (
@@ -81,7 +81,6 @@ export default function MoreToolsPanel({
   onScrollToProjections,
 }) {
   const grid2 = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
-  const gridDims = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
 
   const toolActions = {
     csv: onExportCsv,
@@ -135,19 +134,6 @@ export default function MoreToolsPanel({
             </>
           ) : null}
         </p>
-      </div>
-
-      <div>
-        <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>6 dimensions in every checkup</div>
-        <div style={{ display: 'grid', gridTemplateColumns: gridDims, gap: 10 }}>
-          {CHECKUP_DIMENSIONS.map((f) => (
-            <div key={f.title} style={{ ...cardSoftStyle, padding: '0.75rem' }}>
-              <span style={{ fontSize: 18, marginRight: 6 }}>{f.icon}</span>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>{f.title}</span>
-              <div style={{ fontSize: 12, opacity: 0.82, marginTop: 4, lineHeight: 1.35 }}>{f.detail}</div>
-            </div>
-          ))}
-        </div>
       </div>
 
       {MORE_TOOL_SECTIONS.map((section) => (
