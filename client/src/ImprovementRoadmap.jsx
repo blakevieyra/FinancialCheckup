@@ -118,24 +118,26 @@ function TrackFlow({ label, intro, score, steps, compact, onGoTab, btnNeutral })
   );
 }
 
-export default function ImprovementRoadmap({ roadmap, compact, cardSoftStyle, onGoTab, btnNeutral }) {
+export default function ImprovementRoadmap({ roadmap, compact, cardSoftStyle, onGoTab, btnNeutral, bare = false }) {
   if (!roadmap) return null;
 
   const { tracks, securityScore, wealthScore, securityLabel, wealthLabel, securityIntro, wealthIntro, totalPotentialLift, projectedScore, alwaysDo, currentOverallScore } = roadmap;
 
-  return (
-    <div style={{ ...cardSoftStyle, padding: '1.1rem 1.25rem', display: 'grid', gap: 20 }}>
-      <div>
-        <div style={{ fontWeight: 800, fontSize: compact ? 16 : 18 }}>Your improvement path</div>
-        <p style={{ margin: '6px 0 0', fontSize: 14, opacity: 0.82, lineHeight: 1.5, maxWidth: 720 }}>
-          Tap a step to see details. Work security first, then long-term wealth.
-          {totalPotentialLift > 0 ? (
-            <>
-              {' '}Potential lift: <strong>{Math.round(currentOverallScore ?? 0)}</strong> → <strong>~{Math.round(projectedScore)}</strong>.
-            </>
-          ) : null}
-        </p>
-      </div>
+  const inner = (
+    <>
+      {!bare ? (
+        <div>
+          <div style={{ fontWeight: 800, fontSize: compact ? 16 : 18 }}>Your improvement path</div>
+          <p style={{ margin: '6px 0 0', fontSize: 14, opacity: 0.82, lineHeight: 1.5, maxWidth: 720 }}>
+            Tap a step to see details. Work security first, then long-term wealth.
+            {totalPotentialLift > 0 ? (
+              <>
+                {' '}Potential lift: <strong>{Math.round(currentOverallScore ?? 0)}</strong> → <strong>~{Math.round(projectedScore)}</strong>.
+              </>
+            ) : null}
+          </p>
+        </div>
+      ) : null}
 
       <TrackFlow
         label={securityLabel}
@@ -160,6 +162,16 @@ export default function ImprovementRoadmap({ roadmap, compact, cardSoftStyle, on
       />
 
       {alwaysDo ? <p style={{ margin: 0, fontSize: 12, opacity: 0.68, lineHeight: 1.45 }}>{alwaysDo}</p> : null}
+    </>
+  );
+
+  if (bare) {
+    return <div style={{ display: 'grid', gap: 20 }}>{inner}</div>;
+  }
+
+  return (
+    <div style={{ ...cardSoftStyle, padding: '1.1rem 1.25rem', display: 'grid', gap: 20 }}>
+      {inner}
     </div>
   );
 }

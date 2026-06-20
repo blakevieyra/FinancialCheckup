@@ -16,16 +16,12 @@ function SectionShell({ title, subtitle, children, cardSoftStyle }) {
   );
 }
 
-export default function PrioritiesPanel({ actionPlan, cardSoftStyle, onGoFinances, btnNeutral }) {
+export default function PrioritiesPanel({ actionPlan, cardSoftStyle, onGoFinances, btnNeutral, bare = false }) {
   const items = (actionPlan || []).slice(0, 5);
   if (!items.length) return null;
 
-  return (
-    <SectionShell
-      title="Top priorities"
-      subtitle="Start here — ranked by impact on your score. Tap Finances to update the numbers behind each item."
-      cardSoftStyle={cardSoftStyle}
-    >
+  const content = (
+    <>
       <div style={{ display: 'grid', gap: 10 }}>
         {items.map((item, i) => {
           const style = PRIORITY_STYLE[item.priority] || PRIORITY_STYLE.MED;
@@ -66,6 +62,18 @@ export default function PrioritiesPanel({ actionPlan, cardSoftStyle, onGoFinance
           Update data in Finances →
         </button>
       ) : null}
+    </>
+  );
+
+  if (bare) return content;
+
+  return (
+    <SectionShell
+      title="Top priorities"
+      subtitle="Start here — ranked by impact on your score. Tap Finances to update the numbers behind each item."
+      cardSoftStyle={cardSoftStyle}
+    >
+      {content}
     </SectionShell>
   );
 }

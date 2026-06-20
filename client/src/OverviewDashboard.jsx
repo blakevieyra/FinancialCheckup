@@ -4,6 +4,8 @@ import ScoreExplainer from './ScoreExplainer';
 import GuidePanel from './GuidePanel';
 import PrioritiesPanel from './PrioritiesPanel';
 import RecommendationTimeline from './RecommendationTimeline';
+import ExpandablePanel from './ExpandablePanel';
+import BadgeRewardsPanel from './BadgeRewardsPanel';
 
 function StatTile({ label, value, cardSoftStyle }) {
   return (
@@ -22,6 +24,7 @@ export default function OverviewDashboard({
   totalExpenses,
   budgetGrade,
   cardSoftStyle,
+  btnPrimary,
   btnNeutral,
   checkupBusy,
   onGoFinances,
@@ -33,21 +36,12 @@ export default function OverviewDashboard({
   savingsRate,
   trajectory,
   topCategory,
-  userLevel,
-  xpLabel,
+  userXp,
 }) {
   const gridOverview = isMobile ? '1fr' : isDesktop ? 'minmax(0, 1fr) minmax(280px, 340px)' : '1fr';
 
   return (
     <div style={{ display: 'grid', gap: isDesktop ? 24 : 18, width: '100%' }}>
-      <GuidePanel
-        checkupResult={checkupResult}
-        primaryGoal={primaryGoal}
-        cardSoftStyle={cardSoftStyle}
-        btnNeutral={btnNeutral}
-        onNavigate={onGuideNavigate}
-      />
-
       <div style={{ display: 'grid', gridTemplateColumns: gridOverview, gap: isDesktop ? 20 : 16, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
           <ScoreHero
@@ -60,15 +54,20 @@ export default function OverviewDashboard({
             checkupBusy={checkupBusy}
             onGoFinances={onGoFinances}
           />
+
+          <GuidePanel
+            checkupResult={checkupResult}
+            primaryGoal={primaryGoal}
+            cardSoftStyle={cardSoftStyle}
+            btnPrimary={btnPrimary}
+            btnNeutral={btnNeutral}
+            onNavigate={onGuideNavigate}
+          />
         </div>
 
         <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
-          {userLevel ? (
-            <div style={{ ...cardSoftStyle, padding: '0.85rem 1rem' }}>
-              <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase' }}>Your level</div>
-              <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>Level {userLevel}</div>
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>{xpLabel}</div>
-            </div>
+          {userXp != null ? (
+            <BadgeRewardsPanel userXp={userXp} cardSoftStyle={cardSoftStyle} />
           ) : null}
           <StatTile label="Net surplus" value={`$${savingsAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} cardSoftStyle={cardSoftStyle} />
           <StatTile label="Savings rate" value={`${savingsRate.toFixed(1)}%`} cardSoftStyle={cardSoftStyle} />
@@ -86,36 +85,59 @@ export default function OverviewDashboard({
       </div>
 
       {checkupResult?.actionPlan?.length ? (
-        <PrioritiesPanel
-          actionPlan={checkupResult.actionPlan}
+        <ExpandablePanel
+          title="Top priorities"
+          hint={`${checkupResult.actionPlan.length} actions — tap to expand`}
           cardSoftStyle={cardSoftStyle}
-          onGoFinances={onGoFinances}
-          btnNeutral={btnNeutral}
-        />
+        >
+          <PrioritiesPanel
+            actionPlan={checkupResult.actionPlan}
+            cardSoftStyle={cardSoftStyle}
+            onGoFinances={onGoFinances}
+            btnNeutral={btnNeutral}
+            bare
+          />
+        </ExpandablePanel>
       ) : null}
 
       {checkupResult?.recommendationTimeline?.length ? (
-        <div style={{ ...cardSoftStyle, padding: '1rem 1.15rem' }}>
+        <ExpandablePanel
+          title="Action timeline"
+          hint="Now, this month, and long-term — tap to expand"
+          cardSoftStyle={cardSoftStyle}
+        >
           <RecommendationTimeline
             timeline={checkupResult.recommendationTimeline}
             cardSoftStyle={cardSoftStyle}
             isMobile={isMobile}
+            bare
           />
-        </div>
+        </ExpandablePanel>
       ) : null}
 
       {checkupResult?.improvementRoadmap ? (
-        <ImprovementRoadmap
-          roadmap={checkupResult.improvementRoadmap}
-          compact
+        <ExpandablePanel
+          title="Improvement roadmap"
+          hint="Security vs wealth tracks — tap to expand"
           cardSoftStyle={cardSoftStyle}
-          onGoTab={onGoTab}
-          btnNeutral={btnNeutral}
-        />
+        >
+          <ImprovementRoadmap
+            roadmap={checkupResult.improvementRoadmap}
+            compact
+            cardSoftStyle={cardSoftStyle}
+            onGoTab={onGoTab}
+            btnNeutral={btnNeutral}
+            bare
+          />
+        </ExpandablePanel>
       ) : null}
 
       {checkupResult?.scoreExplanation ? (
-        <div style={{ ...cardSoftStyle, padding: '1rem 1.15rem' }}>
+        <ExpandablePanel
+          title="Score breakdown"
+          hint="Security vs long-term wealth scores — tap to expand"
+          cardSoftStyle={cardSoftStyle}
+        >
           <ScoreExplainer
             explanation={checkupResult.scoreExplanation}
             isMobile={isMobile}
@@ -125,7 +147,7 @@ export default function OverviewDashboard({
             onGoTab={onGoTab}
             btnNeutral={btnNeutral}
           />
-        </div>
+        </ExpandablePanel>
       ) : null}
     </div>
   );

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import * as api from './api';
 import ExpandablePanel from './ExpandablePanel';
+import { strategyForArea, goalLabel } from './goalResources';
+
+const GOAL_AREAS = new Set(['savings', 'investments', 'retirement']);
 
 const AREA_META = {
   budget: { title: 'Budget gaps', hint: 'Spending concentration & cuts — tap for AI report' },
@@ -65,11 +68,37 @@ export default function SpecialistInsightPanel({
   }
 
   const preview = summary || gaps?.[0]?.label || 'Review your profile data for personalized guidance.';
+  const goalStrategy = GOAL_AREAS.has(area) ? strategyForArea(area, primaryGoal) : null;
 
   return (
     <div id={`specialist-${area}`}>
     <ExpandablePanel title={meta.title} hint={meta.hint} cardSoftStyle={cardSoftStyle}>
       <div style={{ display: 'grid', gap: 12 }}>
+        {primaryGoal && goalStrategy ? (
+          <div style={{ padding: '0.75rem 0.85rem', borderRadius: 10, background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(77,166,255,0.25)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Strategy for your goal: {goalLabel(primaryGoal)}
+            </div>
+            <div style={{ fontSize: 14, lineHeight: 1.5, marginTop: 8 }}>{goalStrategy.focus}</div>
+            {goalStrategy.steps?.length ? (
+              <ol style={{ margin: '10px 0 0', paddingLeft: '1.15rem', fontSize: 13, lineHeight: 1.45 }}>
+                {goalStrategy.steps.map((s, i) => <li key={i}>{s}</li>)}
+              </ol>
+            ) : null}
+            {goalStrategy.resources?.length ? (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Resources</div>
+                <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: 12, lineHeight: 1.5 }}>
+                  {goalStrategy.resources.map((r) => (
+                    <li key={r.url}>
+                      <a href={r.url} target="_blank" rel="noreferrer" style={{ color: '#93c5fd' }}>{r.title}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.5 }}>{preview}</div>
         {gaps?.length ? (
           <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: 13, lineHeight: 1.5 }}>

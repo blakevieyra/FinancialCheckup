@@ -2246,8 +2246,7 @@ export default function App() {
             savingsRate={savingsRate}
             trajectory={trendsData?.improvement?.direction}
             topCategory={topCategory?.category}
-            userLevel={xpInfo.level}
-            xpLabel={`${xpInfo.current} / ${xpInfo.next} XP to next level`}
+            userXp={userXp}
           />
         )}
         </>

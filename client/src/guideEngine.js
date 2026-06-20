@@ -116,6 +116,42 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
     }
   }
 
+  if (primaryGoal === 'retirement' && dims.find((d) => d.key === 'retirement' && d.score < 75)) {
+    steps.push({
+      id: 'goal-retire',
+      title: 'Close your retirement gap',
+      detail: 'Increase contributions and review your target retirement age in Finances.',
+      tab: 'finances',
+      tool: null,
+      priority: 'HIGH',
+      cta: 'Review retirement',
+    });
+  }
+
+  if (primaryGoal === 'invest' && dims.find((d) => d.key === 'investments' && d.score < 75)) {
+    steps.push({
+      id: 'goal-invest',
+      title: 'Improve portfolio allocation',
+      detail: 'Review diversification, fees, and contribution rate for your investment goal.',
+      tab: 'finances',
+      tool: 'specialist-investments',
+      priority: 'HIGH',
+      cta: 'Open portfolio guidance',
+    });
+  }
+
+  if (primaryGoal === 'emergency_fund' && dims.find((d) => d.key === 'savings' && d.score < 75)) {
+    steps.push({
+      id: 'goal-ef',
+      title: 'Fund your emergency reserve',
+      detail: 'Build toward 3–6 months of essential expenses — start with one month.',
+      tab: 'finances',
+      tool: 'specialist-savings',
+      priority: 'HIGH',
+      cta: 'Review savings plan',
+    });
+  }
+
   if (checkupResult.overallScore >= 70) {
     steps.push({
       id: 'progress',

@@ -62,21 +62,23 @@ function TimelineCard({ item, expanded, onToggle, cardSoftStyle }) {
   );
 }
 
-export default function RecommendationTimeline({ timeline, cardSoftStyle, compact, isMobile }) {
+export default function RecommendationTimeline({ timeline, cardSoftStyle, compact, isMobile, bare = false }) {
   const phases = (timeline || []).filter((p) => p.items?.length);
   const [expandedKey, setExpandedKey] = useState(null);
   if (!phases.length) return null;
 
   const gridCols = isMobile || compact ? '1fr' : 'repeat(2, minmax(0, 1fr))';
 
-  return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div>
-        <div style={{ fontWeight: 800, fontSize: 17 }}>Action timeline</div>
-        <div style={{ fontSize: 13, opacity: 0.78, marginTop: 4, lineHeight: 1.45 }}>
-          What to do now, this month, and long-term — tap any card for step-by-step instructions.
+  const body = (
+    <>
+      {!bare ? (
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 17 }}>Action timeline</div>
+          <div style={{ fontSize: 13, opacity: 0.78, marginTop: 4, lineHeight: 1.45 }}>
+            What to do now, this month, and long-term — tap any card for step-by-step instructions.
+          </div>
         </div>
-      </div>
+      ) : null}
       {phases.map((phase) => (
         <div key={phase.timeframe}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.65, marginBottom: 10, fontWeight: 700 }}>
@@ -98,6 +100,8 @@ export default function RecommendationTimeline({ timeline, cardSoftStyle, compac
           </div>
         </div>
       ))}
-    </div>
+    </>
   );
+
+  return <div style={{ display: 'grid', gap: 16 }}>{body}</div>;
 }
