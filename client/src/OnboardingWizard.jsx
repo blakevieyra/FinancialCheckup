@@ -13,6 +13,7 @@ import {
 const GOALS = [
   { id: 'emergency_fund', label: 'Build emergency fund', desc: 'Focus on savings & cash reserves' },
   { id: 'debt_free', label: 'Pay off debt', desc: 'Avalanche/snowball payoff plan' },
+  { id: 'wealth_building', label: 'Wealth building', desc: 'Grow net worth across savings, investments & retirement' },
   { id: 'retirement', label: 'Retire on track', desc: '401k/IRA contributions & trajectory' },
   { id: 'invest', label: 'Grow investments', desc: 'Portfolio allocation & diversification' },
   { id: 'insurance', label: 'Fix insurance gaps', desc: 'Life, disability & liability coverage' },
@@ -96,7 +97,7 @@ export default function OnboardingWizard({
           return;
         }
         await persistOnboardingData(payload);
-        await api.createCheckoutSession(token, 'trial', { fromOnboarding: true });
+        await api.startStripeTrial(token);
         const snapshot = {
           ...data,
           income: Number(data.income) || 0,

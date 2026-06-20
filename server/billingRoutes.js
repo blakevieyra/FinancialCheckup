@@ -183,14 +183,25 @@ async function createStripeTrialSubscription(userId, username) {
     throw err;
   }
 
-  const sub = await stripe.subscriptions.create({
-    customer: customerId,
-    items: [{
-      price: STRIPE_PRICES.monthly,
-      current_trial: { trial_offer: STRIPE_TRIAL_OFFER },
-    }],
-    metadata: { userId: String(userId), plan: 'monthly' },
-  });
+  let sub;
+  try {
+    sub = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{
+        price: STRIPE_PRICES.monthly,
+        current_trial: { trial_offer: STRIPE_TRIAL_OFFER },
+      }],
+      metadata: { userId: String(userId), plan: 'monthly' },
+    });
+  } catch (e) {
+    console.warn('[billing] trial_offer failed, using trial_period_days:', e.message);
+    sub = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: STRIPE_PRICES.monthly }],
+      trial_period_days: TRIAL_DAYS,
+      metadata: { userId: String(userId), plan: 'monthly' },
+    });
+  }
 
   await upsertSubscription(userId, {
     stripe_customer_id: customerId,
@@ -295,6 +306,20 @@ router.get('/status', async (req, res) => {
   }
 });
 
+async function handleStartTrial(req, res) {
+  if (!stripe) return res.status(503).json({ error: 'Billing not configured on server.' });
+  try {
+    await createStripeTrialSubscription(req.user.id, req.user.username);
+    res.json({ ok: true, plan: 'trial', ...(await buildStatusJson(req.user.id)) });
+  } catch (e) {
+    console.error('[billing] start-trial failed:', e.message);
+    res.status(e.statusCode || 500).json({ error: e.message || 'Could not start trial.' });
+  }
+}
+
+router.post('/start-trial', handleStartTrial);
+router.post('/welcome-trial', handleStartTrial);
+
 router.post('/sync', async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Billing not configured on server.' });
   try {
@@ -365,8 +390,7 @@ router.post('/checkout', async (req, res) => {
     const returnBase = billingReturnBase(clientUrl);
 
     if (plan === 'trial') {
-      await createStripeTrialSubscription(req.user.id, req.user.username);
-      return res.json({ ok: true, plan: 'trial', ...(await buildStatusJson(req.user.id)) });
+      return handleStartTrial(req, res);
     }
 
     const priceId = STRIPE_PRICES[plan];

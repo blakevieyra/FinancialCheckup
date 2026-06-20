@@ -476,12 +476,8 @@ export default function App() {
     setBillingBusy(true);
     setBillingErr('');
     try {
-      const result = await api.createCheckoutSession(token, plan);
-      if (result.url) {
-        api.openExternalUrl(result.url);
-      } else if (plan === 'trial') {
-        await loadSubscription();
-      }
+      const { url } = await api.createCheckoutSession(token, plan);
+      api.openExternalUrl(url);
     } catch (e) {
       setBillingErr(e.message);
     } finally {

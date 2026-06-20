@@ -366,6 +366,15 @@ export async function getSubscriptionStatus(token) {
   return apiFetch('/api/billing/status', { token });
 }
 
+export async function startStripeTrial(token) {
+  return apiFetch('/api/billing/start-trial', { method: 'POST', token, body: {} });
+}
+
+/** @deprecated use startStripeTrial — kept for cached clients */
+export async function startWelcomeTrial(token) {
+  return apiFetch('/api/billing/welcome-trial', { method: 'POST', token, body: {} });
+}
+
 export async function createCheckoutSession(token, plan, options = {}) {
   return apiFetch('/api/billing/checkout', {
     method: 'POST',

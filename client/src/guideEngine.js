@@ -101,6 +101,21 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
     });
   }
 
+  if (primaryGoal === 'wealth_building') {
+    const weakWealth = dims.find((d) => (d.key === 'retirement' || d.key === 'investments' || d.key === 'savings') && d.score < 75);
+    if (weakWealth) {
+      steps.push({
+        id: 'goal-wealth',
+        title: 'Build long-term wealth',
+        detail: `Strengthen ${weakWealth.label} first — savings, investments, and retirement compound over time.`,
+        tab: 'finances',
+        tool: weakWealth.key === 'investments' ? 'specialist-investments' : 'specialist-savings',
+        priority: 'HIGH',
+        cta: 'Review in Finances',
+      });
+    }
+  }
+
   if (checkupResult.overallScore >= 70) {
     steps.push({
       id: 'progress',
