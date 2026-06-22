@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const { verifyToken } = require('./auth');
 const { dbGet } = require('./db');
 const { sendEmailPlain, smtpConfigured } = require('./mailer');
+const { buildBrandedSimpleEmail } = require('./emailTemplates');
 const { safeClientError } = require('./safeError');
 
 const supportLimiter = rateLimit({
@@ -57,6 +58,33 @@ router.post('/', supportLimiter, verifyToken, async (req, res) => {
       text: body,
       replyTo: fromEmail.includes('@') ? fromEmail : contactEmail.includes('@') ? contactEmail : undefined,
     });
+
+    const userAddr = user?.email || (contactEmail.includes('@') ? contactEmail : null);
+    if (userAddr) {
+      const ackText = `Hi ${username},
+
+We received your support request: "${subject}"
+
+We typically reply within 1–2 business days.
+
+— Financial Checkup · info@operone2i.com`;
+      const ackHtml = buildBrandedSimpleEmail({
+        username,
+        subtitle: 'Support request received',
+        paragraphs: [
+          `We received your message: "${subject}"`,
+          'Our team at Operon E2I LLC typically replies within 1–2 business days.',
+          'If your question is urgent, you can also email info@operone2i.com directly.',
+        ],
+        footerNote: 'This is an automated confirmation — please do not reply to this message unless replying to a follow-up from our team.',
+      });
+      await sendEmailPlain({
+        to: userAddr,
+        subject: 'We received your Financial Checkup support request',
+        text: ackText,
+        html: ackHtml,
+      }).catch((e) => console.warn('[support-ack]', e.message));
+    }
 
     res.json({ ok: true, message: 'Message sent. We typically reply within 1–2 business days.' });
   } catch (e) {
