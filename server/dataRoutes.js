@@ -2,6 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { verifyToken } = require('./auth');
 const { dbGet, dbAll, dbRun } = require('./db');
+const { cancelStripeBillingForUser } = require('./billingRoutes');
 
 router.use(verifyToken);
 
@@ -198,6 +199,7 @@ router.delete('/account', async (req, res) => {
       return res.status(401).json({ error: 'Incorrect password.' });
     }
 
+    await cancelStripeBillingForUser(req.user.id);
     await dbRun('DELETE FROM users WHERE id = ?', [req.user.id]);
     res.json({ ok: true, message: 'Account and all associated data have been permanently deleted.' });
   } catch (e) {

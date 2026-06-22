@@ -45,8 +45,6 @@ services:
         value: claude-sonnet-4-6
       - key: API_PUBLIC_URL
         sync: false
-      - key: MAIL_FROM
-        sync: false
       - key: FRED_API_KEY
         sync: false
       - key: WEEKLY_DIGEST_TZ
@@ -67,6 +65,8 @@ services:
         value: price_1TkBcv1HZuIni9E77RYcHPxd
       - key: STRIPE_TRIAL_DAYS
         value: "7"
+      - key: PG_POOL_MAX
+        value: "10"
   - type: web
     env: static
     name: financialcheckup-web

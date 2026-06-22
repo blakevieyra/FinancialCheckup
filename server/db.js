@@ -242,6 +242,14 @@ async function initDb() {
   `);
   await rawQuery(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registration_pending_email ON registration_pending (LOWER(email))`);
 
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT,
+      processed_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
+
   console.log('✓ Postgres database ready');
 }
 
@@ -252,4 +260,14 @@ async function closeDb() {
   }
 }
 
-module.exports = { initDb, closeDb, dbAll, dbGet, dbRun, rawQuery };
+async function pingDb() {
+  if (!pool) return false;
+  try {
+    await pool.query('SELECT 1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { initDb, closeDb, pingDb, dbAll, dbGet, dbRun, rawQuery };

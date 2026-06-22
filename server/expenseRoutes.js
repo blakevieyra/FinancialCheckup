@@ -9,6 +9,14 @@ const PROFILE_DEFAULTS = {
   organizational: ['Program Services', 'Administrative', 'Fundraising', 'Staff', 'Occupancy', 'Technology', 'Insurance', 'Professional Fees', 'Grants', 'Reserves'],
 };
 
+const MAX_CATEGORY_LEN = 80;
+
+function normalizeCategory(raw) {
+  const category = String(raw || '').trim().slice(0, MAX_CATEGORY_LEN);
+  if (!category) return null;
+  return category;
+}
+
 router.get('/', async (req, res) => {
   try {
     const m = req.query.month || new Date().toISOString().slice(0, 7);
@@ -49,25 +57,27 @@ router.put('/', async (req, res) => {
     const m = month || new Date().toISOString().slice(0, 7);
     const now = new Date().toISOString();
     for (const { category, amount } of expenses) {
+      const cat = normalizeCategory(category);
+      if (!cat) continue;
       const amt = Number(amount) || 0;
       const ex = await dbGet(
         'SELECT id FROM expenses WHERE user_id = ? AND category = ? AND month = ?',
-        [req.user.id, category, m],
+        [req.user.id, cat, m],
       );
       if (ex) {
         await dbRun(
           'UPDATE expenses SET amount = ?, updated_at = ? WHERE user_id = ? AND category = ? AND month = ?',
-          [amt, now, req.user.id, category, m],
+          [amt, now, req.user.id, cat, m],
         );
       } else {
         await dbRun(
           'INSERT INTO expenses (user_id, category, amount, month, updated_at) VALUES (?, ?, ?, ?, ?)',
-          [req.user.id, category, amt, m, now],
+          [req.user.id, cat, amt, m, now],
         );
       }
       await dbRun(
         'INSERT INTO expenses_log (user_id, category, amount, month, logged_at, source) VALUES (?, ?, ?, ?, ?, ?)',
-        [req.user.id, category, amt, m, now, 'manual'],
+        [req.user.id, cat, amt, m, now, 'manual'],
       );
     }
     res.json({ success: true });
@@ -78,15 +88,16 @@ router.post('/category', async (req, res) => {
   try {
     const { category, month } = req.body;
     const m = month || new Date().toISOString().slice(0, 7);
-    if (!category?.trim()) return res.status(400).json({ error: 'Category name required.' });
+    const cat = normalizeCategory(category);
+    if (!cat) return res.status(400).json({ error: 'Category name required.' });
     const existing = await dbGet(
       'SELECT id FROM expenses WHERE user_id = ? AND category = ? AND month = ?',
-      [req.user.id, category.trim(), m],
+      [req.user.id, cat, m],
     );
     if (existing) return res.status(409).json({ error: 'Category exists.' });
     await dbRun(
       'INSERT INTO expenses (user_id, category, amount, month) VALUES (?, ?, 0, ?)',
-      [req.user.id, category.trim(), m],
+      [req.user.id, cat, m],
     );
     res.status(201).json({ success: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }

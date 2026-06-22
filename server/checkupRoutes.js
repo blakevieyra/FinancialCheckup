@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const rateLimit = require('express-rate-limit');
 const { verifyToken } = require('./auth');
 const { dbGet, dbAll, dbRun } = require('./db');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
@@ -6,6 +7,15 @@ const { runCheckup, prefillFromLedger, extractExtendedProfile, mergeSnapshotWith
 const { getUserTier } = require('./requireFeature');
 const { hasFeature } = require('./subscriptionTiers');
 const { requireFeature } = require('./requireFeature');
+const { isProd } = require('./safeError');
+
+const previewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 25 : 150,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many preview checkups. Try again later.' },
+});
 
 function applyTierToCheckupResult(result, tier) {
   if (hasFeature(tier, 'improvementRoadmap')) return result;
@@ -18,7 +28,7 @@ function applyTierToCheckupResult(result, tier) {
 }
 
 /** Public preview — no account required (matches landing “free to start”). */
-router.post('/preview', (req, res) => {
+router.post('/preview', previewLimiter, (req, res) => {
   try {
     const result = runCheckup(req.body || {});
     return res.json({ ok: true, ...result });

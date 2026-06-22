@@ -1,17 +1,19 @@
 const cron = require('node-cron');
 const { runScheduledDigestsForWeekday } = require('./digestDeliver');
 
+let scheduledTask = null;
+
 /** Daily cron hook: sends on each subscriber's digest_weekday local to WEEKLY_DIGEST_TZ */
 function startDigestScheduler() {
   if (String(process.env.WEEKLY_DIGEST_CRON_DISABLED || '') === '1') {
     console.log('○ Weekly digest cron disabled (WEEKLY_DIGEST_CRON_DISABLED=1)');
-    return;
+    return null;
   }
 
   const cronExpr = process.env.WEEKLY_DIGEST_CRON || '0 9 * * *';
   const tz = process.env.WEEKLY_DIGEST_TZ || 'America/Los_Angeles';
 
-  cron.schedule(
+  scheduledTask = cron.schedule(
     cronExpr,
     async () => {
       try {
@@ -25,6 +27,15 @@ function startDigestScheduler() {
   );
 
   console.log(`✓ Weekly digest scheduler: cron "${cronExpr}" (${tz})`);
+  return scheduledTask;
 }
 
-module.exports = startDigestScheduler;
+function stopDigestScheduler() {
+  if (scheduledTask) {
+    scheduledTask.stop();
+    scheduledTask = null;
+    console.log('○ Weekly digest scheduler stopped.');
+  }
+}
+
+module.exports = { startDigestScheduler, stopDigestScheduler };

@@ -182,9 +182,9 @@ router.post('/register/verify', async (req, res) => {
   }
 });
 
-/** Legacy one-step register — redirects clients to OTP flow when SMTP is configured. */
+/** Legacy one-step register — disabled in production; OTP flow required when SMTP is configured. */
 router.post('/register', async (req, res) => {
-  if (smtpConfigured()) {
+  if (process.env.NODE_ENV === 'production' || smtpConfigured()) {
     return res.status(400).json({
       error: 'Use email verification. Submit the form to receive a one-time code.',
       code: 'OTP_REQUIRED',

@@ -4,19 +4,25 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { initDb, closeDb } = require('./db');
-const startDigestScheduler = require('./digestScheduler');
+const { initDb, closeDb, pingDb } = require('./db');
+const { startDigestScheduler, stopDigestScheduler } = require('./digestScheduler');
 const { runScheduledDigestsForWeekday } = require('./digestDeliver');
+const { validateProductionEnv } = require('./envValidation');
+const { safeClientError, isProd } = require('./safeError');
 const { router: billingRouter, stripeWebhook } = require('./billingRoutes');
+
+validateProductionEnv();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const isProd = process.env.NODE_ENV === 'production';
 
 if (isProd && !process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET must be set in production.');
   process.exit(1);
 }
+
+/** Render / reverse-proxy — required for per-IP rate limits. */
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS) || 1);
 
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
   .split(',')
@@ -24,7 +30,7 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
   .filter(Boolean);
 
 /** Capacitor Android/iOS WebView origins (Play Store app). */
-const MOBILE_APP_ORIGINS = ['https://localhost', 'capacitor://localhost', 'http://localhost'];
+const MOBILE_APP_ORIGINS = ['https://localhost', 'capacitor://localhost'];
 
 app.use(
   helmet({
@@ -60,6 +66,20 @@ app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/register/send-code', authLimiter);
 app.use('/api/auth/register/resend-code', authLimiter);
 app.use('/api/auth/register/verify', authLimiter);
+app.use('/api/auth/change-password', authLimiter);
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 400 : 3000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+  skip: (req) => {
+    const path = req.originalUrl || req.path || '';
+    return path.includes('/api/health') || path.includes('/api/billing/webhook');
+  },
+});
+app.use('/api', apiLimiter);
 
 app.use('/api/auth', require('./authRoutes'));
 app.use('/api/billing', billingRouter);
@@ -77,30 +97,23 @@ app.use('/api/goals', require('./goalsRoutes'));
 app.use('/api/checkup', require('./checkupRoutes'));
 app.use('/api/market', require('./marketRoutes'));
 app.use('/api/support', require('./supportRoutes'));
-app.get('/api/health', (_, res) =>
-  res.json({
-    status: 'ok',
-    features: {
-      weeklyDigest: true,
-      trends: true,
-      leaderboard: true,
-      postgres: true,
-      sixDimensionCheckup: true,
+
+app.get('/api/health', async (_, res) => {
+  const dbOk = await pingDb();
+  const payload = {
+    status: dbOk ? 'ok' : 'degraded',
+    db: dbOk ? 'ok' : 'down',
+    ts: new Date().toISOString(),
+  };
+  if (!isProd) {
+    payload.features = {
       stripeBilling: Boolean(process.env.STRIPE_SECRET_KEY),
-    billingRoutes: [
-      'GET /api/billing/status',
-      'POST /api/billing/checkout',
-      'POST /api/billing/start-trial',
-      'POST /api/billing/welcome-trial',
-      'POST /api/billing/sync',
-      'POST /api/billing/portal',
-    ],
-      anthropicAi: Boolean(process.env.ANTHROPIC_API_KEY),
-      anthropicModel: require('./anthropicClient').modelName(),
       emailConfigured: require('./mailer').smtpConfigured(),
-    },
-  }),
-);
+      anthropicAi: Boolean(process.env.ANTHROPIC_API_KEY),
+    };
+  }
+  res.status(dbOk ? 200 : 503).json(payload);
+});
 
 app.post('/api/internal/digest-run', async (req, res) => {
   const secret = process.env.ADMIN_DIGEST_SECRET;
@@ -110,7 +123,8 @@ app.post('/api/internal/digest-run', async (req, res) => {
     const r = await runScheduledDigestsForWeekday();
     res.json({ ok: true, ...r });
   } catch (e) {
-    res.status(500).json({ error: e.message || 'Digest runner failed.' });
+    console.error('[digest-run]', e);
+    res.status(500).json({ error: safeClientError(e, 'Digest runner failed.') });
   }
 });
 
@@ -128,6 +142,7 @@ initDb()
 
     const shutdown = async (signal) => {
       console.log(`Received ${signal}, shutting down...`);
+      stopDigestScheduler();
       server.close(() => console.log('HTTP server closed.'));
       try {
         await closeDb();

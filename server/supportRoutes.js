@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const { verifyToken } = require('./auth');
 const { dbGet } = require('./db');
 const { sendEmailPlain, smtpConfigured } = require('./mailer');
+const { safeClientError } = require('./safeError');
 
 const supportLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -60,7 +61,7 @@ router.post('/', supportLimiter, verifyToken, async (req, res) => {
     res.json({ ok: true, message: 'Message sent. We typically reply within 1–2 business days.' });
   } catch (e) {
     console.error('[support]', e);
-    res.status(500).json({ error: e.message || 'Could not send message.' });
+    res.status(500).json({ error: safeClientError(e, 'Could not send message.') });
   }
 });
 

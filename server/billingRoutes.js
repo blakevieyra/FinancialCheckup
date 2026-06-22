@@ -10,6 +10,7 @@ const {
   TRIAL_DAYS,
 } = require('./subscriptionService');
 const { sendSubscribedEmail, sendDeactivatedEmail } = require('./transactionalEmail');
+const { safeClientError, isProd } = require('./safeError');
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecret ? new Stripe(stripeSecret) : null;
@@ -227,7 +228,34 @@ function buildCheckoutSessionParams({ customerId, userId, plan, priceId, returnB
   };
 }
 
+/** Cancel active Stripe billing before account deletion (GDPR / Play Store expectation). */
+async function cancelStripeBillingForUser(userId) {
+  if (!stripe) return;
+  const row = await dbGet(
+    'SELECT stripe_customer_id, stripe_subscription_id FROM subscriptions WHERE user_id = ?',
+    [userId],
+  );
+  if (!row) return;
+  if (row.stripe_subscription_id) {
+    try {
+      await stripe.subscriptions.cancel(row.stripe_subscription_id);
+    } catch (e) {
+      console.error('[billing] cancel subscription on account delete:', e.message);
+    }
+  }
+  if (row.stripe_customer_id) {
+    try {
+      await stripe.customers.del(row.stripe_customer_id);
+    } catch (e) {
+      console.error('[billing] delete Stripe customer on account delete:', e.message);
+    }
+  }
+}
+
 async function handleWebhookEvent(event) {
+  const seen = await dbGet('SELECT event_id FROM stripe_webhook_events WHERE event_id = ?', [event.id]);
+  if (seen) return;
+
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object;
@@ -272,6 +300,11 @@ async function handleWebhookEvent(event) {
     default:
       break;
   }
+
+  await dbRun(
+    'INSERT INTO stripe_webhook_events (event_id, event_type) VALUES (?, ?) ON CONFLICT (event_id) DO NOTHING',
+    [event.id, event.type],
+  );
 }
 
 async function stripeWebhook(req, res) {
@@ -284,7 +317,7 @@ async function stripeWebhook(req, res) {
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
     console.error('Stripe webhook signature failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    return res.status(400).send(isProd ? 'Webhook signature verification failed.' : `Webhook Error: ${err.message}`);
   }
   try {
     await handleWebhookEvent(event);
@@ -313,7 +346,7 @@ async function handleStartTrial(req, res) {
     res.json({ ok: true, plan: 'trial', ...(await buildStatusJson(req.user.id)) });
   } catch (e) {
     console.error('[billing] start-trial failed:', e.message);
-    res.status(e.statusCode || 500).json({ error: e.message || 'Could not start trial.' });
+    res.status(e.statusCode || 500).json({ error: safeClientError(e, 'Could not start trial.') });
   }
 }
 
@@ -431,4 +464,4 @@ router.post('/portal', async (req, res) => {
   }
 });
 
-module.exports = { router, stripeWebhook };
+module.exports = { router, stripeWebhook, cancelStripeBillingForUser };
