@@ -87,6 +87,7 @@ export default function MoreToolsPanel({
   income,
   totalExpenses,
   extendedProfile,
+  userEmail,
 }) {
   const grid2 = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
 
