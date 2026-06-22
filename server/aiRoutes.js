@@ -136,7 +136,7 @@ Include exactly 6 categoryPlans (one per dimension). Give 2-3 real sources per c
     let reportId = null;
     try {
       reportId = await saveAiReport(req.user.id, {
-        area: 'comprehensive',
+        area: 'ai-insights',
         month: safeMonth,
         dimensionScore: overallScore,
         dimensionGrade: grade,
@@ -149,7 +149,12 @@ Include exactly 6 categoryPlans (one per dimension). Give 2-3 real sources per c
     res.json({ ...result, emailSent: Boolean(emailResult?.sent), reportId });
   } catch (err) {
     console.error('AI error:', err.message);
-    const msg = err.message || 'Failed to generate insights.';
+    const raw = err.message || 'Failed to generate insights.';
+    const msg = /JSON|parse/i.test(raw)
+      ? 'Insights hit a formatting error. Please try again — a second attempt usually succeeds.'
+      : /ANTHROPIC_API_KEY|not set/i.test(raw)
+        ? raw
+        : raw;
     const status = /ANTHROPIC_API_KEY|not set/i.test(msg) ? 400 : msg.includes('Anthropic API') ? 502 : 500;
     res.status(status).json({ error: msg });
   }
@@ -329,19 +334,29 @@ Return ONLY valid JSON:
   "advice": ["5-7 strategic recommendations"],
   "riskWatchouts": ["3-5 specific risks"],
   "primaryResources": [
-    {"title":"real site name","url":"https://...","why":"why this helps THIS user","category":"Budgeting|Debt|Investing|Insurance|Retirement|Tax|Credit"}
+    {"title":"real site name","url":"https://...","why":"one short sentence","category":"Budgeting|Debt|Investing|Insurance|Retirement|Tax|Credit"}
   ],
   "nextSteps": ["5 ordered immediate actions"],
   "sources": [{"title":"","url":"","why":""}],
   "disclaimer": "Educational only."
 }
 
-Include exactly 6 dimensionAnalysis entries. Provide 8-12 primaryResources from authoritative sites (CFPB, IRS, Investor.gov, SBA, etc.). Be specific to user numbers.`;
+Include exactly 6 dimensionAnalysis entries (analysis max 2 sentences each). Provide 6 primaryResources max — real URLs only. Keep all string values concise so the JSON fits in one response.`;
+
+  const compactRetryNote =
+    '\n\nIMPORTANT: Previous reply was invalid or truncated JSON. Return ONLY valid JSON. Use 6 dimensionAnalysis entries, 3 actionRoadmap blocks with 2 actions each, 6 primaryResources max, short strings — no line breaks inside JSON strings.';
 
   try {
-    const system = 'Return a single valid JSON object only. No markdown.';
-    const text = await createMessage({ userContent: prompt, maxTokens: 4096, system });
-    const parsed = parseJsonFromText(text);
+    const system = 'Return a single valid JSON object only. No markdown. Escape quotes inside strings. No trailing commas.';
+    let parsed;
+    try {
+      const text = await createMessage({ userContent: prompt, maxTokens: 8192, system });
+      parsed = parseJsonFromText(text);
+    } catch (parseErr) {
+      console.warn('AI comprehensive JSON retry:', parseErr.message);
+      const text2 = await createMessage({ userContent: prompt + compactRetryNote, maxTokens: 8192, system });
+      parsed = parseJsonFromText(text2);
+    }
     const result = {
       month: safeMonth,
       income: Number(income || 0),
@@ -381,7 +396,11 @@ Include exactly 6 dimensionAnalysis entries. Provide 8-12 primaryResources from 
     res.json({ ...result, reportId, emailSent: Boolean(emailResult?.sent) });
   } catch (err) {
     console.error('AI comprehensive error:', err.message);
-    res.status(502).json({ error: err.message || 'Comprehensive report failed.' });
+    const raw = err.message || '';
+    const friendly = /JSON|parse/i.test(raw)
+      ? 'Report generation hit a formatting error. Please try again — a second attempt usually succeeds.'
+      : raw || 'Comprehensive report failed.';
+    res.status(502).json({ error: friendly });
   }
 });
 

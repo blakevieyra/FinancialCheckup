@@ -82,8 +82,21 @@ Return ONLY valid JSON (no markdown) with this exact shape:
     'You output strict JSON only. Keep language executive and specific to the user\'s categories.';
 
   try {
-    const raw = await createMessage({ userContent, maxTokens: 2500, system });
-    const parsed = parseJsonFromText(raw);
+    const system =
+      'You output strict JSON only. Keep language executive and specific to the user\'s categories. No trailing commas.';
+    let parsed;
+    try {
+      const raw = await createMessage({ userContent, maxTokens: 2500, system });
+      parsed = parseJsonFromText(raw);
+    } catch (parseErr) {
+      console.warn('Expert briefing JSON retry:', parseErr.message);
+      const raw2 = await createMessage({
+        userContent: `${userContent}\n\nIMPORTANT: Return ONLY valid JSON. Shorter strings, max 4 priorities.`,
+        maxTokens: 2500,
+        system,
+      });
+      parsed = parseJsonFromText(raw2);
+    }
 
     const expert = {
       headline: parsed.headline,

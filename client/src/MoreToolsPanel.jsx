@@ -3,6 +3,7 @@ import SpecialistReportsGrid from './SpecialistReportsGrid';
 import AiInsightsPanel from './AiInsightsPanel';
 import ExpertBriefingPanel from './ExpertBriefingPanel';
 import ComprehensiveReportPanel from './ComprehensiveReportPanel';
+import { TOOL_ETA_SECONDS, useGenerationTimer } from './useGenerationTimer';
 
 function ProBadge() {
   return (
@@ -24,7 +25,9 @@ function ProBadge() {
   );
 }
 
-function ToolCard({ tool, locked, onAction, btnNeutral, btnPrimary, busy, busyLabel }) {
+function ToolCard({ tool, locked, onAction, btnNeutral, btnPrimary, busy, busyLabel, etaSeconds }) {
+  const { label: timerLabel } = useGenerationTimer(busy, etaSeconds || 45);
+
   return (
     <div
       style={{
@@ -38,14 +41,30 @@ function ToolCard({ tool, locked, onAction, btnNeutral, btnPrimary, busy, busyLa
     >
       <div style={{ fontWeight: 700, fontSize: 14 }}>{tool.label}</div>
       <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.4 }}>{tool.desc}</div>
-      <button
-        type="button"
-        disabled={locked || busy}
-        onClick={onAction}
-        style={{ ...(locked ? btnNeutral : btnPrimary), justifySelf: 'start', opacity: locked ? 0.55 : 1 }}
-      >
-        {busy && busyLabel ? busyLabel : locked ? 'Upgrade in Account' : tool.label}
-      </button>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          disabled={locked || busy}
+          onClick={onAction}
+          style={{ ...(locked ? btnNeutral : btnPrimary), opacity: locked ? 0.55 : 1 }}
+        >
+          {busy && busyLabel ? busyLabel : locked ? 'Upgrade in Account' : tool.label}
+        </button>
+        {busy && !locked ? (
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#93c5fd',
+              letterSpacing: '0.02em',
+              whiteSpace: 'nowrap',
+            }}
+            aria-live="polite"
+          >
+            {timerLabel}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -188,6 +207,7 @@ export default function MoreToolsPanel({
                 btnPrimary={btnPrimary}
                 busy={toolBusy[tool.id] || busy}
                 busyLabel={toolBusyLabel[tool.id]}
+                etaSeconds={TOOL_ETA_SECONDS[tool.id]}
               />
             ))}
           </div>

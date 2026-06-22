@@ -88,19 +88,85 @@ function stripJsonFence(text) {
     .trim();
 }
 
-/** Extract and parse JSON even when the model adds prose or truncates fences. */
-function parseJsonFromText(text) {
-  const cleaned = stripJsonFence(text);
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const start = cleaned.indexOf('{');
-    const end = cleaned.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      return JSON.parse(cleaned.slice(start, end + 1));
+/** Remove trailing commas and other common model JSON mistakes. */
+function sanitizeJsonText(text) {
+  return String(text || '')
+    .replace(/^\uFEFF/, '')
+    .replace(/,\s*([}\]])/g, '$1')
+    .replace(/\r\n/g, '\n');
+}
+
+/** Close truncated JSON when the model hits max_tokens mid-response. */
+function repairTruncatedJson(text) {
+  let s = sanitizeJsonText(text);
+  const stack = [];
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (c === '\\') {
+        escape = true;
+        continue;
+      }
+      if (c === '"') inString = false;
+      continue;
     }
-    throw new Error('Could not parse JSON from model response.');
+    if (c === '"') {
+      inString = true;
+      continue;
+    }
+    if (c === '{') stack.push('}');
+    else if (c === '[') stack.push(']');
+    else if (c === '}' || c === ']') {
+      if (stack.length && stack[stack.length - 1] === c) stack.pop();
+    }
   }
+
+  if (inString) s += '"';
+
+  // Drop trailing incomplete array/object element (common truncation site).
+  s = s.replace(/,\s*"[^"]*"?\s*:?\s*("[^"]*)?$/, '');
+  s = s.replace(/,\s*\{[^}]*$/, '');
+  s = s.replace(/,\s*\[[^\]]*$/, '');
+  s = s.replace(/,\s*$/, '');
+
+  while (stack.length) s += stack.pop();
+  return s;
+}
+
+/** Extract and parse JSON even when the model adds prose, truncates, or minor syntax errors. */
+function parseJsonFromText(text) {
+  const cleaned = sanitizeJsonText(stripJsonFence(text));
+  const candidates = [cleaned];
+
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    candidates.push(cleaned.slice(start, end + 1));
+  }
+  candidates.push(repairTruncatedJson(cleaned));
+  if (start >= 0 && end > start) {
+    candidates.push(repairTruncatedJson(cleaned.slice(start, end + 1)));
+  }
+
+  let lastErr = null;
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      return JSON.parse(candidate);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  const msg = lastErr?.message || 'Could not parse JSON from model response.';
+  throw new Error(msg.includes('JSON') ? msg : `Could not parse JSON from model response: ${msg}`);
 }
 
 module.exports = { createMessage, stripJsonFence, parseJsonFromText, modelName };

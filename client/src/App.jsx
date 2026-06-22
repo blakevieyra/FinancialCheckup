@@ -1508,7 +1508,9 @@ export default function App() {
       setAiError(
         /model|anthropic|ANTHROPIC/i.test(msg)
           ? 'AI model unavailable — set ANTHROPIC_MODEL=claude-sonnet-4-6 on Render if this persists.'
-          : msg,
+          : /JSON|parse/i.test(msg)
+            ? 'Report formatting error — please try again (usually works on retry).'
+            : msg,
       );
     } finally {
       setAiBusy(false);
@@ -1563,7 +1565,12 @@ export default function App() {
       setExpertData(d);
       setExpertEmailNote('');
     } catch (e) {
-      setExpertError(e.message);
+      const msg = e.message || 'Expert briefing failed.';
+      setExpertError(
+        /JSON|parse/i.test(msg)
+          ? 'Briefing formatting error — please try again (usually works on retry).'
+          : msg,
+      );
     } finally {
       setExpertBusy(false);
     }
@@ -1606,7 +1613,9 @@ export default function App() {
       setComprehensiveError(
         /model|anthropic|ANTHROPIC/i.test(msg)
           ? 'AI model unavailable — set ANTHROPIC_MODEL=claude-sonnet-4-6 on Render if this persists.'
-          : msg,
+          : /JSON|parse/i.test(msg)
+            ? 'Report formatting error — please tap Comprehensive report again (usually works on retry).'
+            : msg,
       );
     } finally {
       setComprehensiveBusy(false);
