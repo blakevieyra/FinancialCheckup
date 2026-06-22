@@ -213,6 +213,51 @@ async function sendAiInsightsEmail(userId, plan) {
   );
 }
 
+async function sendSpecialistReportEmail(userId, report) {
+  const u = await getUserContact(userId);
+  if (!u?.email) return { sent: false, reason: 'no_email' };
+
+  const title = report.title || report.area || 'Dimension report';
+  const lines = [
+    `Hi ${u.username},`,
+    '',
+    `Your ${title} report is attached below.`,
+    '',
+    report.summary || '',
+    '',
+    report.report || '',
+    '',
+  ];
+
+  if (report.advice?.length) {
+    lines.push('ADVICE');
+    for (const a of report.advice) lines.push(`  • ${a}`);
+    lines.push('');
+  }
+  if (report.nextSteps?.length) {
+    lines.push('NEXT STEPS');
+    report.nextSteps.forEach((s, i) => lines.push(`  ${i + 1}. ${s}`));
+    lines.push('');
+  }
+  if (report.sources?.length) {
+    lines.push('SOURCES');
+    for (const s of report.sources) lines.push(`  • ${s.title}: ${s.url}`);
+    lines.push('');
+  }
+
+  lines.push(report.disclaimer || 'Educational only — not investment, tax, or legal advice.');
+  lines.push('');
+  lines.push(`View in app: ${clientBaseUrl()}/?section=tools`);
+  lines.push('');
+  lines.push('— Financial Checkup');
+
+  return sendIfConfigured(
+    u.email,
+    `Financial Checkup — ${title}${report.month ? ` (${report.month})` : ''}`,
+    lines.join('\n'),
+  );
+}
+
 async function sendReportEmail(userId, { reportType, month }) {
   const u = await getUserContact(userId);
   if (!u?.email) return { sent: false };
@@ -245,5 +290,6 @@ module.exports = {
   sendDeactivatedEmail,
   sendReportEmail,
   sendAiInsightsEmail,
+  sendSpecialistReportEmail,
   smtpConfigured,
 };

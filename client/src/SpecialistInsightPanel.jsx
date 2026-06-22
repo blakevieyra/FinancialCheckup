@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as api from './api';
 import ExpandablePanel from './ExpandablePanel';
 import { strategyForArea, goalLabel } from './goalResources';
+import { printReport, mailtoReport } from './reportActions';
 
 const GOAL_AREAS = new Set(['savings', 'investments', 'retirement']);
 
@@ -32,11 +33,30 @@ export default function SpecialistInsightPanel({
   btnNeutral,
   income,
   totalExpenses,
+  accountEmail,
 }) {
   const [aiData, setAiData] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailNote, setEmailNote] = useState('');
   const [err, setErr] = useState('');
   const meta = AREA_META[area] || { title: area, hint: 'Tap for details' };
+
+  function buildReportPayload(data) {
+    return {
+      title: meta.title,
+      area,
+      month,
+      score: dimensionScore,
+      grade: dimensionGrade,
+      summary: data.summary,
+      report: data.report,
+      advice: data.advice,
+      nextSteps: data.nextSteps,
+      sources: data.sources,
+      disclaimer: data.disclaimer,
+    };
+  }
 
   async function runAi() {
     if (!isPro) {
@@ -60,10 +80,60 @@ export default function SpecialistInsightPanel({
         summary,
       });
       setAiData(res);
+      if (res.emailSent) {
+        setEmailNote('A copy was emailed to your account address.');
+      } else {
+        setEmailNote('');
+      }
     } catch (e) {
       setErr(e.message || 'AI report failed.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  function handlePrint() {
+    if (!aiData) return;
+    printReport({
+      title: meta.title,
+      month,
+      score: dimensionScore,
+      grade: dimensionGrade,
+      aiData,
+    });
+  }
+
+  async function handleEmail() {
+    if (!aiData) return;
+    setEmailNote('');
+    setEmailBusy(true);
+    try {
+      const res = await api.emailSpecialistReport(token, buildReportPayload(aiData));
+      if (res.emailSent) {
+        setEmailNote('Report emailed to your account address.');
+      } else {
+        mailtoReport({
+          email: accountEmail,
+          title: meta.title,
+          month,
+          score: dimensionScore,
+          grade: dimensionGrade,
+          aiData,
+        });
+        setEmailNote(accountEmail ? 'Opened your email app — send when ready.' : 'Opened email app — add your address and send.');
+      }
+    } catch {
+      mailtoReport({
+        email: accountEmail,
+        title: meta.title,
+        month,
+        score: dimensionScore,
+        grade: dimensionGrade,
+        aiData,
+      });
+      setEmailNote('Server email unavailable — opened your email app instead.');
+    } finally {
+      setEmailBusy(false);
     }
   }
 
@@ -120,6 +190,15 @@ export default function SpecialistInsightPanel({
         {err ? <div style={{ color: '#ffb3b3', fontSize: 13 }}>{err}</div> : null}
         {aiData ? (
           <div style={{ display: 'grid', gap: 10, paddingTop: 4, borderTop: '1px solid rgba(148,163,184,0.15)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <button type="button" onClick={handlePrint} style={{ ...btnNeutral, padding: '0.4rem 0.75rem', fontSize: 13 }}>
+                Print report
+              </button>
+              <button type="button" onClick={handleEmail} disabled={emailBusy} style={{ ...btnNeutral, padding: '0.4rem 0.75rem', fontSize: 13 }}>
+                {emailBusy ? 'Sending…' : 'Email to me'}
+              </button>
+              {emailNote ? <span style={{ fontSize: 12, opacity: 0.75 }}>{emailNote}</span> : null}
+            </div>
             {aiData.summary ? <div style={{ fontWeight: 700 }}>{aiData.summary}</div> : null}
             {aiData.report ? <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.5 }}>{aiData.report}</div> : null}
             {aiData.advice?.length ? (

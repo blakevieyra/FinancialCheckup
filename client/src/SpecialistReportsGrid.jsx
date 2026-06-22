@@ -16,6 +16,7 @@ export default function SpecialistReportsGrid({
   income,
   totalExpenses,
   extended,
+  accountEmail,
 }) {
   if (!result) return null;
   const budgetDim = result.dimensions?.find((d) => d.key === 'budget');
@@ -49,6 +50,7 @@ export default function SpecialistReportsGrid({
         btnNeutral={btnNeutral}
         income={income}
         totalExpenses={totalExpenses}
+        accountEmail={accountEmail}
       />
       <SpecialistInsightPanel
         area="debt"
@@ -71,6 +73,7 @@ export default function SpecialistReportsGrid({
         btnNeutral={btnNeutral}
         income={income}
         totalExpenses={totalExpenses}
+        accountEmail={accountEmail}
       />
       <SpecialistInsightPanel
         area="insurance"
@@ -90,6 +93,7 @@ export default function SpecialistReportsGrid({
         btnNeutral={btnNeutral}
         income={income}
         totalExpenses={totalExpenses}
+        accountEmail={accountEmail}
       />
       <SpecialistInsightPanel
         area="investments"
@@ -109,6 +113,7 @@ export default function SpecialistReportsGrid({
         btnNeutral={btnNeutral}
         income={income}
         totalExpenses={totalExpenses}
+        accountEmail={accountEmail}
       />
       <SpecialistInsightPanel
         area="savings"
@@ -128,6 +133,7 @@ export default function SpecialistReportsGrid({
         btnNeutral={btnNeutral}
         income={income}
         totalExpenses={totalExpenses}
+        accountEmail={accountEmail}
       />
       <SpecialistInsightPanel
         area="retirement"
@@ -147,6 +153,7 @@ export default function SpecialistReportsGrid({
         btnNeutral={btnNeutral}
         income={income}
         totalExpenses={totalExpenses}
+        accountEmail={accountEmail}
       />
     </div>
   );

@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { verifyToken } = require('./auth');
 const { createMessage, parseJsonFromText } = require('./anthropicClient');
 const { requireFeature } = require('./requireFeature');
-const { sendAiInsightsEmail } = require('./transactionalEmail');
+const { sendAiInsightsEmail, sendSpecialistReportEmail } = require('./transactionalEmail');
 
 router.use(verifyToken);
 
@@ -203,7 +203,7 @@ Return ONLY valid JSON:
     const system = 'Return a single valid JSON object only. No markdown.';
     const text = await createMessage({ userContent: prompt, maxTokens: 2048, system });
     const parsed = parseJsonFromText(text);
-    res.json({
+    const result = {
       area,
       month: safeMonth,
       summary: parsed.summary || '',
@@ -212,10 +212,29 @@ Return ONLY valid JSON:
       nextSteps: Array.isArray(parsed.nextSteps) ? parsed.nextSteps : [],
       sources: Array.isArray(parsed.sources) ? parsed.sources : [],
       disclaimer: parsed.disclaimer || 'Educational only.',
-    });
+    };
+    const emailResult = await sendSpecialistReportEmail(req.user.id, {
+      ...result,
+      title: area.charAt(0).toUpperCase() + area.slice(1),
+    }).catch(() => ({ sent: false }));
+    res.json({ ...result, emailSent: Boolean(emailResult?.sent) });
   } catch (err) {
     console.error('AI specialist error:', err.message);
     res.status(502).json({ error: err.message || 'Specialist AI failed.' });
+  }
+});
+
+router.post('/specialist/email', requireFeature('aiInsights'), async (req, res) => {
+  const report = req.body?.report;
+  if (!report || (!report.summary && !report.report)) {
+    return res.status(400).json({ error: 'Missing report content.' });
+  }
+  try {
+    const emailResult = await sendSpecialistReportEmail(req.user.id, report).catch(() => ({ sent: false }));
+    res.json({ emailSent: Boolean(emailResult?.sent), reason: emailResult?.reason || null });
+  } catch (err) {
+    console.error('Specialist email error:', err.message);
+    res.status(500).json({ error: 'Failed to send email.' });
   }
 });
 

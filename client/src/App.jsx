@@ -227,7 +227,16 @@ function LineChartSvg({ data }) {
   const gridLines = Array.from({ length: gridCount + 1 }, (_, i) => i);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="260" role="img" aria-label="History line chart">
+    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="260" role="img" aria-label="Income vs expenses history line chart">
+      <text x={padL} y={14} fill="rgba(230,237,243,0.75)" fontSize="12">
+        Blue = income · Orange = expenses
+      </text>
+      <g transform={`translate(${width - padR - 168}, 8)`}>
+        <line x1={0} y1={8} x2={22} y2={8} stroke="#3b82f6" strokeWidth="2.5" />
+        <text x={28} y={12} fill="rgba(230,237,243,0.85)" fontSize="11">Income</text>
+        <line x1={88} y1={8} x2={110} y2={8} stroke="#f59e0b" strokeWidth="2.5" />
+        <text x={116} y={12} fill="rgba(230,237,243,0.85)" fontSize="11">Expenses</text>
+      </g>
       {gridLines.map((i) => {
         const v = (maxY * i) / gridCount;
         const yy = y(v);
@@ -1289,25 +1298,55 @@ export default function App() {
   );
 
   const categoryStats = useMemo(() => {
-    const rows = monthBarData || [];
-    const total = rows.reduce((s, r) => s + (Number(r.value) || 0), 0);
+    const rows = (expenses || [])
+      .map((e) => ({ name: e.category, value: Number(e.amount) || 0 }))
+      .filter((r) => r.value > 0)
+      .sort((a, b) => b.value - a.value);
+    const total = Number(totalExpenses) || rows.reduce((s, r) => s + r.value, 0);
     const nonZeroCount = rows.length;
     const top = rows[0] || null;
+    const bottom = rows.length ? rows[rows.length - 1] : null;
     const avgPerActive = nonZeroCount ? total / nonZeroCount : 0;
+    const values = rows.map((r) => r.value).sort((a, b) => a - b);
+    const median = values.length
+      ? values.length % 2
+        ? values[(values.length - 1) / 2]
+        : (values[values.length / 2 - 1] + values[values.length / 2]) / 2
+      : 0;
     const aboveAvgCount = rows.filter(
-      (r) => (Number(r.value) || 0) > (Number(categoryAverages?.[r.name]) || 0) + 0.5,
+      (r) => r.value > (Number(categoryAverages?.[r.name]) || 0) + 0.5,
     ).length;
-    const topShare = total > 0 && top ? (Number(top.value) / total) * 100 : 0;
+    const belowAvgCount = rows.filter(
+      (r) => r.value < (Number(categoryAverages?.[r.name]) || 0) - 0.5,
+    ).length;
+    const topShare = total > 0 && top ? (top.value / total) * 100 : 0;
+    const bottomShare = total > 0 && bottom ? (bottom.value / total) * 100 : 0;
     const peerComparisonReady = categoryAvgPeerCount > 1;
+    const inc = Number(income) || 0;
+    const surplus = inc - total;
+    const savingsRate = inc > 0 ? ((inc - total) / inc) * 100 : 0;
+    const expenseRatioPct = inc > 0 ? (total / inc) * 100 : 0;
+    const topThreeShare = total > 0
+      ? (rows.slice(0, 3).reduce((s, r) => s + r.value, 0) / total) * 100
+      : 0;
     return {
+      total,
       nonZeroCount,
       avgPerActive,
+      median,
       aboveAvgCount: peerComparisonReady ? aboveAvgCount : null,
+      belowAvgCount: peerComparisonReady ? belowAvgCount : null,
       peerComparisonReady,
       topCategory: top?.name || 'N/A',
       topShare,
+      bottomCategory: bottom?.name || 'N/A',
+      bottomShare,
+      topThreeShare,
+      surplus,
+      savingsRate,
+      expenseRatioPct,
     };
-  }, [monthBarData, categoryAverages, categoryAvgPeerCount]);
+  }, [expenses, totalExpenses, categoryAverages, categoryAvgPeerCount, income]);
 
   const historySeries = useMemo(() => {
     const expMap = new Map((expensesHistory || []).map((e) => [e.month, Number(e.total) || 0]));
@@ -1362,8 +1401,10 @@ export default function App() {
     return {
       mean,
       variance,
+      stdDev: Math.sqrt(variance),
       max,
       min,
+      range: max - min,
       maxMonth,
       minMonth,
     };
@@ -1991,26 +2032,86 @@ export default function App() {
               <CategoryBarChartSvg data={monthBarData} avgByCategory={categoryAverages} compact={isMobile} />
             </div>
             <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '0.75rem' }}>
-              <div style={{ marginBottom: 8, opacity: 0.92, fontWeight: 700 }}>Category statistics</div>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, fontSize: 13 }}>
-                <div>Active categories: <strong>{categoryStats.nonZeroCount}</strong></div>
-                <div>Avg per active category: <strong>${Number(categoryStats.avgPerActive).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
-                <div>
-                  Above community avg:{' '}
-                  <strong>
-                    {categoryStats.peerComparisonReady
-                      ? categoryStats.aboveAvgCount
-                      : '— (need 2+ users)'}
-                  </strong>
+              <div style={{ marginBottom: 10, opacity: 0.92, fontWeight: 700 }}>Category statistics</div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Total spend ({month})</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>${Number(categoryStats.total).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                 </div>
-                <div>Top concentration: <strong>{categoryStats.topCategory} ({categoryStats.topShare.toFixed(1)}%)</strong></div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Monthly surplus</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2, color: categoryStats.surplus >= 0 ? '#86efac' : '#fca5a5' }}>
+                    {categoryStats.surplus >= 0 ? '+' : ''}${Math.abs(categoryStats.surplus).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Savings rate</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>{categoryStats.savingsRate.toFixed(1)}%</div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Active categories</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>{categoryStats.nonZeroCount}</div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Avg per category</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>${Number(categoryStats.avgPerActive).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Median category spend</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>${Number(categoryStats.median).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Top 3 categories share</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>{categoryStats.topThreeShare.toFixed(1)}%</div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Largest category</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginTop: 2, lineHeight: 1.25 }}>{categoryStats.topCategory} ({categoryStats.topShare.toFixed(1)}%)</div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Smallest active category</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginTop: 2, lineHeight: 1.25 }}>{categoryStats.bottomCategory} ({categoryStats.bottomShare.toFixed(1)}%)</div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Above community avg</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>
+                    {categoryStats.peerComparisonReady ? categoryStats.aboveAvgCount : '—'}
+                  </div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Below community avg</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>
+                    {categoryStats.peerComparisonReady ? categoryStats.belowAvgCount : '—'}
+                  </div>
+                </div>
+                <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                  <div style={{ opacity: 0.7, fontSize: 11 }}>Expense ratio</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginTop: 2 }}>{categoryStats.expenseRatioPct.toFixed(1)}%</div>
+                </div>
               </div>
               {rudimentaryStats ? (
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: 13, display: 'grid', gap: 6 }}>
-                  <div style={{ fontWeight: 700 }}>Spend statistics over time</div>
-                  <div>Mean monthly spend: <strong>${Number(rudimentaryStats.mean).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></div>
-                  <div>Most spend month: <strong>{rudimentaryStats.maxMonth || 'N/A'}</strong></div>
-                  <div>Least spend month: <strong>{rudimentaryStats.minMonth || 'N/A'}</strong></div>
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Spend statistics over time</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+                    <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                      <div style={{ opacity: 0.7, fontSize: 11 }}>Mean monthly spend</div>
+                      <div style={{ fontWeight: 800, fontSize: 15, marginTop: 2 }}>${Number(rudimentaryStats.mean).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                    </div>
+                    <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                      <div style={{ opacity: 0.7, fontSize: 11 }}>Spend volatility (σ)</div>
+                      <div style={{ fontWeight: 800, fontSize: 15, marginTop: 2 }}>${Number(rudimentaryStats.stdDev).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                    </div>
+                    <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                      <div style={{ opacity: 0.7, fontSize: 11 }}>Highest spend month</div>
+                      <div style={{ fontWeight: 800, fontSize: 15, marginTop: 2 }}>{rudimentaryStats.maxMonth || 'N/A'}</div>
+                      <div style={{ fontSize: 11, opacity: 0.7 }}>${Number(rudimentaryStats.max).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                    </div>
+                    <div style={{ ...cardSoftStyle, padding: '0.55rem 0.65rem' }}>
+                      <div style={{ opacity: 0.7, fontSize: 11 }}>Lowest spend month</div>
+                      <div style={{ fontWeight: 800, fontSize: 15, marginTop: 2 }}>{rudimentaryStats.minMonth || 'N/A'}</div>
+                      <div style={{ fontSize: 11, opacity: 0.7 }}>${Number(rudimentaryStats.min).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </div>

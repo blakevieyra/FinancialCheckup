@@ -246,6 +246,7 @@ export default function MoreToolsPanel({
                     income={income}
                     totalExpenses={totalExpenses}
                     extended={extendedProfile}
+                    accountEmail={userEmail}
                   />
                 ) : (
                   <div style={{ fontSize: 13, opacity: 0.75, lineHeight: 1.45 }}>

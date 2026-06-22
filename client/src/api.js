@@ -320,6 +320,10 @@ export async function getSpecialistAdvice(token, payload) {
   return apiFetch('/api/ai/specialist', { method: 'POST', token, body: payload });
 }
 
+export async function emailSpecialistReport(token, report) {
+  return apiFetch('/api/ai/specialist/email', { method: 'POST', token, body: { report } });
+}
+
 export async function getGoals(token) {
   return apiFetch('/api/goals', { token });
 }
