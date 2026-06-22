@@ -1,7 +1,7 @@
 const { dbRun, dbGet, dbAll } = require('./db');
 
 const SPECIALIST_AREAS = new Set(['budget', 'debt', 'insurance', 'investments', 'savings', 'retirement']);
-const LOG_AREAS = new Set([...SPECIALIST_AREAS, 'comprehensive', 'expert']);
+const LOG_AREAS = new Set([...SPECIALIST_AREAS, 'ai-insights', 'comprehensive', 'expert']);
 
 function parseRow(row, { includeBody = false } = {}) {
   let body = {};

@@ -1,8 +1,6 @@
 import { MORE_TOOL_SECTIONS, RESOURCE_LINKS } from './planConstants';
 import SpecialistReportsGrid from './SpecialistReportsGrid';
-import AiInsightsPanel from './AiInsightsPanel';
-import ExpertBriefingPanel from './ExpertBriefingPanel';
-import ComprehensiveReportPanel from './ComprehensiveReportPanel';
+import AdviceToolsGrid from './AdviceToolsGrid';
 import { TOOL_ETA_SECONDS, useGenerationTimer } from './useGenerationTimer';
 
 function ProBadge() {
@@ -92,14 +90,17 @@ export default function MoreToolsPanel({
   onAiInsights,
   aiError,
   aiPlan,
+  aiReportId,
   expertBusy,
   onExpert,
   expertError,
   expertData,
+  expertReportId,
   comprehensiveData,
   comprehensiveBusy,
   comprehensiveError,
   onComprehensiveReport,
+  comprehensiveReportId,
   onPrintAiReport,
   onEmailAiReport,
   onPrintExpertReport,
@@ -135,27 +136,18 @@ export default function MoreToolsPanel({
     csv: onExportCsv,
     pdf: onExportPdf,
     bizpdf: onExportBusinessPdf,
-    ai: onAiInsights,
-    expert: onExpert,
-    comprehensive: onComprehensiveReport,
   };
 
   const toolBusy = {
     csv: exportBusy,
     pdf: pdfBusy,
     bizpdf: businessPdfBusy,
-    ai: aiBusy,
-    expert: expertBusy,
-    comprehensive: comprehensiveBusy,
   };
 
   const toolBusyLabel = {
     csv: 'Exporting…',
     pdf: 'Building PDF…',
     bizpdf: 'Building PDF…',
-    ai: 'Generating insights…',
-    expert: 'Building briefing…',
-    comprehensive: 'Building report…',
   };
 
   return (
@@ -195,6 +187,18 @@ export default function MoreToolsPanel({
             {section.pro ? <ProBadge /> : null}
           </div>
           <p style={{ margin: 0, fontSize: 14, opacity: 0.85, lineHeight: 1.45 }}>{section.intro}</p>
+          {section.id === 'ai' ? (
+            <select
+              value={profile}
+              onChange={(e) => onProfileChange(e.target.value)}
+              style={{ ...inputStyle, maxWidth: 320 }}
+              aria-label="Profile type for AI advice"
+            >
+              <option value="personal">Personal profile</option>
+              <option value="business">Business profile</option>
+              <option value="organizational">Organizational profile</option>
+            </select>
+          ) : null}
           {section.tools.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: grid2, gap: 12 }}>
             {section.tools.map((tool) => (
@@ -214,56 +218,49 @@ export default function MoreToolsPanel({
           ) : null}
           {section.id === 'ai' ? (
             <div style={{ display: 'grid', gap: 16 }}>
-              <select value={profile} onChange={(e) => onProfileChange(e.target.value)} style={{ ...inputStyle, maxWidth: 280 }}>
-                <option value="personal">Personal profile</option>
-                <option value="business">Business profile</option>
-                <option value="organizational">Organizational profile</option>
-              </select>
-
-              {aiError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{aiError}</div> : null}
-              {aiPlan ? (
-                <AiInsightsPanel
-                  aiPlan={aiPlan}
-                  cardSoftStyle={cardSoftStyle}
-                  isMobile={isMobile}
-                  onPrint={onPrintAiReport}
-                  onEmail={onEmailAiReport}
-                  emailBusy={aiEmailBusy}
-                  emailNote={aiEmailNote}
-                  btnNeutral={btnNeutral}
-                />
-              ) : null}
-
-              {expertError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{expertError}</div> : null}
-              {expertData?.expert ? (
-                <ExpertBriefingPanel
-                  expertData={expertData}
-                  cardSoftStyle={cardSoftStyle}
-                  onPrint={onPrintExpertReport}
-                  onEmail={onEmailExpertReport}
-                  emailBusy={expertEmailBusy}
-                  emailNote={expertEmailNote}
-                  btnNeutral={btnNeutral}
-                />
-              ) : null}
-
-              {comprehensiveError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{comprehensiveError}</div> : null}
-              {comprehensiveData ? (
-                <ComprehensiveReportPanel
-                  data={comprehensiveData}
-                  month={month}
-                  overallScore={overallScore}
-                  grade={budgetGrade}
-                  income={income}
-                  totalExpenses={totalExpenses}
-                  onPrint={onPrintComprehensiveReport}
-                  onEmail={onEmailComprehensiveReport}
-                  emailBusy={comprehensiveEmailBusy}
-                  emailNote={comprehensiveEmailNote}
-                  btnNeutral={btnNeutral}
-                  cardSoftStyle={cardSoftStyle}
-                />
-              ) : null}
+              <AdviceToolsGrid
+                isTablet={isTablet}
+                cardSoftStyle={cardSoftStyle}
+                token={token}
+                isPro={isPro}
+                onGoPlan={onGoPlan}
+                btnPrimary={btnPrimary}
+                btnNeutral={btnNeutral}
+                isMobile={isMobile}
+                month={month}
+                overallScore={overallScore}
+                budgetGrade={budgetGrade}
+                income={income}
+                totalExpenses={totalExpenses}
+                checkupResult={checkupResult}
+                aiPlan={aiPlan}
+                aiBusy={aiBusy}
+                aiError={aiError}
+                onAiInsights={onAiInsights}
+                aiReportId={aiReportId}
+                onPrintAiReport={onPrintAiReport}
+                onEmailAiReport={onEmailAiReport}
+                aiEmailBusy={aiEmailBusy}
+                aiEmailNote={aiEmailNote}
+                expertData={expertData}
+                expertBusy={expertBusy}
+                expertError={expertError}
+                onExpert={onExpert}
+                expertReportId={expertReportId}
+                onPrintExpertReport={onPrintExpertReport}
+                onEmailExpertReport={onEmailExpertReport}
+                expertEmailBusy={expertEmailBusy}
+                expertEmailNote={expertEmailNote}
+                comprehensiveData={comprehensiveData}
+                comprehensiveBusy={comprehensiveBusy}
+                comprehensiveError={comprehensiveError}
+                onComprehensiveReport={onComprehensiveReport}
+                comprehensiveReportId={comprehensiveReportId}
+                onPrintComprehensiveReport={onPrintComprehensiveReport}
+                onEmailComprehensiveReport={onEmailComprehensiveReport}
+                comprehensiveEmailBusy={comprehensiveEmailBusy}
+                comprehensiveEmailNote={comprehensiveEmailNote}
+              />
 
               <div style={{ display: 'grid', gap: 10, paddingTop: 8, borderTop: '1px solid rgba(148,163,184,0.15)' }}>
                 <div>

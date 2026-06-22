@@ -3,7 +3,7 @@ const { verifyToken } = require('./auth');
 const { createMessage, parseJsonFromText } = require('./anthropicClient');
 const { requireFeature } = require('./requireFeature');
 const { sendAiInsightsEmail, sendSpecialistReportEmail } = require('./transactionalEmail');
-const { saveAiReport, listAiReports, getAiReport, deleteAiReport, SPECIALIST_AREAS } = require('./aiReportLog');
+const { saveAiReport, listAiReports, getAiReport, deleteAiReport, SPECIALIST_AREAS, LOG_AREAS } = require('./aiReportLog');
 
 router.use(verifyToken);
 
@@ -408,7 +408,7 @@ router.get('/specialist/history', requireFeature('aiInsights'), async (req, res)
   const area = req.query.area;
   const month = req.query.month;
   const limit = req.query.limit;
-  if (area && !SPECIALIST_AREAS.has(area)) {
+  if (area && !LOG_AREAS.has(area)) {
     return res.status(400).json({ error: 'Invalid area filter.' });
   }
   if (month && !/^\d{4}-\d{2}$/.test(month)) {

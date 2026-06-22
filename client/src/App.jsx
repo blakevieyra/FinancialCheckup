@@ -2447,6 +2447,7 @@ export default function App() {
             onAiInsights={generateInsights}
             aiError={aiError}
             aiPlan={aiPlan}
+            aiReportId={aiPlan?.reportId}
             token={token}
             userEmail={accountEmail || digestEmail}
             onAccountDeleted={logout}
@@ -2454,7 +2455,9 @@ export default function App() {
             onExpert={loadExpertBriefing}
             expertError={expertError}
             expertData={expertData}
+            expertReportId={expertData?.reportId}
             comprehensiveData={comprehensiveData}
+            comprehensiveReportId={comprehensiveData?.reportId}
             comprehensiveBusy={comprehensiveBusy}
             comprehensiveError={comprehensiveError}
             onComprehensiveReport={loadComprehensiveReport}
