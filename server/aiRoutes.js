@@ -220,6 +220,8 @@ Return ONLY valid JSON:
     const result = {
       area,
       month: safeMonth,
+      income: Number(income || 0),
+      totalExpenses: Number(totalExpenses || 0),
       summary: parsed.summary || '',
       report: parsed.report || '',
       advice: Array.isArray(parsed.advice) ? parsed.advice : [],
@@ -230,6 +232,8 @@ Return ONLY valid JSON:
     const emailResult = await sendSpecialistReportEmail(req.user.id, {
       ...result,
       title: area.charAt(0).toUpperCase() + area.slice(1),
+      score: dimensionScore,
+      grade: dimensionGrade,
     }).catch(() => ({ sent: false }));
 
     let reportId = null;

@@ -51,6 +51,50 @@ function gradeFromExpenseRatio(ratio) {
   return 'F';
 }
 
+function IncomeExpenseRatioBadge({ income, expenses, month, compact }) {
+  const inc = Number(income) || 0;
+  const exp = Number(expenses) || 0;
+  if (inc <= 0 && exp <= 0) return null;
+  const ieRatio = exp > 0 ? inc / exp : null;
+  const expensePct = inc > 0 ? (exp / inc) * 100 : null;
+  const surplus = inc - exp;
+  const healthy = inc > 0 && inc >= exp;
+  const color = healthy ? '#22c55e' : '#ef4444';
+
+  return (
+    <div
+      style={{
+        flexShrink: 0,
+        minWidth: compact ? undefined : 148,
+        padding: '0.65rem 0.75rem',
+        borderRadius: 10,
+        border: `1px solid ${healthy ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
+        background: healthy ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+        alignSelf: compact ? 'stretch' : 'flex-start',
+      }}
+    >
+      <div style={{ fontSize: 11, opacity: 0.75, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        Income/expense ratio
+      </div>
+      {month ? <div style={{ fontSize: 10, opacity: 0.55, marginTop: 2 }}>{month}</div> : null}
+      <div style={{ fontSize: compact ? 22 : 26, fontWeight: 800, color, marginTop: 6, lineHeight: 1.1 }}>
+        {ieRatio != null ? `${ieRatio.toFixed(2)}×` : '—'}
+      </div>
+      {expensePct != null ? (
+        <div style={{ fontSize: 12, color, fontWeight: 600, marginTop: 4 }}>
+          {expensePct.toFixed(1)}% of income
+        </div>
+      ) : null}
+      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6 }}>
+        Surplus:{' '}
+        <span style={{ color, fontWeight: 700 }}>
+          {surplus >= 0 ? '+' : ''}${Math.abs(surplus).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function PieChartSvg({ data, colors, wrapLegend }) {
   const total = data.reduce((s, d) => s + d.value, 0);
   const r = 78;
@@ -2020,13 +2064,18 @@ export default function App() {
               <div style={{ marginBottom: 6, opacity: 0.9, fontWeight: 700 }}>Income vs expenses (history)</div>
               {historyError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{historyError}</div> : null}
               {historySeries.length ? (
-                <LineChartSvg
-                  data={historySeries.map((d) => ({
-                    month: d.month,
-                    expensesTotal: d.expensesTotal,
-                    incomeAmount: d.incomeAmount,
-                  }))}
-                />
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, alignItems: isMobile ? 'stretch' : 'flex-start' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <LineChartSvg
+                      data={historySeries.map((d) => ({
+                        month: d.month,
+                        expensesTotal: d.expensesTotal,
+                        incomeAmount: d.incomeAmount,
+                      }))}
+                    />
+                  </div>
+                  <IncomeExpenseRatioBadge income={income} expenses={totalExpenses} month={month} compact={isMobile} />
+                </div>
               ) : (
                 <div style={{ opacity: 0.85, padding: '0.75rem 0' }}>No history yet.</div>
               )}

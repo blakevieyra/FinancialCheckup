@@ -135,6 +135,8 @@ export default function SpecialistInsightPanel({
       month,
       score: dimensionScore,
       grade: dimensionGrade,
+      income,
+      totalExpenses,
       summary: data.summary,
       report: data.report,
       advice: data.advice,
@@ -216,6 +218,8 @@ export default function SpecialistInsightPanel({
       score: dimensionScore,
       grade: dimensionGrade,
       aiData,
+      income,
+      totalExpenses,
     });
   }
 
@@ -235,6 +239,8 @@ export default function SpecialistInsightPanel({
           score: dimensionScore,
           grade: dimensionGrade,
           aiData,
+          income,
+          totalExpenses,
         });
         setEmailNote(accountEmail ? 'Opened your email app — send when ready.' : 'Opened email app — add your address and send.');
       }
@@ -246,6 +252,8 @@ export default function SpecialistInsightPanel({
         score: dimensionScore,
         grade: dimensionGrade,
         aiData,
+        income,
+        totalExpenses,
       });
       setEmailNote('Server email unavailable — opened your email app instead.');
     } finally {

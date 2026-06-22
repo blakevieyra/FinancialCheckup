@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { sendEmailPlain, smtpConfigured } = require('./mailer');
 const { getUserContact } = require('./userEmail');
+const { buildBrandedReportEmail } = require('./emailTemplates');
 
 function clientBaseUrl() {
   return (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
@@ -206,10 +207,25 @@ async function sendAiInsightsEmail(userId, plan) {
   lines.push('');
   lines.push('— Financial Checkup');
 
+  const html = buildBrandedReportEmail({
+    username: u.username,
+    reportTitle: 'AI Financial Plan',
+    month: plan.month,
+    summary: plan.summary,
+    report: null,
+    advice: (plan.categoryPlans || []).flatMap((c) => (c.optimizedPlan || []).slice(0, 2)),
+    nextSteps: (plan.insights || []).slice(0, 5).map((i) => `${i.title}: ${i.message}`),
+    sources: (plan.categoryPlans || []).flatMap((c) => c.sources || []).slice(0, 6),
+    disclaimer: plan.disclaimer,
+    ctaHref: `${clientBaseUrl()}/?section=tools`,
+    ctaLabel: 'View full plan in app',
+  });
+
   return sendIfConfigured(
     u.email,
     `Your AI financial plan — ${plan.month || 'checkup'}`,
     lines.join('\n'),
+    html,
   );
 }
 
@@ -251,10 +267,29 @@ async function sendSpecialistReportEmail(userId, report) {
   lines.push('');
   lines.push('— Financial Checkup');
 
+  const html = buildBrandedReportEmail({
+    username: u.username,
+    reportTitle: title,
+    month: report.month,
+    score: report.score,
+    grade: report.grade,
+    income: report.income,
+    totalExpenses: report.totalExpenses,
+    summary: report.summary,
+    report: report.report,
+    advice: report.advice,
+    nextSteps: report.nextSteps,
+    sources: report.sources,
+    disclaimer: report.disclaimer,
+    ctaHref: `${clientBaseUrl()}/?section=tools`,
+    ctaLabel: 'Open report in app',
+  });
+
   return sendIfConfigured(
     u.email,
     `Financial Checkup — ${title}${report.month ? ` (${report.month})` : ''}`,
     lines.join('\n'),
+    html,
   );
 }
 
