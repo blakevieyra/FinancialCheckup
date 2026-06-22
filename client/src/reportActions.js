@@ -24,6 +24,27 @@ export function formatSpecialistReportText({ title, month, score, grade, aiData,
   if (aiData.sources?.length) {
     lines.push('SOURCES', ...aiData.sources.map((s) => `• ${s.title}: ${s.url}${s.why ? ` — ${s.why}` : ''}`), '');
   }
+  if (aiData.primaryResources?.length) {
+    lines.push('PRIMARY RESOURCES', ...aiData.primaryResources.map((s) => `• ${s.title}: ${s.url}${s.why ? ` — ${s.why}` : ''}`), '');
+  }
+  if (aiData.dimensionAnalysis?.length) {
+    lines.push('DIMENSION ANALYSIS');
+    for (const d of aiData.dimensionAnalysis) {
+      lines.push(`• ${d.dimension || d.label}: ${d.analysis || d.summary || ''}`);
+    }
+    lines.push('');
+  }
+  if (aiData.actionRoadmap?.length) {
+    lines.push('ACTION ROADMAP');
+    for (const block of aiData.actionRoadmap) {
+      lines.push(`${block.timeframe || block.phase}:`);
+      for (const a of block.actions || []) lines.push(`  - ${a}`);
+    }
+    lines.push('');
+  }
+  if (aiData.riskWatchouts?.length) {
+    lines.push('RISK WATCHOUTS', ...aiData.riskWatchouts.map((r) => `• ${r}`), '');
+  }
   if (aiData.disclaimer) lines.push(aiData.disclaimer);
   lines.push('', '— Financial Checkup (educational only, not financial advice)');
   return lines.join('\n');
@@ -38,6 +59,16 @@ export function formatSpecialistReportHtml({ title, month, score, grade, aiData,
   const ratioColor = healthy ? '#16a34a' : '#dc2626';
   const advice = (aiData.advice || []).map((a) => `<li>${esc(a)}</li>`).join('');
   const steps = (aiData.nextSteps || []).map((s) => `<li>${esc(s)}</li>`).join('');
+  const primary = (aiData.primaryResources || [])
+    .map((s) => `<li><a href="${esc(s.url)}">${esc(s.title)}</a>${s.why ? ` — ${esc(s.why)}` : ''}</li>`)
+    .join('');
+  const dimensions = (aiData.dimensionAnalysis || [])
+    .map((d) => `<li><strong>${esc(d.dimension || d.label)}</strong> (${Math.round(d.score || 0)}/100): ${esc(d.analysis || d.summary || '')}</li>`)
+    .join('');
+  const roadmap = (aiData.actionRoadmap || [])
+    .map((b) => `<div style="margin-bottom:10px"><strong>${esc(b.timeframe || b.phase)}</strong><ul>${(b.actions || []).map((a) => `<li>${esc(a)}</li>`).join('')}</ul></div>`)
+    .join('');
+  const risks = (aiData.riskWatchouts || []).map((r) => `<li>${esc(r)}</li>`).join('');
   const sources = (aiData.sources || [])
     .map((s) => `<li><a href="${esc(s.url)}">${esc(s.title)}</a>${s.why ? ` — ${esc(s.why)}` : ''}</li>`)
     .join('');
@@ -58,7 +89,11 @@ ${aiData.summary ? `<p><strong>${esc(aiData.summary)}</strong></p>` : ''}
 ${aiData.report ? `<p>${esc(aiData.report)}</p>` : ''}
 ${advice ? `<h2>Advice</h2><ul>${advice}</ul>` : ''}
 ${steps ? `<h2>Next steps</h2><ol>${steps}</ol>` : ''}
-${sources ? `<h2>Sources</h2><ul>${sources}</ul>` : ''}
+${dimensions ? `<h2>Dimension analysis</h2><ul>${dimensions}</ul>` : ''}
+${roadmap ? `<h2>Action roadmap</h2>${roadmap}` : ''}
+${risks ? `<h2>Risk watchouts</h2><ul>${risks}</ul>` : ''}
+${primary ? `<h2>Primary resources</h2><ul>${primary}</ul>` : ''}
+${sources ? `<h2>Additional sources</h2><ul>${sources}</ul>` : ''}
 <div class="disc">${esc(aiData.disclaimer || 'Educational only.')} · Operon E2I LLC · info@operone2i.com</div>
 </body></html>`;
 }
@@ -84,4 +119,46 @@ export function mailtoReport({ email, title, aiData, month, score, grade, income
   const to = email || '';
   const href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = href;
+}
+
+export function aiPlanToReportData(aiPlan) {
+  if (!aiPlan) return {};
+  return {
+    summary: aiPlan.summary,
+    report: (aiPlan.specialistPlans || []).map((sp) => `${sp.area}: ${sp.summary || ''}`).join('\n'),
+    advice: (aiPlan.insights || []).map((i) => `${i.title}: ${i.message}`),
+    nextSteps: (aiPlan.categoryPlans || []).flatMap((c) => (c.optimizedPlan || []).slice(0, 3)),
+    sources: (aiPlan.categoryPlans || []).flatMap((c) => c.sources || []).slice(0, 10),
+    primaryResources: (aiPlan.categoryPlans || []).flatMap((c) => c.sources || []),
+    disclaimer: aiPlan.disclaimer,
+  };
+}
+
+export function expertToReportData(expertData) {
+  const e = expertData?.expert || {};
+  return {
+    summary: e.headline,
+    report: [e.executiveVerdict, e.benchmarkContext].filter(Boolean).join('\n\n'),
+    advice: [],
+    nextSteps: e.personalizedPriorities || [],
+    riskWatchouts: e.riskWatchouts || [],
+    sources: [],
+    disclaimer: e.disclaimer,
+  };
+}
+
+export function comprehensiveToReportData(data) {
+  if (!data) return {};
+  return {
+    summary: data.summary,
+    report: data.report,
+    dimensionAnalysis: data.dimensionAnalysis,
+    actionRoadmap: data.actionRoadmap,
+    advice: data.advice,
+    riskWatchouts: data.riskWatchouts,
+    primaryResources: data.primaryResources,
+    nextSteps: data.nextSteps,
+    sources: data.sources,
+    disclaimer: data.disclaimer,
+  };
 }

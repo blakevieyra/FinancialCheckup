@@ -70,11 +70,11 @@ ${macroLine ? `Macro context (optional): ${macroLine}` : ''}
 
 Return ONLY valid JSON (no markdown) with this exact shape:
 {
-  "headline": "string under 80 chars",
-  "executiveVerdict": "2-3 sentences",
-  "personalizedPriorities": ["max 5 actionable strings"],
-  "benchmarkContext": "1-2 sentences comparing to common rules of thumb for this profile",
-  "riskWatchouts": ["max 4 short strings"],
+  "headline": "string under 80 chars — specific numbers if deficit or critical ratio",
+  "executiveVerdict": "3-4 sentences: cash flow reality, biggest structural risk, what must change first",
+  "personalizedPriorities": ["5 ordered, specific actionable strings tied to user's expense lines"],
+  "benchmarkContext": "2-3 sentences comparing expense ratio and top categories to common rules (50/30/20, housing under 28-30%, emergency fund months)",
+  "riskWatchouts": ["4-5 short strings — debt spiral, concentration, liquidity, income fragility"],
   "disclaimer": "One sentence: educational only, not personalized investment/legal/tax advice."
 }`;
 

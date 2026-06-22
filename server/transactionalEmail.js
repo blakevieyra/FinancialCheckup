@@ -253,6 +253,31 @@ async function sendSpecialistReportEmail(userId, report) {
     report.nextSteps.forEach((s, i) => lines.push(`  ${i + 1}. ${s}`));
     lines.push('');
   }
+  if (report.dimensionAnalysis?.length) {
+    lines.push('DIMENSION ANALYSIS');
+    for (const d of report.dimensionAnalysis) {
+      lines.push(`  • ${d.dimension || d.label}: ${d.analysis || d.summary || ''}`);
+    }
+    lines.push('');
+  }
+  if (report.actionRoadmap?.length) {
+    lines.push('ACTION ROADMAP');
+    for (const b of report.actionRoadmap) {
+      lines.push(`  ${b.timeframe || b.phase}:`);
+      for (const a of b.actions || []) lines.push(`    - ${a}`);
+    }
+    lines.push('');
+  }
+  if (report.riskWatchouts?.length) {
+    lines.push('RISK WATCHOUTS');
+    for (const r of report.riskWatchouts) lines.push(`  • ${r}`);
+    lines.push('');
+  }
+  if (report.primaryResources?.length) {
+    lines.push('PRIMARY RESOURCES');
+    for (const s of report.primaryResources) lines.push(`  • ${s.title}: ${s.url}`);
+    lines.push('');
+  }
   if (report.sources?.length) {
     lines.push('SOURCES');
     for (const s of report.sources) lines.push(`  • ${s.title}: ${s.url}`);
@@ -278,6 +303,10 @@ async function sendSpecialistReportEmail(userId, report) {
     advice: report.advice,
     nextSteps: report.nextSteps,
     sources: report.sources,
+    primaryResources: report.primaryResources,
+    dimensionAnalysis: report.dimensionAnalysis,
+    actionRoadmap: report.actionRoadmap,
+    riskWatchouts: report.riskWatchouts,
     disclaimer: report.disclaimer,
     ctaHref: `${clientBaseUrl()}/?section=tools`,
     ctaLabel: 'Open report in app',

@@ -318,6 +318,10 @@ function buildBrandedReportEmail({
   advice,
   nextSteps,
   sources,
+  primaryResources,
+  dimensionAnalysis,
+  actionRoadmap,
+  riskWatchouts,
   disclaimer,
   ctaHref,
   ctaLabel,
@@ -342,6 +346,27 @@ function buildBrandedReportEmail({
       (s) =>
         `<li style="margin-bottom:6px;font-size:13px;"><a href="${esc(s.url)}" style="color:#2563eb;">${esc(s.title)}</a>${s.why ? `<span style="color:#64748b;"> — ${esc(s.why)}</span>` : ''}</li>`,
     )
+    .join('');
+  const primaryList = (primaryResources || [])
+    .map(
+      (s) =>
+        `<li style="margin-bottom:6px;font-size:13px;"><a href="${esc(s.url)}" style="color:#2563eb;font-weight:600;">${esc(s.title)}</a>${s.category ? `<span style="color:#64748b;"> · ${esc(s.category)}</span>` : ''}${s.why ? `<div style="color:#64748b;font-size:12px;margin-top:2px;">${esc(s.why)}</div>` : ''}</li>`,
+    )
+    .join('');
+  const dimensionList = (dimensionAnalysis || [])
+    .map(
+      (d) =>
+        `<li style="margin-bottom:8px;color:#334155;line-height:1.5;"><strong>${esc(d.dimension || d.label)}</strong> (${Math.round(d.score || 0)}/100): ${esc(d.analysis || d.summary || '')}</li>`,
+    )
+    .join('');
+  const roadmapHtml = (actionRoadmap || [])
+    .map(
+      (b) =>
+        `<div style="margin-bottom:10px;"><strong style="color:#1e40af;">${esc(b.timeframe || b.phase)}</strong><ul style="margin:6px 0 0;padding-left:18px;">${(b.actions || []).map((a) => `<li style="margin-bottom:4px;color:#334155;">${esc(a)}</li>`).join('')}</ul></div>`,
+    )
+    .join('');
+  const riskList = (riskWatchouts || [])
+    .map((r) => `<li style="margin-bottom:6px;color:#334155;">${esc(r)}</li>`)
     .join('');
 
   const metricsBlock =
@@ -383,7 +408,11 @@ function buildBrandedReportEmail({
       ${report ? `<div style="font-size:14px;color:#475569;line-height:1.6;margin-bottom:18px;">${esc(report)}</div>` : ''}
       ${adviceList ? `<div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#0f172a;">Advice</div><ul style="margin:0 0 18px;padding-left:20px;">${adviceList}</ul>` : ''}
       ${stepsList ? `<div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#0f172a;">Next steps</div><ol style="margin:0 0 18px;padding-left:20px;">${stepsList}</ol>` : ''}
-      ${sourceList ? `<div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#0f172a;">Sources</div><ul style="margin:0;padding-left:20px;">${sourceList}</ul>` : ''}`,
+      ${dimensionList ? `<div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#0f172a;">Dimension analysis</div><ul style="margin:0 0 18px;padding-left:20px;">${dimensionList}</ul>` : ''}
+      ${roadmapHtml ? `<div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#0f172a;">Action roadmap</div>${roadmapHtml}` : ''}
+      ${riskList ? `<div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#0f172a;">Risk watchouts</div><ul style="margin:0 0 18px;padding-left:20px;">${riskList}</ul>` : ''}
+      ${primaryList ? `<div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#0f172a;">Primary resources</div><ul style="margin:0 0 18px;padding-left:20px;">${primaryList}</ul>` : ''}
+      ${sourceList ? `<div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#0f172a;">Additional sources</div><ul style="margin:0;padding-left:20px;">${sourceList}</ul>` : ''}`,
     ctaHref: ctaHref || `${appUrl}/?section=tools`,
     ctaLabel: ctaLabel || 'Open Financial Checkup',
     footerNote: esc(disclaimer || 'Educational only — not investment, tax, or legal advice.'),

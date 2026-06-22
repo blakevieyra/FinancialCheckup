@@ -256,6 +256,135 @@ Return ONLY valid JSON:
   }
 });
 
+router.post('/comprehensive', requireFeature('aiInsights'), async (req, res) => {
+  const {
+    income,
+    expenses,
+    totalExpenses,
+    grade,
+    expenseRatio,
+    month,
+    profile,
+    dimensions,
+    overallScore,
+    headline,
+    primaryGoal,
+    actionPlan,
+  } = req.body;
+
+  if (income === undefined || !Array.isArray(expenses)) {
+    return res.status(400).json({ error: 'Missing financial data.' });
+  }
+
+  const safeMonth = month || new Date().toISOString().slice(0, 7);
+  const dims = Array.isArray(dimensions) ? dimensions : [];
+  const goalLine = primaryGoal ? `Primary goal: ${primaryGoal}.` : 'Primary goal: general financial wellness.';
+  const actions = Array.isArray(actionPlan) ? actionPlan.slice(0, 6) : [];
+
+  const profileInstruction =
+    profile === 'business'
+      ? 'You are a senior fractional CFO producing a comprehensive financial health report for a small business owner.'
+      : profile === 'organizational'
+        ? 'You are a nonprofit CFO producing a comprehensive organizational sustainability report.'
+        : 'You are a CFP-style personal finance coach producing the most helpful comprehensive report possible (educational only).';
+
+  const dimBlock = dims.length
+    ? dims.map((d) => `- ${d.label || d.key}: ${Math.round(d.score || 0)}/100 (${d.grade || 'N/A'}) — ${d.summary || ''}`).join('\n')
+    : 'No dimension scores provided.';
+
+  const prompt = `${profileInstruction}
+
+${goalLine}
+Month: ${safeMonth}
+Income: $${Number(income).toLocaleString()}
+Total expenses: $${Number(totalExpenses).toLocaleString()}
+Expense ratio: ${Number(expenseRatio).toFixed(1)}%
+Budget grade: ${grade}
+Overall score: ${overallScore != null ? Math.round(overallScore) : 'unknown'}/100
+Headline: ${headline || 'N/A'}
+
+DIMENSION SCORES
+${dimBlock}
+
+TOP EXPENSES
+${expenses.slice(0, 14).map((e) => `  ${e.category}: $${Number(e.amount).toLocaleString()}`).join('\n')}
+
+APP ACTION PLAN HINTS
+${actions.length ? actions.map((a) => (typeof a === 'string' ? a : a.title || a.message || '')).join('\n') : 'None'}
+
+${AUTHORITATIVE_SOURCES}
+
+Return ONLY valid JSON:
+{
+  "summary": "2-3 sentence executive summary — specific numbers, urgent if deficit",
+  "report": "4-6 sentence comprehensive narrative: cash flow, concentration risks, trajectory",
+  "dimensionAnalysis": [
+    {"dimension":"Budget|Debt|Savings|Investments|Insurance|Retirement","score":number,"priority":"high|medium|low","analysis":"2-3 sentences"}
+  ],
+  "actionRoadmap": [
+    {"timeframe":"Next 30 days","actions":["specific step","specific step"]},
+    {"timeframe":"Days 31-60","actions":["..."]},
+    {"timeframe":"Days 61-90","actions":["..."]}
+  ],
+  "advice": ["5-7 strategic recommendations"],
+  "riskWatchouts": ["3-5 specific risks"],
+  "primaryResources": [
+    {"title":"real site name","url":"https://...","why":"why this helps THIS user","category":"Budgeting|Debt|Investing|Insurance|Retirement|Tax|Credit"}
+  ],
+  "nextSteps": ["5 ordered immediate actions"],
+  "sources": [{"title":"","url":"","why":""}],
+  "disclaimer": "Educational only."
+}
+
+Include exactly 6 dimensionAnalysis entries. Provide 8-12 primaryResources from authoritative sites (CFPB, IRS, Investor.gov, SBA, etc.). Be specific to user numbers.`;
+
+  try {
+    const system = 'Return a single valid JSON object only. No markdown.';
+    const text = await createMessage({ userContent: prompt, maxTokens: 4096, system });
+    const parsed = parseJsonFromText(text);
+    const result = {
+      month: safeMonth,
+      income: Number(income || 0),
+      totalExpenses: Number(totalExpenses || 0),
+      summary: parsed.summary || '',
+      report: parsed.report || '',
+      dimensionAnalysis: Array.isArray(parsed.dimensionAnalysis) ? parsed.dimensionAnalysis : [],
+      actionRoadmap: Array.isArray(parsed.actionRoadmap) ? parsed.actionRoadmap : [],
+      advice: Array.isArray(parsed.advice) ? parsed.advice : [],
+      riskWatchouts: Array.isArray(parsed.riskWatchouts) ? parsed.riskWatchouts : [],
+      primaryResources: Array.isArray(parsed.primaryResources) ? parsed.primaryResources : [],
+      nextSteps: Array.isArray(parsed.nextSteps) ? parsed.nextSteps : [],
+      sources: Array.isArray(parsed.sources) ? parsed.sources : [],
+      disclaimer: parsed.disclaimer || 'Educational only.',
+    };
+
+    const emailResult = await sendSpecialistReportEmail(req.user.id, {
+      ...result,
+      title: 'Comprehensive Financial Report',
+      score: overallScore,
+      grade,
+    }).catch(() => ({ sent: false }));
+
+    let reportId = null;
+    try {
+      reportId = await saveAiReport(req.user.id, {
+        area: 'comprehensive',
+        month: safeMonth,
+        dimensionScore: overallScore,
+        dimensionGrade: grade,
+        report: result,
+      });
+    } catch (logErr) {
+      console.warn('Comprehensive report log save failed:', logErr.message);
+    }
+
+    res.json({ ...result, reportId, emailSent: Boolean(emailResult?.sent) });
+  } catch (err) {
+    console.error('AI comprehensive error:', err.message);
+    res.status(502).json({ error: err.message || 'Comprehensive report failed.' });
+  }
+});
+
 router.get('/specialist/history', requireFeature('aiInsights'), async (req, res) => {
   const area = req.query.area;
   const month = req.query.month;

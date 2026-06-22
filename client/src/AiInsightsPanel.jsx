@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AdviceReportToolbar from './AdviceReportToolbar';
 
 const STATUS_COLOR = {
   strong: '#86efac',
@@ -84,7 +85,16 @@ function CategoryCard({ cat, cardSoftStyle, expanded, onToggle }) {
   );
 }
 
-export default function AiInsightsPanel({ aiPlan, cardSoftStyle, isMobile }) {
+export default function AiInsightsPanel({
+  aiPlan,
+  cardSoftStyle,
+  isMobile,
+  onPrint,
+  onEmail,
+  emailBusy,
+  emailNote,
+  btnNeutral,
+}) {
   const [expanded, setExpanded] = useState({});
 
   if (!aiPlan) return null;
@@ -92,7 +102,14 @@ export default function AiInsightsPanel({ aiPlan, cardSoftStyle, isMobile }) {
   const toggle = (key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div id="ai-insights-report" style={{ display: 'grid', gap: 14 }}>
+      <AdviceReportToolbar
+        onPrint={onPrint}
+        onEmail={onEmail}
+        emailBusy={emailBusy}
+        emailNote={emailNote}
+        btnNeutral={btnNeutral}
+      />
       {aiPlan.summary ? (
         <div style={{ ...cardSoftStyle, padding: '1rem', fontSize: 15, lineHeight: 1.5 }}>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>Executive summary</div>

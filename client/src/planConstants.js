@@ -74,8 +74,9 @@ export const MORE_TOOL_SECTIONS = [
     intro: 'Data-driven insights tailored to your profile — personal, business, or organizational.',
     pro: true,
     tools: [
-      { id: 'ai', label: 'AI insights & plan', desc: 'Scored category plans, debt & investment guidance with sources' },
-      { id: 'expert', label: 'Expert briefing', desc: 'Executive-style strategy summary' },
+      { id: 'ai', label: 'AI insights & plan', desc: 'Category scores, optimized plans & sources — print or email' },
+      { id: 'expert', label: 'Expert briefing', desc: 'Executive strategy, benchmarks & risk watchouts' },
+      { id: 'comprehensive', label: 'Comprehensive report', desc: 'Full financial analysis, 90-day roadmap & primary resources' },
     ],
   },
   {

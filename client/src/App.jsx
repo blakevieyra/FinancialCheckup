@@ -25,6 +25,13 @@ import {
 } from './userStorage';
 import { awardXp, loadXp, saveXp, xpProgressLabel } from './progression';
 import { validateRegisterForm } from './authValidation';
+import {
+  printReport,
+  mailtoReport,
+  aiPlanToReportData,
+  expertToReportData,
+  comprehensiveToReportData,
+} from './reportActions';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -427,6 +434,16 @@ export default function App() {
   const [expertBusy, setExpertBusy] = useState(false);
   const [expertError, setExpertError] = useState('');
   const [expertData, setExpertData] = useState(null);
+
+  const [comprehensiveData, setComprehensiveData] = useState(null);
+  const [comprehensiveBusy, setComprehensiveBusy] = useState(false);
+  const [comprehensiveError, setComprehensiveError] = useState('');
+  const [aiEmailBusy, setAiEmailBusy] = useState(false);
+  const [expertEmailBusy, setExpertEmailBusy] = useState(false);
+  const [comprehensiveEmailBusy, setComprehensiveEmailBusy] = useState(false);
+  const [aiEmailNote, setAiEmailNote] = useState('');
+  const [expertEmailNote, setExpertEmailNote] = useState('');
+  const [comprehensiveEmailNote, setComprehensiveEmailNote] = useState('');
 
   const [rankData, setRankData] = useState(null);
   const [rankErr, setRankErr] = useState('');
@@ -1484,6 +1501,7 @@ export default function App() {
       });
 
       setAiPlan(res);
+      setAiEmailNote(res.emailSent ? 'A copy was emailed to your account address.' : '');
       awardXpThrottled('aiReport', 60000);
     } catch (e) {
       const msg = e.message || 'AI insights failed.';
@@ -1543,11 +1561,151 @@ export default function App() {
     try {
       const d = await api.getExpertBriefing(token, { month, profile });
       setExpertData(d);
+      setExpertEmailNote('');
     } catch (e) {
       setExpertError(e.message);
     } finally {
       setExpertBusy(false);
     }
+  }
+
+  async function loadComprehensiveReport() {
+    setComprehensiveError('');
+    setComprehensiveData(null);
+    setComprehensiveBusy(true);
+    try {
+      const payloadExpenses = expenses.map((e) => ({
+        category: e.category,
+        amount: Number(e.amount) || 0,
+      }));
+      const res = await api.getComprehensiveReport(token, {
+        income: Number(income) || 0,
+        expenses: payloadExpenses,
+        totalExpenses,
+        grade,
+        expenseRatio,
+        month,
+        profile,
+        primaryGoal,
+        actionPlan: checkupResult?.actionPlan || [],
+        dimensions: (checkupResult?.dimensions || []).map((d) => ({
+          key: d.key,
+          label: d.label,
+          score: d.score,
+          grade: d.grade,
+          summary: d.summary,
+        })),
+        overallScore: checkupResult?.overallScore,
+        headline: checkupResult?.headline,
+      });
+      setComprehensiveData(res);
+      setComprehensiveEmailNote(res.emailSent ? 'A copy was emailed to your account address.' : '');
+      awardXpThrottled('aiReport', 60000);
+    } catch (e) {
+      const msg = e.message || 'Comprehensive report failed.';
+      setComprehensiveError(
+        /model|anthropic|ANTHROPIC/i.test(msg)
+          ? 'AI model unavailable — set ANTHROPIC_MODEL=claude-sonnet-4-6 on Render if this persists.'
+          : msg,
+      );
+    } finally {
+      setComprehensiveBusy(false);
+    }
+  }
+
+  async function sendAdviceReportEmail({
+    title,
+    area,
+    aiData,
+    score,
+    gradeVal,
+    setBusy,
+    setNote,
+  }) {
+    if (!aiData) return;
+    setNote('');
+    setBusy(true);
+    try {
+      const report = {
+        title,
+        area,
+        month,
+        score,
+        grade: gradeVal,
+        income: Number(income) || 0,
+        totalExpenses,
+        ...aiData,
+      };
+      const res = await api.emailSpecialistReport(token, report);
+      if (res.emailSent) {
+        setNote('Report emailed to your account address.');
+      } else {
+        mailtoReport({
+          email: accountEmail || digestEmail,
+          title,
+          month,
+          score,
+          grade: gradeVal,
+          aiData,
+          income,
+          totalExpenses,
+        });
+        setNote(accountEmail || digestEmail ? 'Opened your email app — send when ready.' : 'Opened email app — add your address and send.');
+      }
+    } catch {
+      mailtoReport({
+        email: accountEmail || digestEmail,
+        title,
+        month,
+        score,
+        grade: gradeVal,
+        aiData,
+        income,
+        totalExpenses,
+      });
+      setNote('Server email unavailable — opened your email app instead.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function printAiReport() {
+    if (!aiPlan) return;
+    printReport({
+      title: 'AI Insights & Plan',
+      month,
+      score: checkupResult?.overallScore,
+      grade,
+      aiData: aiPlanToReportData(aiPlan),
+      income,
+      totalExpenses,
+    });
+  }
+
+  function printExpertReport() {
+    if (!expertData?.expert) return;
+    printReport({
+      title: 'Expert Briefing',
+      month,
+      score: checkupResult?.overallScore,
+      grade,
+      aiData: expertToReportData(expertData),
+      income,
+      totalExpenses,
+    });
+  }
+
+  function printComprehensiveReport() {
+    if (!comprehensiveData) return;
+    printReport({
+      title: 'Comprehensive Financial Report',
+      month,
+      score: checkupResult?.overallScore,
+      grade,
+      aiData: comprehensiveToReportData(comprehensiveData),
+      income,
+      totalExpenses,
+    });
   }
 
   const topExpensesForShare = useMemo(() => {
@@ -2287,6 +2445,54 @@ export default function App() {
             onExpert={loadExpertBriefing}
             expertError={expertError}
             expertData={expertData}
+            comprehensiveData={comprehensiveData}
+            comprehensiveBusy={comprehensiveBusy}
+            comprehensiveError={comprehensiveError}
+            onComprehensiveReport={loadComprehensiveReport}
+            onPrintAiReport={printAiReport}
+            onEmailAiReport={() =>
+              sendAdviceReportEmail({
+                title: 'AI Insights & Plan',
+                area: 'ai-insights',
+                aiData: aiPlanToReportData(aiPlan),
+                score: checkupResult?.overallScore,
+                gradeVal: grade,
+                setBusy: setAiEmailBusy,
+                setNote: setAiEmailNote,
+              })
+            }
+            onPrintExpertReport={printExpertReport}
+            onEmailExpertReport={() =>
+              sendAdviceReportEmail({
+                title: 'Expert Briefing',
+                area: 'expert',
+                aiData: expertToReportData(expertData),
+                score: checkupResult?.overallScore,
+                gradeVal: grade,
+                setBusy: setExpertEmailBusy,
+                setNote: setExpertEmailNote,
+              })
+            }
+            onPrintComprehensiveReport={printComprehensiveReport}
+            onEmailComprehensiveReport={() =>
+              sendAdviceReportEmail({
+                title: 'Comprehensive Financial Report',
+                area: 'comprehensive',
+                aiData: comprehensiveToReportData(comprehensiveData),
+                score: checkupResult?.overallScore,
+                gradeVal: grade,
+                setBusy: setComprehensiveEmailBusy,
+                setNote: setComprehensiveEmailNote,
+              })
+            }
+            aiEmailBusy={aiEmailBusy}
+            expertEmailBusy={expertEmailBusy}
+            comprehensiveEmailBusy={comprehensiveEmailBusy}
+            aiEmailNote={aiEmailNote}
+            expertEmailNote={expertEmailNote}
+            comprehensiveEmailNote={comprehensiveEmailNote}
+            overallScore={checkupResult?.overallScore}
+            budgetGrade={grade}
             forecastBusy={forecastBusy}
             forecastErr={forecastErr}
             forecastData={forecastData}

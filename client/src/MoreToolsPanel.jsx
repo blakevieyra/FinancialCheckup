@@ -1,5 +1,8 @@
 import { MORE_TOOL_SECTIONS, RESOURCE_LINKS } from './planConstants';
 import SpecialistReportsGrid from './SpecialistReportsGrid';
+import AiInsightsPanel from './AiInsightsPanel';
+import ExpertBriefingPanel from './ExpertBriefingPanel';
+import ComprehensiveReportPanel from './ComprehensiveReportPanel';
 
 function ProBadge() {
   return (
@@ -74,6 +77,24 @@ export default function MoreToolsPanel({
   onExpert,
   expertError,
   expertData,
+  comprehensiveData,
+  comprehensiveBusy,
+  comprehensiveError,
+  onComprehensiveReport,
+  onPrintAiReport,
+  onEmailAiReport,
+  onPrintExpertReport,
+  onEmailExpertReport,
+  onPrintComprehensiveReport,
+  onEmailComprehensiveReport,
+  aiEmailBusy,
+  expertEmailBusy,
+  comprehensiveEmailBusy,
+  aiEmailNote,
+  expertEmailNote,
+  comprehensiveEmailNote,
+  overallScore,
+  budgetGrade,
   forecastBusy,
   forecastErr,
   forecastData,
@@ -97,6 +118,7 @@ export default function MoreToolsPanel({
     bizpdf: onExportBusinessPdf,
     ai: onAiInsights,
     expert: onExpert,
+    comprehensive: onComprehensiveReport,
   };
 
   const toolBusy = {
@@ -105,14 +127,16 @@ export default function MoreToolsPanel({
     bizpdf: businessPdfBusy,
     ai: aiBusy,
     expert: expertBusy,
+    comprehensive: comprehensiveBusy,
   };
 
   const toolBusyLabel = {
     csv: 'Exporting…',
     pdf: 'Building PDF…',
     bizpdf: 'Building PDF…',
-    ai: 'Generating…',
-    expert: 'Loading…',
+    ai: 'Generating insights…',
+    expert: 'Building briefing…',
+    comprehensive: 'Building report…',
   };
 
   return (
@@ -169,61 +193,58 @@ export default function MoreToolsPanel({
           </div>
           ) : null}
           {section.id === 'ai' ? (
-            <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ display: 'grid', gap: 16 }}>
               <select value={profile} onChange={(e) => onProfileChange(e.target.value)} style={{ ...inputStyle, maxWidth: 280 }}>
                 <option value="personal">Personal profile</option>
                 <option value="business">Business profile</option>
                 <option value="organizational">Organizational profile</option>
               </select>
+
               {aiError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{aiError}</div> : null}
-              {aiPlan?.summary ? (
-                <div style={{ ...cardSoftStyle, padding: '0.85rem', display: 'grid', gap: 10 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>{aiPlan.summary}</div>
-                  {aiPlan.emailSent ? <div style={{ fontSize: 12, color: '#86efac' }}>A copy was emailed to your account address.</div> : null}
-                </div>
+              {aiPlan ? (
+                <AiInsightsPanel
+                  aiPlan={aiPlan}
+                  cardSoftStyle={cardSoftStyle}
+                  isMobile={isMobile}
+                  onPrint={onPrintAiReport}
+                  onEmail={onEmailAiReport}
+                  emailBusy={aiEmailBusy}
+                  emailNote={aiEmailNote}
+                  btnNeutral={btnNeutral}
+                />
               ) : null}
-              {aiPlan?.categoryPlans?.length ? (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {aiPlan.categoryPlans.map((cat) => (
-                    <div key={cat.key || cat.label} style={{ ...cardSoftStyle, padding: '0.75rem' }}>
-                      <div style={{ fontWeight: 700 }}>
-                        {cat.label} — {Math.round(cat.score || 0)}/100 ({cat.grade}) · <span style={{ textTransform: 'capitalize', opacity: 0.8 }}>{cat.status}</span>
-                      </div>
-                      <ul style={{ margin: '8px 0 0', paddingLeft: '1.1rem', fontSize: 13, lineHeight: 1.45 }}>
-                        {(cat.optimizedPlan || []).slice(0, 4).map((step, i) => <li key={i}>{step}</li>)}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {aiPlan?.insights?.length && !aiPlan?.categoryPlans?.length ? (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {aiPlan.insights.map((ins, idx) => (
-                    <div key={`${ins.title}-${idx}`} style={{ ...cardSoftStyle, padding: '0.75rem' }}>
-                      <div style={{ fontWeight: 700 }}>{ins.title}</div>
-                      <div style={{ marginTop: 4, opacity: 0.9, fontSize: 14, lineHeight: 1.4 }}>{ins.message}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+
               {expertError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{expertError}</div> : null}
               {expertData?.expert ? (
-                <div style={{ ...cardSoftStyle, padding: '0.85rem', fontSize: 14, lineHeight: 1.45, display: 'grid', gap: 8 }}>
-                  {expertData.expert.headline ? (
-                    <div><strong>{expertData.expert.headline}</strong></div>
-                  ) : null}
-                  {expertData.expert.executiveVerdict ? (
-                    <div style={{ opacity: 0.9 }}>{expertData.expert.executiveVerdict}</div>
-                  ) : null}
-                  {expertData.expert.personalizedPriorities?.length ? (
-                    <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
-                      {expertData.expert.personalizedPriorities.slice(0, 5).map((p, i) => (
-                        <li key={`ep-${i}`}>{p}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
+                <ExpertBriefingPanel
+                  expertData={expertData}
+                  cardSoftStyle={cardSoftStyle}
+                  onPrint={onPrintExpertReport}
+                  onEmail={onEmailExpertReport}
+                  emailBusy={expertEmailBusy}
+                  emailNote={expertEmailNote}
+                  btnNeutral={btnNeutral}
+                />
               ) : null}
+
+              {comprehensiveError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{comprehensiveError}</div> : null}
+              {comprehensiveData ? (
+                <ComprehensiveReportPanel
+                  data={comprehensiveData}
+                  month={month}
+                  overallScore={overallScore}
+                  grade={budgetGrade}
+                  income={income}
+                  totalExpenses={totalExpenses}
+                  onPrint={onPrintComprehensiveReport}
+                  onEmail={onEmailComprehensiveReport}
+                  emailBusy={comprehensiveEmailBusy}
+                  emailNote={comprehensiveEmailNote}
+                  btnNeutral={btnNeutral}
+                  cardSoftStyle={cardSoftStyle}
+                />
+              ) : null}
+
               <div style={{ display: 'grid', gap: 10, paddingTop: 8, borderTop: '1px solid rgba(148,163,184,0.15)' }}>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: 15 }}>Dimension AI reports</div>
