@@ -1042,7 +1042,7 @@ export default function App() {
       return;
     }
     if (step.tool?.startsWith('specialist-')) {
-      setActiveSection('finances');
+      setActiveSection('tools');
       const area = step.tool.replace('specialist-', '');
       setTimeout(() => {
         document.getElementById(`specialist-${area}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1263,6 +1263,11 @@ export default function App() {
       insuranceCount,
     };
   }, [userId, token, checkupResult]);
+
+  const extendedProfile = useMemo(
+    () => loadExtendedProfile(userId, !token),
+    [userId, token, checkupResult],
+  );
 
   const monthPieData = useMemo(() => {
     // Use top categories only; otherwise pie gets unreadable.
@@ -2134,6 +2139,12 @@ export default function App() {
             businessDocs={businessDocs}
             onOpenProjections={loadForecastAndDocs}
             onScrollToProjections={scrollToProjections}
+            checkupResult={checkupResult}
+            month={month}
+            primaryGoal={primaryGoal}
+            income={income}
+            totalExpenses={totalExpenses}
+            extendedProfile={extendedProfile}
           />
         )}
 

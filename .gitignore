@@ -1,6 +1,15 @@
 ﻿.env
+client/.env
+client/.env.production
+client/.env.local
 node_modules/
 client/node_modules/
 server/node_modules/
+client/android/.gradle/
+client/android/app/build/
+client/android/build/
+client/android/local.properties
+*.jks
+*.keystore
 *.db
 __pycache__/

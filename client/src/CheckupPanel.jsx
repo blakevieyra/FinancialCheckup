@@ -2,10 +2,21 @@ import { useEffect, useState, useRef } from 'react';
 import * as api from './api';
 import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, DIMENSION_IMPORTANCE, DIMENSION_BASICS, DEBT_STARTER_TEMPLATES, INSURANCE_COVERAGE_TYPES, BLANK_SNAPSHOT } from './checkupConstants';
 import {
+  DEBT_TYPES,
+  EXPENSE_CATEGORY_GROUPS,
+  EXPENSE_CATEGORIES,
+  LEGACY_DEBT_LABELS,
+  INVESTMENT_ACCOUNT_TYPES,
+  INVESTMENT_STARTER_ACCOUNTS,
+  RETIREMENT_ACCOUNT_TYPES,
+  RETIREMENT_STARTER_ACCOUNTS,
+} from './categoryOptions';
+import CategorySelect from './CategorySelect';
+import {
   loadExtendedProfile,
   saveExtendedProfile,
 } from './userStorage';
-import SpecialistInsightPanel from './SpecialistInsightPanel';
+import SpecialistReportsGrid from './SpecialistReportsGrid';
 
 const fieldGrid = (isMobile) => ({
   display: 'grid',
@@ -162,15 +173,22 @@ function BudgetLedgerEditor({
       </label>
 
       <div>
-        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Expenses by category</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-          <input
-            value={newCategory}
-            onChange={(e) => onNewCategoryChange(e.target.value)}
-            placeholder="Add category"
-            style={{ ...inputStyle, flex: '1 1 160px', minWidth: 140 }}
-            disabled={catBusy}
-          />
+        <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>Expenses by category</div>
+        <p style={{ margin: '0 0 10px', fontSize: 12, opacity: 0.72, lineHeight: 1.45 }}>
+          Pick a category from the list, or choose Custom to type your own.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12, alignItems: 'flex-end' }}>
+          <div style={{ flex: '1 1 220px', minWidth: 180 }}>
+            <CategorySelect
+              optionGroups={EXPENSE_CATEGORY_GROUPS}
+              value={newCategory}
+              onChange={onNewCategoryChange}
+              inputStyle={inputStyle}
+              placeholder="Choose expense category"
+              customPlaceholder="Custom category name"
+              disabled={catBusy}
+            />
+          </div>
           <button type="button" onClick={onAddCategory} disabled={catBusy || !newCategory.trim()} style={btnNeutral}>
             Add
           </button>
@@ -225,11 +243,27 @@ function tierColor(tier) {
   return '#93c5fd';
 }
 
-function DebtEditor({ debts, onChange, onAdd, onRemove, inputStyle, btnNeutral, cardSoftStyle, isMobile }) {
+function DebtEditor({ debts, onChange, onPatch, onAdd, onRemove, inputStyle, btnNeutral, cardSoftStyle, isMobile }) {
   const rows = debts || [];
+
+  function debtDisplayName(name) {
+    if (!name || LEGACY_DEBT_LABELS.has(name)) return '';
+    return name;
+  }
+
+  function handleDebtTypeChange(i, type) {
+    const preset = DEBT_TYPES.find((x) => x.label === type);
+    if (onPatch) {
+      onPatch(i, { name: type, ...(preset ? { apr: preset.defaultApr } : {}) });
+      return;
+    }
+    onChange(i, 'name', type);
+    if (preset) onChange(i, 'apr', preset.defaultApr);
+  }
+
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <SectionLabel>Add each loan or card below — remove any that do not apply, or add another debt.</SectionLabel>
+      <SectionLabel>Add each loan or card below — pick a type from the list, or Custom. Remove any that do not apply.</SectionLabel>
       {rows.length ? (
         rows.map((d, i) => (
           <div
@@ -242,11 +276,13 @@ function DebtEditor({ debts, onChange, onAdd, onRemove, inputStyle, btnNeutral, 
                 Remove
               </button>
             </div>
-            <input
-              value={d.name}
-              onChange={(e) => onChange(i, 'name', e.target.value)}
-              placeholder="e.g. Mortgage, credit card, auto loan"
-              style={inputStyle}
+            <CategorySelect
+              options={DEBT_TYPES}
+              value={debtDisplayName(d.name)}
+              onChange={(type) => handleDebtTypeChange(i, type)}
+              inputStyle={inputStyle}
+              placeholder="Choose debt type"
+              customPlaceholder="Custom account name"
             />
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
               <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
@@ -269,6 +305,70 @@ function DebtEditor({ debts, onChange, onAdd, onRemove, inputStyle, btnNeutral, 
       )}
       <button type="button" onClick={onAdd} style={{ ...btnNeutral, fontSize: 12, padding: '0.4rem 0.75rem', justifySelf: 'start' }}>
         + Add another debt
+      </button>
+    </div>
+  );
+}
+
+function TypedAccountsEditor({
+  accounts,
+  onChange,
+  onAdd,
+  onRemove,
+  typeOptions,
+  showMonthlyContribution = false,
+  inputStyle,
+  btnNeutral,
+  cardSoftStyle,
+  isMobile,
+  sectionLabel,
+  addLabel = '+ Add another account',
+  typePlaceholder = 'Choose account type',
+  customPlaceholder = 'Custom account name',
+}) {
+  const rows = accounts || [];
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      {sectionLabel ? <SectionLabel>{sectionLabel}</SectionLabel> : null}
+      {rows.length ? (
+        rows.map((a, i) => (
+          <div
+            key={`acct-${i}-${a.type}`}
+            style={{ ...cardSoftStyle, padding: '0.75rem', display: 'grid', gap: 10 }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              <FieldLabel>Account type</FieldLabel>
+              <button type="button" onClick={() => onRemove(i)} style={{ ...btnNeutral, fontSize: 11, padding: '0.25rem 0.5rem' }}>
+                Remove
+              </button>
+            </div>
+            <CategorySelect
+              options={typeOptions}
+              value={a.type}
+              onChange={(type) => onChange(i, 'type', type)}
+              inputStyle={inputStyle}
+              placeholder={typePlaceholder}
+              customPlaceholder={customPlaceholder}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : showMonthlyContribution ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 10 }}>
+              <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                <FieldLabel>Balance ($)</FieldLabel>
+                <input type="number" value={a.balance} onChange={(e) => onChange(i, 'balance', e.target.value)} style={inputStyle} />
+              </label>
+              {showMonthlyContribution ? (
+                <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                  <FieldLabel>Monthly contribution ($)</FieldLabel>
+                  <input type="number" value={a.monthlyContribution} onChange={(e) => onChange(i, 'monthlyContribution', e.target.value)} style={inputStyle} />
+                </label>
+              ) : null}
+            </div>
+          </div>
+        ))
+      ) : (
+        <div style={{ fontSize: 13, opacity: 0.75 }}>No accounts listed — add a row to get started.</div>
+      )}
+      <button type="button" onClick={onAdd} style={{ ...btnNeutral, fontSize: 12, padding: '0.4rem 0.75rem', justifySelf: 'start' }}>
+        {addLabel}
       </button>
     </div>
   );
@@ -341,157 +441,6 @@ function ActionPlanBlock({ actionPlan, cardSoftStyle, compact, bare }) {
   );
 }
 
-function DetailCards({
-  result,
-  isTablet,
-  cardSoftStyle,
-  token,
-  month,
-  profile,
-  primaryGoal,
-  isPro,
-  onGoPlan,
-  btnPrimary,
-  btnNeutral,
-  income,
-  totalExpenses,
-  extended,
-}) {
-  if (!result) return null;
-  const budgetDim = result.dimensions?.find((d) => d.key === 'budget');
-  const debtDim = result.dimensions?.find((d) => d.key === 'debt');
-  const savingsDim = result.dimensions?.find((d) => d.key === 'savings');
-  const investDim = result.dimensions?.find((d) => d.key === 'investments');
-  const insDim = result.dimensions?.find((d) => d.key === 'insurance');
-  const retireDim = result.dimensions?.find((d) => d.key === 'retirement');
-
-  const debtSummary = result.debtPlanner
-    ? `Extra $${result.debtPlanner.extraMonthly?.toLocaleString()}/mo · Avalanche ${result.debtPlanner.avalanche?.months ?? 0} mo vs Snowball ${result.debtPlanner.snowball?.months ?? 0} mo`
-    : debtDim?.summary;
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: 12 }}>
-      <SpecialistInsightPanel
-        area="budget"
-        summary={budgetDim?.summary || (result.budgetGapAnalysis || [])[0]}
-        gaps={(result.budgetGapAnalysis || []).slice(0, 5)}
-        dimensionScore={budgetDim?.score}
-        dimensionGrade={budgetDim?.grade}
-        snapshot={{ income, totalExpenses, ...extended }}
-        token={token}
-        month={month}
-        profile={profile}
-        primaryGoal={primaryGoal}
-        isPro={isPro}
-        onGoPlan={onGoPlan}
-        cardSoftStyle={cardSoftStyle}
-        btnPrimary={btnPrimary}
-        btnNeutral={btnNeutral}
-        income={income}
-        totalExpenses={totalExpenses}
-      />
-      <SpecialistInsightPanel
-        area="debt"
-        summary={debtSummary}
-        gaps={[
-          result.debtPlanner?.avalanche ? `Avalanche: ${result.debtPlanner.avalanche.months} mo, $${result.debtPlanner.avalanche.totalInterest?.toLocaleString()} interest` : null,
-          result.debtPlanner?.snowball ? `Snowball: ${result.debtPlanner.snowball.months} mo, $${result.debtPlanner.snowball.totalInterest?.toLocaleString()} interest` : null,
-        ].filter(Boolean)}
-        dimensionScore={debtDim?.score}
-        dimensionGrade={debtDim?.grade}
-        snapshot={extended}
-        token={token}
-        month={month}
-        profile={profile}
-        primaryGoal={primaryGoal}
-        isPro={isPro}
-        onGoPlan={onGoPlan}
-        cardSoftStyle={cardSoftStyle}
-        btnPrimary={btnPrimary}
-        btnNeutral={btnNeutral}
-        income={income}
-        totalExpenses={totalExpenses}
-      />
-      <SpecialistInsightPanel
-        area="insurance"
-        summary={insDim?.summary}
-        gaps={result.insuranceGaps}
-        dimensionScore={insDim?.score}
-        dimensionGrade={insDim?.grade}
-        snapshot={{ ...extended, hasLifeInsurance: extended?.hasLifeInsurance, hasDisabilityInsurance: extended?.hasDisabilityInsurance }}
-        token={token}
-        month={month}
-        profile={profile}
-        primaryGoal={primaryGoal}
-        isPro={isPro}
-        onGoPlan={onGoPlan}
-        cardSoftStyle={cardSoftStyle}
-        btnPrimary={btnPrimary}
-        btnNeutral={btnNeutral}
-        income={income}
-        totalExpenses={totalExpenses}
-      />
-      <SpecialistInsightPanel
-        area="investments"
-        summary={result.investmentHealth?.summary || investDim?.summary}
-        gaps={result.investmentHealth?.gaps || []}
-        dimensionScore={investDim?.score}
-        dimensionGrade={investDim?.grade}
-        snapshot={extended}
-        token={token}
-        month={month}
-        profile={profile}
-        primaryGoal={primaryGoal}
-        isPro={isPro}
-        onGoPlan={onGoPlan}
-        cardSoftStyle={cardSoftStyle}
-        btnPrimary={btnPrimary}
-        btnNeutral={btnNeutral}
-        income={income}
-        totalExpenses={totalExpenses}
-      />
-      <SpecialistInsightPanel
-        area="savings"
-        summary={savingsDim?.summary}
-        gaps={savingsDim?.gap ? [{ label: `Emergency fund gap: $${Number(savingsDim.gap).toLocaleString()}` }] : []}
-        dimensionScore={savingsDim?.score}
-        dimensionGrade={savingsDim?.grade}
-        snapshot={extended}
-        token={token}
-        month={month}
-        profile={profile}
-        primaryGoal={primaryGoal}
-        isPro={isPro}
-        onGoPlan={onGoPlan}
-        cardSoftStyle={cardSoftStyle}
-        btnPrimary={btnPrimary}
-        btnNeutral={btnNeutral}
-        income={income}
-        totalExpenses={totalExpenses}
-      />
-      <SpecialistInsightPanel
-        area="retirement"
-        summary={result.retirementTrajectory?.summary || retireDim?.summary}
-        gaps={result.retirementTrajectory?.monthlyGap ? [`Suggested +$${Number(result.retirementTrajectory.monthlyGap).toLocaleString()}/mo to benchmark`] : []}
-        dimensionScore={retireDim?.score}
-        dimensionGrade={retireDim?.grade}
-        snapshot={extended}
-        token={token}
-        month={month}
-        profile={profile}
-        primaryGoal={primaryGoal}
-        isPro={isPro}
-        onGoPlan={onGoPlan}
-        cardSoftStyle={cardSoftStyle}
-        btnPrimary={btnPrimary}
-        btnNeutral={btnNeutral}
-        income={income}
-        totalExpenses={totalExpenses}
-      />
-    </div>
-  );
-}
-
 export default function CheckupPanel({
   token,
   userId,
@@ -526,6 +475,7 @@ export default function CheckupPanel({
   const [err, setErr] = useState('');
   const [history, setHistory] = useState([]);
   const debtSeededRef = useRef(false);
+  const accountsSeededRef = useRef(false);
 
   useEffect(() => {
     if (isGuest) return;
@@ -567,6 +517,8 @@ export default function CheckupPanel({
       targetRetirementAge,
       retirementBalance,
       monthlyRetirementContribution,
+      investmentAccounts,
+      retirementAccounts,
       excludedFromScore,
     } = s;
     return {
@@ -589,6 +541,8 @@ export default function CheckupPanel({
       targetRetirementAge,
       retirementBalance,
       monthlyRetirementContribution,
+      investmentAccounts: Array.isArray(investmentAccounts) ? investmentAccounts : [],
+      retirementAccounts: Array.isArray(retirementAccounts) ? retirementAccounts : [],
       excludedFromScore: Array.isArray(excludedFromScore) ? excludedFromScore : [],
     };
   }
@@ -628,10 +582,18 @@ export default function CheckupPanel({
     });
   }
 
-  function addDebt(name = 'Other loan') {
+  function patchDebt(i, patch) {
+    setExtended((prev) => {
+      const debts = [...(prev.debts || [])];
+      debts[i] = { ...debts[i], ...patch };
+      return { ...prev, debts };
+    });
+  }
+
+  function addDebt() {
     setExtended((prev) => ({
       ...prev,
-      debts: [...(prev.debts || []), { name, balance: 0, minPayment: 0, apr: 18 }],
+      debts: [...(prev.debts || []), { name: '', balance: 0, minPayment: 0, apr: 18 }],
     }));
   }
 
@@ -640,6 +602,70 @@ export default function CheckupPanel({
       ...prev,
       debts: (prev.debts || []).filter((_, idx) => idx !== i),
     }));
+  }
+
+  function setInvestmentAccount(i, key, value) {
+    setExtended((prev) => {
+      const investmentAccounts = [...(prev.investmentAccounts || [])];
+      investmentAccounts[i] = { ...investmentAccounts[i], [key]: value };
+      return { ...prev, investmentAccounts };
+    });
+  }
+
+  function addInvestmentAccount() {
+    setExtended((prev) => ({
+      ...prev,
+      investmentAccounts: [...(prev.investmentAccounts || []), { type: '', balance: 0 }],
+    }));
+  }
+
+  function removeInvestmentAccount(i) {
+    setExtended((prev) => ({
+      ...prev,
+      investmentAccounts: (prev.investmentAccounts || []).filter((_, idx) => idx !== i),
+    }));
+  }
+
+  function setRetirementAccount(i, key, value) {
+    setExtended((prev) => {
+      const retirementAccounts = [...(prev.retirementAccounts || [])];
+      retirementAccounts[i] = { ...retirementAccounts[i], [key]: value };
+      return { ...prev, retirementAccounts };
+    });
+  }
+
+  function addRetirementAccount() {
+    setExtended((prev) => ({
+      ...prev,
+      retirementAccounts: [...(prev.retirementAccounts || []), { type: '', balance: 0, monthlyContribution: 0 }],
+    }));
+  }
+
+  function removeRetirementAccount(i) {
+    setExtended((prev) => ({
+      ...prev,
+      retirementAccounts: (prev.retirementAccounts || []).filter((_, idx) => idx !== i),
+    }));
+  }
+
+  function syncAccountTotals(accounts) {
+    const investmentAccounts = accounts.investmentAccounts || [];
+    const retirementAccounts = accounts.retirementAccounts || [];
+    if (!investmentAccounts.length && !retirementAccounts.length) return accounts;
+
+    const investmentTotal = investmentAccounts.reduce((s, a) => s + (Number(a.balance) || 0), 0);
+    const retirementBalance = retirementAccounts.reduce((s, a) => s + (Number(a.balance) || 0), 0);
+    const monthlyRetirementContribution = retirementAccounts.reduce(
+      (s, a) => s + (Number(a.monthlyContribution) || 0),
+      0,
+    );
+
+    return {
+      ...accounts,
+      investmentTotal,
+      retirementBalance,
+      monthlyRetirementContribution,
+    };
   }
 
   useEffect(() => {
@@ -653,6 +679,55 @@ export default function CheckupPanel({
       return { ...prev, debts: DEBT_STARTER_TEMPLATES.map((d) => ({ ...d })) };
     });
   }, [dimensionCardLayout, isGuest]);
+
+  useEffect(() => {
+    if (!dimensionCardLayout || isGuest || accountsSeededRef.current) return;
+    setExtended((prev) => {
+      const hasInv = (prev.investmentAccounts || []).length > 0;
+      const hasRet = (prev.retirementAccounts || []).length > 0;
+      if (hasInv && hasRet) {
+        accountsSeededRef.current = true;
+        return prev;
+      }
+      accountsSeededRef.current = true;
+
+      let investmentAccounts = prev.investmentAccounts;
+      if (!hasInv) {
+        const total = Number(prev.investmentTotal) || 0;
+        investmentAccounts = total > 0
+          ? [{ type: 'Taxable brokerage', balance: total }]
+          : INVESTMENT_STARTER_ACCOUNTS.map((a) => ({ ...a }));
+      }
+
+      let retirementAccounts = prev.retirementAccounts;
+      if (!hasRet) {
+        const bal = Number(prev.retirementBalance) || 0;
+        const mo = Number(prev.monthlyRetirementContribution) || 0;
+        retirementAccounts = bal > 0 || mo > 0
+          ? [{ type: 'Employer 401(k)', balance: bal, monthlyContribution: mo }]
+          : RETIREMENT_STARTER_ACCOUNTS.map((a) => ({ ...a }));
+      }
+
+      return syncAccountTotals({ ...prev, investmentAccounts, retirementAccounts });
+    });
+  }, [dimensionCardLayout, isGuest]);
+
+  useEffect(() => {
+    setExtended((prev) => {
+      const invAccounts = prev.investmentAccounts || [];
+      const retAccounts = prev.retirementAccounts || [];
+      if (!invAccounts.length && !retAccounts.length) return prev;
+      const next = syncAccountTotals(prev);
+      if (
+        next.investmentTotal === prev.investmentTotal
+        && next.retirementBalance === prev.retirementBalance
+        && next.monthlyRetirementContribution === prev.monthlyRetirementContribution
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [extended.investmentAccounts, extended.retirementAccounts]);
 
   async function runCheckup(silent = false) {
     if (!silent) setErr('');
@@ -779,6 +854,7 @@ export default function CheckupPanel({
         <DebtEditor
           debts={extended.debts}
           onChange={setDebt}
+          onPatch={patchDebt}
           onAdd={() => addDebt()}
           onRemove={removeDebt}
           inputStyle={inputStyle}
@@ -798,11 +874,23 @@ export default function CheckupPanel({
         btnNeutral={btnNeutral}
         scoreLine={dimScoreLine(result, 'investments')}
       >
+        <TypedAccountsEditor
+          accounts={extended.investmentAccounts}
+          onChange={setInvestmentAccount}
+          onAdd={addInvestmentAccount}
+          onRemove={removeInvestmentAccount}
+          typeOptions={INVESTMENT_ACCOUNT_TYPES}
+          inputStyle={inputStyle}
+          btnNeutral={btnNeutral}
+          cardSoftStyle={cardSoftStyle}
+          isMobile={isMobile}
+          sectionLabel="Add each investment account — remove any that do not apply, or add another."
+          typePlaceholder="Choose investment type"
+        />
+        <div style={{ fontSize: 13, opacity: 0.85 }}>
+          Portfolio total: <strong>${Number(extended.investmentTotal || 0).toLocaleString()}</strong> (auto-summed from accounts)
+        </div>
         <div style={grid}>
-          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-            Portfolio ($)
-            <input type="number" value={extended.investmentTotal} onChange={(e) => setField('investmentTotal', e.target.value)} style={inputStyle} />
-          </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
             Fees %/yr
             <input type="number" step="0.01" value={extended.feePct} onChange={(e) => setField('feePct', e.target.value)} style={inputStyle} />
@@ -837,11 +925,31 @@ export default function CheckupPanel({
         btnNeutral={btnNeutral}
         scoreLine={dimScoreLine(result, 'retirement')}
       >
+        <TypedAccountsEditor
+          accounts={extended.retirementAccounts}
+          onChange={setRetirementAccount}
+          onAdd={addRetirementAccount}
+          onRemove={removeRetirementAccount}
+          typeOptions={RETIREMENT_ACCOUNT_TYPES}
+          showMonthlyContribution
+          inputStyle={inputStyle}
+          btnNeutral={btnNeutral}
+          cardSoftStyle={cardSoftStyle}
+          isMobile={isMobile}
+          sectionLabel="Add each retirement account — remove any that do not apply, or add another."
+          typePlaceholder="Choose retirement account type"
+        />
+        <div style={{ fontSize: 13, opacity: 0.85, display: 'grid', gap: 4 }}>
+          <div>
+            Total saved: <strong>${Number(extended.retirementBalance || 0).toLocaleString()}</strong>
+          </div>
+          <div>
+            Monthly contributions: <strong>${Number(extended.monthlyRetirementContribution || 0).toLocaleString()}</strong>
+          </div>
+        </div>
         <div style={grid}>
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Age<input type="number" value={extended.age} onChange={(e) => setField('age', e.target.value)} style={inputStyle} /></label>
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Retire at<input type="number" value={extended.targetRetirementAge} onChange={(e) => setField('targetRetirementAge', e.target.value)} style={inputStyle} /></label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Retirement $ saved<input type="number" value={extended.retirementBalance} onChange={(e) => setField('retirementBalance', e.target.value)} style={inputStyle} /></label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Monthly 401k/IRA<input type="number" value={extended.monthlyRetirementContribution} onChange={(e) => setField('monthlyRetirementContribution', e.target.value)} style={inputStyle} /></label>
         </div>
       </DimensionCard>
 
@@ -943,6 +1051,7 @@ export default function CheckupPanel({
             <DebtEditor
               debts={extended.debts}
               onChange={setDebt}
+              onPatch={patchDebt}
               onAdd={() => addDebt()}
               onRemove={removeDebt}
               inputStyle={inputStyle}
@@ -954,11 +1063,22 @@ export default function CheckupPanel({
 
           <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
             <div style={{ fontWeight: 700, marginBottom: 8 }}>Investments</div>
+            <TypedAccountsEditor
+              accounts={extended.investmentAccounts}
+              onChange={setInvestmentAccount}
+              onAdd={addInvestmentAccount}
+              onRemove={removeInvestmentAccount}
+              typeOptions={INVESTMENT_ACCOUNT_TYPES}
+              inputStyle={inputStyle}
+              btnNeutral={btnNeutral}
+              cardSoftStyle={{ padding: 0, border: 'none', background: 'transparent' }}
+              isMobile={isMobile}
+              typePlaceholder="Choose investment type"
+            />
+            <div style={{ fontSize: 13, opacity: 0.85, margin: '10px 0' }}>
+              Portfolio total: <strong>${Number(extended.investmentTotal || 0).toLocaleString()}</strong>
+            </div>
             <div style={grid}>
-              <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-                Portfolio ($)
-                <input type="number" value={extended.investmentTotal} onChange={(e) => setField('investmentTotal', e.target.value)} style={inputStyle} />
-              </label>
               <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
                 Fees %/yr
                 <input type="number" step="0.01" value={extended.feePct} onChange={(e) => setField('feePct', e.target.value)} style={inputStyle} />
@@ -981,11 +1101,26 @@ export default function CheckupPanel({
 
           <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
             <div style={{ fontWeight: 700, marginBottom: 8 }}>Retirement</div>
+            <TypedAccountsEditor
+              accounts={extended.retirementAccounts}
+              onChange={setRetirementAccount}
+              onAdd={addRetirementAccount}
+              onRemove={removeRetirementAccount}
+              typeOptions={RETIREMENT_ACCOUNT_TYPES}
+              showMonthlyContribution
+              inputStyle={inputStyle}
+              btnNeutral={btnNeutral}
+              cardSoftStyle={{ padding: 0, border: 'none', background: 'transparent' }}
+              isMobile={isMobile}
+              typePlaceholder="Choose retirement account type"
+            />
+            <div style={{ fontSize: 13, opacity: 0.85, margin: '10px 0', display: 'grid', gap: 4 }}>
+              <div>Total saved: <strong>${Number(extended.retirementBalance || 0).toLocaleString()}</strong></div>
+              <div>Monthly contributions: <strong>${Number(extended.monthlyRetirementContribution || 0).toLocaleString()}</strong></div>
+            </div>
             <div style={grid}>
               <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Age<input type="number" value={extended.age} onChange={(e) => setField('age', e.target.value)} style={inputStyle} /></label>
               <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Retire at<input type="number" value={extended.targetRetirementAge} onChange={(e) => setField('targetRetirementAge', e.target.value)} style={inputStyle} /></label>
-              <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Retirement $ saved<input type="number" value={extended.retirementBalance} onChange={(e) => setField('retirementBalance', e.target.value)} style={inputStyle} /></label>
-              <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Monthly 401k/IRA<input type="number" value={extended.monthlyRetirementContribution} onChange={(e) => setField('monthlyRetirementContribution', e.target.value)} style={inputStyle} /></label>
             </div>
           </div>
 
@@ -1006,7 +1141,7 @@ export default function CheckupPanel({
       {result ? (
         <>
           {showDetails ? (
-            <DetailCards
+            <SpecialistReportsGrid
               result={result}
               isTablet={isTablet}
               cardSoftStyle={cardSoftStyle}
@@ -1041,4 +1176,4 @@ export default function CheckupPanel({
   );
 }
 
-export { ActionPlanBlock, DetailCards };
+export { ActionPlanBlock, SpecialistReportsGrid as DetailCards };

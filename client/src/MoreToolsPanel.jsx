@@ -1,4 +1,5 @@
 import { MORE_TOOL_SECTIONS, RESOURCE_LINKS } from './planConstants';
+import SpecialistReportsGrid from './SpecialistReportsGrid';
 
 function ProBadge() {
   return (
@@ -79,6 +80,13 @@ export default function MoreToolsPanel({
   businessDocs,
   onOpenProjections,
   onScrollToProjections,
+  checkupResult,
+  month,
+  token,
+  primaryGoal,
+  income,
+  totalExpenses,
+  extendedProfile,
 }) {
   const grid2 = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
 
@@ -215,6 +223,36 @@ export default function MoreToolsPanel({
                   ) : null}
                 </div>
               ) : null}
+              <div style={{ display: 'grid', gap: 10, paddingTop: 8, borderTop: '1px solid rgba(148,163,184,0.15)' }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>Dimension AI reports</div>
+                  <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.85, lineHeight: 1.45 }}>
+                    Deep-dive reports for each checkup category — budget, debt, insurance, investments, savings, and retirement.
+                  </p>
+                </div>
+                {checkupResult ? (
+                  <SpecialistReportsGrid
+                    result={checkupResult}
+                    isTablet={isTablet}
+                    cardSoftStyle={cardSoftStyle}
+                    token={token}
+                    month={month}
+                    profile={profile}
+                    primaryGoal={primaryGoal}
+                    isPro={isPro}
+                    onGoPlan={onGoPlan}
+                    btnPrimary={btnPrimary}
+                    btnNeutral={btnNeutral}
+                    income={income}
+                    totalExpenses={totalExpenses}
+                    extended={extendedProfile}
+                  />
+                ) : (
+                  <div style={{ fontSize: 13, opacity: 0.75, lineHeight: 1.45 }}>
+                    Complete your profile on Finances to generate scores, then return here for per-dimension AI reports.
+                  </div>
+                )}
+              </div>
             </div>
           ) : null}
           {section.id === 'projections' ? (

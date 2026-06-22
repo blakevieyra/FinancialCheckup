@@ -1,20 +1,32 @@
 {
   "name": "financialcheckup-client",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:mobile": "cross-env VITE_CAPACITOR=true vite build && cap sync android",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:run": "npm run build:mobile && cap run android"
   },
   "dependencies": {
+    "@capacitor/android": "^7.2.0",
+    "@capacitor/app": "^7.0.1",
+    "@capacitor/core": "^7.2.0",
+    "@capacitor/splash-screen": "^7.0.1",
+    "@capacitor/status-bar": "^7.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.2.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.8.3",
     "vite": "^6.3.5"
   }
 }

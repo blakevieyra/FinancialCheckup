@@ -106,7 +106,7 @@ export default function FinancesPage({
         }}
         onResult={onResult}
         showForm
-        showDetails
+        showDetails={false}
         showHistory={false}
         profile={profile}
         primaryGoal={primaryGoal}

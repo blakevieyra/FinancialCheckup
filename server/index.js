@@ -23,6 +23,9 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
   .map((s) => s.trim())
   .filter(Boolean);
 
+/** Capacitor Android/iOS WebView origins (Play Store app). */
+const MOBILE_APP_ORIGINS = ['https://localhost', 'capacitor://localhost', 'http://localhost'];
+
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -33,7 +36,7 @@ app.use(
   cors({
     origin(origin, cb) {
       if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
+      if (allowedOrigins.includes(origin) || MOBILE_APP_ORIGINS.includes(origin)) return cb(null, true);
       return cb(new Error(`Origin ${origin} is not in CLIENT_URL allow-list.`));
     },
     credentials: true,

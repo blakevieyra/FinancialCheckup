@@ -956,6 +956,8 @@ const EXTENDED_PROFILE_KEYS = [
   'targetRetirementAge',
   'retirementBalance',
   'monthlyRetirementContribution',
+  'investmentAccounts',
+  'retirementAccounts',
   'excludedFromScore',
 ];
 

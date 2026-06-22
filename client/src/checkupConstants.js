@@ -106,6 +106,8 @@ export const BLANK_SNAPSHOT = {
   targetRetirementAge: 65,
   retirementBalance: 0,
   monthlyRetirementContribution: 0,
+  investmentAccounts: [],
+  retirementAccounts: [],
   excludedFromScore: [],
 };
 
@@ -135,20 +137,14 @@ export const DIMENSION_IMPORTANCE = {
 
 export const DIMENSION_BASICS = {
   investments:
-    'Enter your total portfolio value, annual fee %, and allocation split (stocks, bonds, international, cash). Start with low-cost index funds in a 401(k) or IRA; capture any employer match first.',
+    'Add each investment account by type (401(k), IRA, brokerage, etc.) and balance — totals update automatically. Then enter fee % and allocation split (stocks, bonds, international, cash).',
   insurance:
     'Check each coverage type you carry today — essential policies first (life, disability), then property and liability. Remove checks for anything you do not have.',
   retirement:
-    'Enter your age, target retirement age, current balance in 401(k)/IRA accounts, and monthly contributions. A common target is 15% of income including employer match; increase 1% per year if you are behind.',
+    'Add each retirement account by type (401(k), IRA, pension, etc.) with balance and monthly contribution. Enter your age and target retirement age. A common target is 15% of income including employer match.',
 };
 
-/** Suggested debt rows for new users — delete any that do not apply. */
-export const DEBT_STARTER_TEMPLATES = [
-  { name: 'Mortgage', balance: 0, minPayment: 0, apr: 6.5 },
-  { name: 'Credit card', balance: 0, minPayment: 0, apr: 22 },
-  { name: 'Auto loan', balance: 0, minPayment: 0, apr: 7 },
-  { name: 'Personal loan', balance: 0, minPayment: 0, apr: 12 },
-];
+export { DEBT_STARTER_TEMPLATES } from './categoryOptions';
 
 /** Insurance coverage types ordered by importance (weight sums to 100 on server). */
 export const INSURANCE_COVERAGE_TYPES = [

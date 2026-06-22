@@ -2,17 +2,30 @@
   "name": "Financial Checkup",
   "short_name": "FC Checkup",
   "description": "Personal finance checkup — track money, score your financial health, and get a step-by-step plan.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#0a0f1a",
   "theme_color": "#0a0f1a",
   "orientation": "portrait-primary",
+  "categories": ["finance", "productivity"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/apple-touch-icon.png",

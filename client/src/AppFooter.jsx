@@ -12,6 +12,11 @@ export default function AppFooter() {
         textTransform: 'uppercase',
       }}
     >
+      <div style={{ marginBottom: 8, textTransform: 'none', letterSpacing: 'normal', fontSize: 12 }}>
+        <a href="/privacy.html" style={{ color: '#93c5fd', textDecoration: 'none' }}>
+          Privacy Policy
+        </a>
+      </div>
       OPERON E2I LLC
     </div>
   );

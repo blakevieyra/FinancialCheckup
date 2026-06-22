@@ -16,6 +16,10 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @keyframes fcFadeIn {
@@ -129,11 +133,25 @@ table tbody tr:nth-child(even) {
   input[type='text'],
   input[type='number'],
   input[type='password'],
-  input[type='month'],
-  select,
-  textarea {
-    font-size: 16px;
-  }
+input[type='month'],
+select,
+textarea {
+  font-size: 16px;
+}
+
+select.fc-category-select {
+  appearance: none;
+  background-color: rgba(15, 23, 42, 0.85);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  cursor: pointer;
+}
+
+select.fc-category-select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 }
 
 @keyframes fcSpin {

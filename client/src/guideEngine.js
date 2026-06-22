@@ -13,27 +13,27 @@ const DIM_META = {
   },
   savings: {
     label: 'Savings',
-    tab: 'finances',
+    tab: 'tools',
     focus: 'Emergency fund & monthly savings',
     tool: 'specialist-savings',
   },
   investments: {
     label: 'Investments',
-    tab: 'finances',
+    tab: 'tools',
     focus: 'Portfolio balance & allocation',
     tool: 'specialist-investments',
   },
   insurance: {
     label: 'Insurance',
-    tab: 'finances',
+    tab: 'tools',
     focus: 'Life, disability & liability coverage',
     tool: 'specialist-insurance',
   },
   retirement: {
     label: 'Retirement',
-    tab: 'finances',
+    tab: 'tools',
     focus: 'Retirement balance & contributions',
-    tool: null,
+    tool: 'specialist-retirement',
   },
 };
 
@@ -69,7 +69,7 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
       dimension: weakest.key,
       score: weakest.score,
       priority: weakest.score < 55 ? 'HIGH' : 'MED',
-      cta: meta.tool ? 'Open guidance in Finances' : 'Edit in Finances',
+      cta: meta.tool ? 'Open AI report in Tools' : 'Edit in Finances',
     });
   }
 
@@ -79,7 +79,9 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
       id: 'action-top',
       title: topAction.title,
       detail: topAction.detail || topAction.steps?.[0] || 'Your highest-impact next step.',
-      tab: topAction.horizon === 'wealth' ? 'finances' : 'finances',
+      tab: topAction.title?.toLowerCase().includes('invest') || topAction.title?.toLowerCase().includes('insurance')
+        || topAction.title?.toLowerCase().includes('saving') || topAction.title?.toLowerCase().includes('emergency')
+        ? 'tools' : 'finances',
       tool: topAction.title?.toLowerCase().includes('invest') ? 'specialist-investments'
         : topAction.title?.toLowerCase().includes('insurance') ? 'specialist-insurance'
           : topAction.title?.toLowerCase().includes('saving') || topAction.title?.toLowerCase().includes('emergency')
@@ -108,10 +110,10 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
         id: 'goal-wealth',
         title: 'Build long-term wealth',
         detail: `Strengthen ${weakWealth.label} first — savings, investments, and retirement compound over time.`,
-        tab: 'finances',
-        tool: weakWealth.key === 'investments' ? 'specialist-investments' : 'specialist-savings',
+        tab: 'tools',
+        tool: weakWealth.key === 'investments' ? 'specialist-investments' : weakWealth.key === 'retirement' ? 'specialist-retirement' : 'specialist-savings',
         priority: 'HIGH',
-        cta: 'Review in Finances',
+        cta: 'Open in Tools',
       });
     }
   }
@@ -121,10 +123,10 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
       id: 'goal-retire',
       title: 'Close your retirement gap',
       detail: 'Increase contributions and review your target retirement age in Finances.',
-      tab: 'finances',
-      tool: null,
+      tab: 'tools',
+      tool: 'specialist-retirement',
       priority: 'HIGH',
-      cta: 'Review retirement',
+      cta: 'Open retirement report',
     });
   }
 
@@ -133,10 +135,10 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
       id: 'goal-invest',
       title: 'Improve portfolio allocation',
       detail: 'Review diversification, fees, and contribution rate for your investment goal.',
-      tab: 'finances',
+      tab: 'tools',
       tool: 'specialist-investments',
       priority: 'HIGH',
-      cta: 'Open portfolio guidance',
+      cta: 'Open portfolio report',
     });
   }
 
@@ -145,10 +147,10 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
       id: 'goal-ef',
       title: 'Fund your emergency reserve',
       detail: 'Build toward 3–6 months of essential expenses — start with one month.',
-      tab: 'finances',
+      tab: 'tools',
       tool: 'specialist-savings',
       priority: 'HIGH',
-      cta: 'Review savings plan',
+      cta: 'Open savings report',
     });
   }
 
