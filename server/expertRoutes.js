@@ -4,6 +4,7 @@ const { createMessage, parseJsonFromText } = require('./anthropicClient');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
 const { buildMacroContextLine } = require('./fredContext');
 const { requireFeature } = require('./requireFeature');
+const { saveAiReport } = require('./aiReportLog');
 
 router.use(verifyToken);
 
@@ -84,6 +85,28 @@ Return ONLY valid JSON (no markdown) with this exact shape:
     const raw = await createMessage({ userContent, maxTokens: 2500, system });
     const parsed = parseJsonFromText(raw);
 
+    const expert = {
+      headline: parsed.headline,
+      executiveVerdict: parsed.executiveVerdict,
+      personalizedPriorities: parsed.personalizedPriorities || [],
+      benchmarkContext: parsed.benchmarkContext,
+      riskWatchouts: parsed.riskWatchouts || [],
+      disclaimer: parsed.disclaimer,
+    };
+
+    let reportId = null;
+    try {
+      reportId = await saveAiReport(req.user.id, {
+        area: 'expert',
+        month,
+        dimensionScore: snap.expenseRatio,
+        dimensionGrade: snap.grade,
+        report: { month, profile, summary: parsed.headline, expert },
+      });
+    } catch (logErr) {
+      console.warn('Expert report log save failed:', logErr.message);
+    }
+
     res.json({
       month,
       profile,
@@ -95,15 +118,9 @@ Return ONLY valid JSON (no markdown) with this exact shape:
         grade: snap.grade,
       },
       deterministicTips: snap.deterministicTips,
-      expert: {
-        headline: parsed.headline,
-        executiveVerdict: parsed.executiveVerdict,
-        personalizedPriorities: parsed.personalizedPriorities || [],
-        benchmarkContext: parsed.benchmarkContext,
-        riskWatchouts: parsed.riskWatchouts || [],
-        disclaimer: parsed.disclaimer,
-      },
+      expert,
       macroUsed: Boolean(macroLine),
+      reportId,
     });
   } catch (e) {
     console.error('Expert briefing error:', e.message);

@@ -361,6 +361,7 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPhase, setRegisterPhase] = useState('form'); // form | code
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [verifyCode, setVerifyCode] = useState('');
   const [authFieldErrors, setAuthFieldErrors] = useState({});
   const [authNotice, setAuthNotice] = useState('');
@@ -1138,14 +1139,14 @@ export default function App() {
         return;
       }
 
-      const v = validateRegisterForm({ username, email: registerEmail, password });
+      const v = validateRegisterForm({ username, email: registerEmail, password, acceptedTerms });
       if (!v.valid) {
-        setAuthFieldErrors({ username: v.username, email: v.email, password: v.password });
+        setAuthFieldErrors({ username: v.username, email: v.email, password: v.password, terms: v.terms });
         return;
       }
       setBusy(true);
       try {
-        await api.sendRegisterCode(username, password, registerEmail.trim());
+        await api.sendRegisterCode(username, password, registerEmail.trim(), acceptedTerms);
         setRegisterPhase('code');
         setAuthNotice(`We sent a 6-digit code to ${registerEmail.trim()}. Check your spam folder if it does not arrive within a minute.`);
       } catch (e2) {
@@ -1721,6 +1722,7 @@ export default function App() {
           setAuthMode={(mode) => {
             setAuthMode(mode);
             setRegisterPhase('form');
+            setAcceptedTerms(false);
             setAuthError('');
             setAuthFieldErrors({});
             setAuthNotice('');
@@ -1732,6 +1734,8 @@ export default function App() {
           registerEmail={registerEmail}
           setRegisterEmail={setRegisterEmail}
           registerPhase={registerPhase}
+          acceptedTerms={acceptedTerms}
+          setAcceptedTerms={setAcceptedTerms}
           verifyCode={verifyCode}
           setVerifyCode={setVerifyCode}
           authError={authError}

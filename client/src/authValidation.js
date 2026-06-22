@@ -23,14 +23,16 @@ export function validatePassword(password) {
   return '';
 }
 
-export function validateRegisterForm({ username, email, password }) {
+export function validateRegisterForm({ username, email, password, acceptedTerms }) {
   const usernameErr = validateUsername(username);
   const emailErr = validateEmail(email);
   const passwordErr = validatePassword(password);
+  const termsErr = acceptedTerms ? '' : 'You must agree to the Terms of Use and Privacy Policy.';
   return {
     username: usernameErr,
     email: emailErr,
     password: passwordErr,
-    valid: !usernameErr && !emailErr && !passwordErr,
+    terms: termsErr,
+    valid: !usernameErr && !emailErr && !passwordErr && !termsErr,
   };
 }

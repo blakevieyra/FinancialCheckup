@@ -27,7 +27,7 @@ function otpExpiresAt() {
   return new Date(Date.now() + 15 * 60 * 1000).toISOString();
 }
 
-async function createUserAccount({ username, email, passwordHash }) {
+async function createUserAccount({ username, email, passwordHash, termsAcceptedAt }) {
   const { lastInsertRowid: userId } = await dbRun(
     `INSERT INTO users (username, password_hash, email, email_verified, email_verify_token, account_status)
      VALUES (?, ?, ?, 1, NULL, 'active')`,
@@ -42,11 +42,14 @@ async function createUserAccount({ username, email, passwordHash }) {
     );
   }
   await dbRun('INSERT INTO checkup_profiles (user_id, snapshot_json) VALUES (?, ?)', [userId, '{}']);
+  const acceptedAt = termsAcceptedAt || new Date().toISOString();
   await dbRun(
-    `INSERT INTO user_preferences (user_id, digest_email, digest_channel, digest_enabled, digest_frequency)
-     VALUES (?, ?, 'none', 0, 'weekly')
-     ON CONFLICT (user_id) DO UPDATE SET digest_email = EXCLUDED.digest_email`,
-    [userId, email],
+    `INSERT INTO user_preferences (user_id, digest_email, digest_channel, digest_enabled, digest_frequency, terms_accepted_at)
+     VALUES (?, ?, 'none', 0, 'weekly', ?)
+     ON CONFLICT (user_id) DO UPDATE SET
+       digest_email = EXCLUDED.digest_email,
+       terms_accepted_at = COALESCE(user_preferences.terms_accepted_at, EXCLUDED.terms_accepted_at)`,
+    [userId, email, acceptedAt],
   );
 
   sendWelcomeEmail(userId).catch(() => {});
@@ -65,6 +68,11 @@ router.post('/register/send-code', async (req, res) => {
       return res.status(400).json({ error: first, errors: v.errors });
     }
 
+    if (!req.body?.acceptedTerms) {
+      return res.status(400).json({ error: 'You must agree to the Terms of Use and Privacy Policy.' });
+    }
+    const termsAcceptedAt = new Date().toISOString();
+
     if (await dbGet('SELECT id FROM users WHERE username = ?', [username])) {
       return res.status(409).json({ error: 'Username already taken.' });
     }
@@ -82,9 +90,9 @@ router.post('/register/send-code', async (req, res) => {
 
     await dbRun('DELETE FROM registration_pending WHERE LOWER(email) = ?', [email]);
     await dbRun(
-      `INSERT INTO registration_pending (username, email, password_hash, verify_code, expires_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [username, email, hash, code, expires],
+      `INSERT INTO registration_pending (username, email, password_hash, verify_code, expires_at, terms_accepted_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [username, email, hash, code, expires, termsAcceptedAt],
     );
 
     const sent = await sendRegistrationOtpEmail(email, username, code);
@@ -152,6 +160,10 @@ router.post('/register/verify', async (req, res) => {
       await dbRun('DELETE FROM registration_pending WHERE id = ?', [pending.id]);
       return res.status(400).json({ error: 'Code expired. Request a new one.' });
     }
+    if (!pending.terms_accepted_at) {
+      await dbRun('DELETE FROM registration_pending WHERE id = ?', [pending.id]);
+      return res.status(400).json({ error: 'Registration expired. Please sign up again and accept the Terms and Privacy Policy.' });
+    }
 
     if (await dbGet('SELECT id FROM users WHERE username = ?', [pending.username])) {
       return res.status(409).json({ error: 'Username already taken.' });
@@ -164,6 +176,7 @@ router.post('/register/verify', async (req, res) => {
       username: pending.username,
       email: pending.email,
       passwordHash: pending.password_hash,
+      termsAcceptedAt: pending.terms_accepted_at,
     });
 
     await dbRun('DELETE FROM registration_pending WHERE id = ?', [pending.id]);
@@ -201,6 +214,9 @@ router.post('/register', async (req, res) => {
       const first = Object.values(v.errors)[0];
       return res.status(400).json({ error: first, errors: v.errors });
     }
+    if (!req.body?.acceptedTerms) {
+      return res.status(400).json({ error: 'You must agree to the Terms of Use and Privacy Policy.' });
+    }
 
     if (await dbGet('SELECT id FROM users WHERE username = ?', [username])) {
       return res.status(409).json({ error: 'Username already taken.' });
@@ -210,7 +226,12 @@ router.post('/register', async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 12);
-    const { userId, username: uname } = await createUserAccount({ username, email, passwordHash: hash });
+    const { userId, username: uname } = await createUserAccount({
+      username,
+      email,
+      passwordHash: hash,
+      termsAcceptedAt: new Date().toISOString(),
+    });
 
     res.status(201).json({
       token: signToken({ id: userId, username: uname }),
@@ -241,7 +262,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
     if (user.account_status === 'deactivated') {
-      return res.status(403).json({ error: 'This account has been deactivated. Contact support@operone2i.com.' });
+      return res.status(403).json({ error: 'This account has been deactivated. Contact info@operone2i.com.' });
     }
 
     res.json({

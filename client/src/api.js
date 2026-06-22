@@ -107,10 +107,10 @@ export async function register(username, password, email) {
   });
 }
 
-export async function sendRegisterCode(username, password, email) {
+export async function sendRegisterCode(username, password, email, acceptedTerms = false) {
   return apiFetch('/api/auth/register/send-code', {
     method: 'POST',
-    body: { username, password, email },
+    body: { username, password, email, acceptedTerms: Boolean(acceptedTerms) },
   });
 }
 
@@ -322,6 +322,23 @@ export async function getSpecialistAdvice(token, payload) {
 
 export async function emailSpecialistReport(token, report) {
   return apiFetch('/api/ai/specialist/email', { method: 'POST', token, body: { report } });
+}
+
+export async function listSpecialistReports(token, { area, month, limit } = {}) {
+  const qs = new URLSearchParams();
+  if (area) qs.set('area', area);
+  if (month) qs.set('month', month);
+  if (limit) qs.set('limit', String(limit));
+  const q = qs.toString();
+  return apiFetch(`/api/ai/specialist/history${q ? `?${q}` : ''}`, { token });
+}
+
+export async function getSpecialistReport(token, id) {
+  return apiFetch(`/api/ai/specialist/history/${encodeURIComponent(id)}`, { token });
+}
+
+export async function deleteSpecialistReport(token, id) {
+  return apiFetch(`/api/ai/specialist/history/${encodeURIComponent(id)}`, { method: 'DELETE', token });
 }
 
 export async function getGoals(token) {

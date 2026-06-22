@@ -23,6 +23,8 @@ export default function LandingPage({
   registerEmail,
   setRegisterEmail,
   registerPhase,
+  acceptedTerms,
+  setAcceptedTerms,
   verifyCode,
   setVerifyCode,
   authNotice,
@@ -178,8 +180,30 @@ export default function LandingPage({
                     <div style={{ fontSize: 11, opacity: 0.65 }}>Min 8 characters with a letter and a number.</div>
                   ) : null}
                 </label>
+                {authMode === 'register' ? (
+                  <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.45, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      style={{ marginTop: 3, flexShrink: 0 }}
+                    />
+                    <span>
+                      I agree to the{' '}
+                      <a href="/terms.html" target="_blank" rel="noreferrer" style={{ color: '#93c5fd' }} onClick={(e) => e.stopPropagation()}>
+                        Terms of Use
+                      </a>
+                      {' '}and{' '}
+                      <a href="/privacy.html" target="_blank" rel="noreferrer" style={{ color: '#93c5fd' }} onClick={(e) => e.stopPropagation()}>
+                        Privacy Policy
+                      </a>
+                      .
+                    </span>
+                  </label>
+                ) : null}
+                {authFieldErrors?.terms ? <div style={{ color: '#fca5a5', fontSize: 12, marginTop: -4 }}>{authFieldErrors.terms}</div> : null}
                 {authError ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{authError}</div> : null}
-                <button type="submit" disabled={busy} style={{ ...btnPrimary, marginTop: 4 }}>
+                <button type="submit" disabled={busy || (authMode === 'register' && !acceptedTerms)} style={{ ...btnPrimary, marginTop: 4 }}>
                   {busy
                     ? 'Working…'
                     : authMode === 'register'
@@ -202,7 +226,13 @@ export default function LandingPage({
           }}
         >
           <div>© 2026 Financial Checkup · OPERON E2I LLC · Fresno, CA</div>
-          <div>Contact: info@operone2i.com</div>
+          <div>
+            <a href="/terms.html" style={{ color: '#93c5fd', textDecoration: 'none' }}>Terms</a>
+            {' · '}
+            <a href="/privacy.html" style={{ color: '#93c5fd', textDecoration: 'none' }}>Privacy</a>
+            {' · '}
+            info@operone2i.com
+          </div>
         </footer>
       </div>
     </div>

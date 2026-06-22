@@ -3,6 +3,7 @@ const { verifyToken } = require('./auth');
 const { createMessage, parseJsonFromText } = require('./anthropicClient');
 const { requireFeature } = require('./requireFeature');
 const { sendAiInsightsEmail, sendSpecialistReportEmail } = require('./transactionalEmail');
+const { saveAiReport, listAiReports, getAiReport, deleteAiReport, SPECIALIST_AREAS } = require('./aiReportLog');
 
 router.use(verifyToken);
 
@@ -132,7 +133,20 @@ Include exactly 6 categoryPlans (one per dimension). Give 2-3 real sources per c
 
     const emailResult = await sendAiInsightsEmail(req.user.id, result).catch(() => ({ sent: false }));
 
-    res.json({ ...result, emailSent: Boolean(emailResult?.sent) });
+    let reportId = null;
+    try {
+      reportId = await saveAiReport(req.user.id, {
+        area: 'comprehensive',
+        month: safeMonth,
+        dimensionScore: overallScore,
+        dimensionGrade: grade,
+        report: result,
+      });
+    } catch (logErr) {
+      console.warn('AI insights log save failed:', logErr.message);
+    }
+
+    res.json({ ...result, emailSent: Boolean(emailResult?.sent), reportId });
   } catch (err) {
     console.error('AI error:', err.message);
     const msg = err.message || 'Failed to generate insights.';
@@ -217,10 +231,65 @@ Return ONLY valid JSON:
       ...result,
       title: area.charAt(0).toUpperCase() + area.slice(1),
     }).catch(() => ({ sent: false }));
-    res.json({ ...result, emailSent: Boolean(emailResult?.sent) });
+
+    let reportId = null;
+    try {
+      reportId = await saveAiReport(req.user.id, {
+        area,
+        month: safeMonth,
+        dimensionScore,
+        dimensionGrade,
+        report: result,
+      });
+    } catch (logErr) {
+      console.warn('Specialist report log save failed:', logErr.message);
+    }
+
+    res.json({ ...result, reportId, emailSent: Boolean(emailResult?.sent) });
   } catch (err) {
     console.error('AI specialist error:', err.message);
     res.status(502).json({ error: err.message || 'Specialist AI failed.' });
+  }
+});
+
+router.get('/specialist/history', requireFeature('aiInsights'), async (req, res) => {
+  const area = req.query.area;
+  const month = req.query.month;
+  const limit = req.query.limit;
+  if (area && !SPECIALIST_AREAS.has(area)) {
+    return res.status(400).json({ error: 'Invalid area filter.' });
+  }
+  if (month && !/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: 'month must be YYYY-MM.' });
+  }
+  try {
+    const reports = await listAiReports(req.user.id, { area, month, limit });
+    res.json({ reports });
+  } catch (err) {
+    console.error('Specialist history list error:', err.message);
+    res.status(500).json({ error: 'Could not load report history.' });
+  }
+});
+
+router.get('/specialist/history/:id', requireFeature('aiInsights'), async (req, res) => {
+  try {
+    const row = await getAiReport(req.user.id, Number(req.params.id));
+    if (!row) return res.status(404).json({ error: 'Report not found.' });
+    res.json(row);
+  } catch (err) {
+    console.error('Specialist history get error:', err.message);
+    res.status(500).json({ error: 'Could not load report.' });
+  }
+});
+
+router.delete('/specialist/history/:id', requireFeature('aiInsights'), async (req, res) => {
+  try {
+    const ok = await deleteAiReport(req.user.id, Number(req.params.id));
+    if (!ok) return res.status(404).json({ error: 'Report not found.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Specialist history delete error:', err.message);
+    res.status(500).json({ error: 'Could not delete report.' });
   }
 });
 

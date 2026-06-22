@@ -75,7 +75,7 @@ In Android Studio signed-bundle wizard, point to this keystore.
 | **Package name** | `com.operone2i.financialcheckup` |
 | **Category** | Finance |
 | **Privacy policy URL** | `https://YOUR-WEB-HOST/privacy.html` |
-| **Contact email** | support@financialcheckup.app (update if different) |
+| **Contact email** | info@operone2i.com |
 
 ### Store listing assets
 

@@ -99,8 +99,13 @@ router.get('/data-export', async (req, res) => {
       [uid],
     );
     const goals = await dbAll('SELECT id, name, goal_type, target_amount, current_amount, created_at FROM goals WHERE user_id = ?', [uid]);
+    const aiReports = await dbAll(
+      `SELECT id, area, month, dimension_score, dimension_grade, created_at
+       FROM ai_report_log WHERE user_id = ? ORDER BY area, created_at DESC LIMIT 500`,
+      [uid],
+    );
     const prefs = await dbGet(
-      'SELECT digest_enabled, digest_channel, digest_email, digest_weekday FROM user_preferences WHERE user_id = ?',
+      'SELECT digest_enabled, digest_channel, digest_email, digest_weekday, terms_accepted_at FROM user_preferences WHERE user_id = ?',
       [uid],
     );
     const subscription = await dbGet(
@@ -133,6 +138,14 @@ router.get('/data-export', async (req, res) => {
         month: h.month,
         overallScore: h.overall_score,
         createdAt: h.created_at,
+      })),
+      aiReportLog: aiReports.map((r) => ({
+        id: r.id,
+        area: r.area,
+        month: r.month,
+        dimensionScore: r.dimension_score,
+        dimensionGrade: r.dimension_grade,
+        createdAt: r.created_at,
       })),
       goals,
     });

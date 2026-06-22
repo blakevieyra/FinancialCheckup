@@ -4,7 +4,7 @@ let pool;
 
 /** Tables whose primary key is `id`; INSERTs into these auto-RETURN id so callers
  *  can keep using the legacy { lastInsertRowid } shape inherited from the SQLite era. */
-const TABLES_WITH_ID_PK = new Set(['users', 'income', 'expenses', 'expenses_log', 'goals']);
+const TABLES_WITH_ID_PK = new Set(['users', 'income', 'expenses', 'expenses_log', 'goals', 'ai_report_log']);
 
 /** Default ISO-8601 UTC timestamp expression used everywhere we used to call SQLite's datetime('now'). */
 const ISO_NOW_DEFAULT = `to_char((now() AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
@@ -173,6 +173,7 @@ async function initDb() {
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS primary_goal TEXT`,
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS digest_frequency TEXT NOT NULL DEFAULT 'weekly'`,
     `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS xp_total INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS terms_accepted_at TEXT`,
   ];
   for (const stmt of prefMigrations) await rawQuery(stmt);
 
@@ -214,6 +215,21 @@ async function initDb() {
   await rawQuery(`CREATE INDEX IF NOT EXISTS idx_checkup_history_user ON checkup_history(user_id, month, created_at DESC)`);
 
   await rawQuery(`
+    CREATE TABLE IF NOT EXISTS ai_report_log (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      area TEXT NOT NULL,
+      month TEXT NOT NULL,
+      dimension_score DOUBLE PRECISION,
+      dimension_grade TEXT,
+      report_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_ai_report_log_user_area ON ai_report_log(user_id, area, created_at DESC)`);
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_ai_report_log_user_month ON ai_report_log(user_id, month, created_at DESC)`);
+
+  await rawQuery(`
     CREATE TABLE IF NOT EXISTS subscriptions (
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       stripe_customer_id TEXT,
@@ -241,6 +257,7 @@ async function initDb() {
     )
   `);
   await rawQuery(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registration_pending_email ON registration_pending (LOWER(email))`);
+  await rawQuery(`ALTER TABLE registration_pending ADD COLUMN IF NOT EXISTS terms_accepted_at TEXT`);
 
   await rawQuery(`
     CREATE TABLE IF NOT EXISTS stripe_webhook_events (

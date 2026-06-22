@@ -13,6 +13,9 @@ export default function AppFooter() {
       }}
     >
       <div style={{ marginBottom: 8, textTransform: 'none', letterSpacing: 'normal', fontSize: 12 }}>
+        <a href="/terms.html" style={{ color: '#93c5fd', textDecoration: 'none', marginRight: 12 }}>
+          Terms of Use
+        </a>
         <a href="/privacy.html" style={{ color: '#93c5fd', textDecoration: 'none' }}>
           Privacy Policy
         </a>
