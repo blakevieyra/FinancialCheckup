@@ -48,6 +48,36 @@ function otpExpiresAt() {
   return new Date(Date.now() + 15 * 60 * 1000).toISOString();
 }
 
+function maskEmail(email) {
+  const e = String(email || '').trim();
+  const at = e.indexOf('@');
+  if (at <= 0) return 'your email';
+  const local = e.slice(0, at);
+  const domain = e.slice(at + 1);
+  const maskedLocal =
+    local.length <= 2 ? `${local[0] || '*'}*` : `${local[0]}***${local.slice(-1)}`;
+  return `${maskedLocal}@${domain}`;
+}
+
+function parseResetIdentifier(body) {
+  return String(body?.identifier || body?.email || '').trim();
+}
+
+async function findUserForPasswordReset(identifier) {
+  const raw = String(identifier || '').trim();
+  if (!raw) return null;
+  if (raw.includes('@')) {
+    return dbGet(
+      'SELECT id, username, email, account_status FROM users WHERE LOWER(email) = ?',
+      [raw.toLowerCase()],
+    );
+  }
+  return dbGet(
+    'SELECT id, username, email, account_status FROM users WHERE LOWER(username) = LOWER(?)',
+    [raw],
+  );
+}
+
 async function createUserAccount({ username, email, passwordHash, termsAcceptedAt }) {
   const { lastInsertRowid: userId } = await dbRun(
     `INSERT INTO users (username, password_hash, email, email_verified, email_verify_token, account_status)
@@ -296,9 +326,10 @@ router.post('/login', async (req, res) => {
 
 router.post('/forgot-password/send-code', async (req, res) => {
   try {
-    const email = String(req.body?.email || '').trim().toLowerCase();
-    const emailErr = validateEmail(email);
-    if (emailErr) return res.status(400).json({ error: emailErr });
+    const identifier = parseResetIdentifier(req.body);
+    if (!identifier) {
+      return res.status(400).json({ error: 'Enter your email or username.' });
+    }
 
     if (!smtpConfigured()) {
       return res.status(503).json({
@@ -306,29 +337,55 @@ router.post('/forgot-password/send-code', async (req, res) => {
       });
     }
 
-    const user = await dbGet(
-      'SELECT id, username, email, account_status FROM users WHERE LOWER(email) = ?',
-      [email],
-    );
+    const user = await findUserForPasswordReset(identifier);
+    const usedEmailLookup = identifier.includes('@');
 
-    if (user && user.account_status !== 'deactivated') {
-      const code = generateOtpCode();
-      const expires = otpExpiresAt();
-      await dbRun('DELETE FROM password_reset_pending WHERE LOWER(email) = ?', [email]);
-      await dbRun(
-        `INSERT INTO password_reset_pending (user_id, email, reset_code, expires_at)
-         VALUES (?, ?, ?, ?)`,
-        [user.id, email, code, expires],
-      );
-      const sent = await sendPasswordResetOtpEmail(email, user.username, code);
-      if (!sent.sent) {
-        return res.status(502).json({ error: sent.reason || 'Could not send reset email.' });
+    if (!user) {
+      if (usedEmailLookup) {
+        return res.json({
+          ok: true,
+          message: 'If an account exists for that email, we sent a reset code. Check your inbox and spam folder.',
+        });
       }
+      return res.status(404).json({ error: 'No account found with that username.' });
+    }
+
+    if (user.account_status === 'deactivated') {
+      if (usedEmailLookup) {
+        return res.json({
+          ok: true,
+          message: 'If an account exists for that email, we sent a reset code. Check your inbox and spam folder.',
+        });
+      }
+      return res.status(403).json({ error: 'This account has been deactivated. Contact info@operone2i.com.' });
+    }
+
+    const deliveryEmail = String(user.email || '').trim().toLowerCase();
+    if (!deliveryEmail) {
+      return res.status(400).json({
+        error: 'This account has no email on file. Contact info@operone2i.com to reset your password.',
+        code: 'NO_EMAIL_ON_FILE',
+      });
+    }
+
+    const code = generateOtpCode();
+    const expires = otpExpiresAt();
+    await dbRun('DELETE FROM password_reset_pending WHERE user_id = ?', [user.id]);
+    await dbRun(
+      `INSERT INTO password_reset_pending (user_id, email, reset_code, expires_at)
+       VALUES (?, ?, ?, ?)`,
+      [user.id, deliveryEmail, code, expires],
+    );
+    const sent = await sendPasswordResetOtpEmail(deliveryEmail, user.username, code);
+    if (!sent.sent) {
+      console.error('[forgot-password] send failed:', sent.reason);
+      return res.status(502).json({ error: sent.reason || 'Could not send reset email. Try again or contact info@operone2i.com.' });
     }
 
     res.json({
       ok: true,
-      message: 'If an account exists for that email, we sent a reset code. Check your inbox and spam folder.',
+      sentTo: maskEmail(deliveryEmail),
+      message: `Reset code sent to ${maskEmail(deliveryEmail)}. Check your inbox and spam folder.`,
     });
   } catch (e) {
     console.error(e);
@@ -338,9 +395,10 @@ router.post('/forgot-password/send-code', async (req, res) => {
 
 router.post('/forgot-password/resend-code', async (req, res) => {
   try {
-    const email = String(req.body?.email || '').trim().toLowerCase();
-    const emailErr = validateEmail(email);
-    if (emailErr) return res.status(400).json({ error: emailErr });
+    const identifier = parseResetIdentifier(req.body);
+    if (!identifier) {
+      return res.status(400).json({ error: 'Enter your email or username.' });
+    }
 
     if (!smtpConfigured()) {
       return res.status(503).json({
@@ -348,36 +406,42 @@ router.post('/forgot-password/resend-code', async (req, res) => {
       });
     }
 
-    const pending = await dbGet('SELECT * FROM password_reset_pending WHERE LOWER(email) = ?', [email]);
-    if (!pending) {
-      return res.json({
-        ok: true,
-        message: 'If an account exists for that email, we sent a reset code. Check your inbox and spam folder.',
+    const user = await findUserForPasswordReset(identifier);
+    if (!user || user.account_status === 'deactivated') {
+      return res.status(404).json({ error: 'No active reset request found. Start again from Forgot password.' });
+    }
+
+    const deliveryEmail = String(user.email || '').trim().toLowerCase();
+    if (!deliveryEmail) {
+      return res.status(400).json({
+        error: 'This account has no email on file. Contact info@operone2i.com to reset your password.',
+        code: 'NO_EMAIL_ON_FILE',
       });
     }
 
-    const user = await dbGet('SELECT username, account_status FROM users WHERE id = ?', [pending.user_id]);
-    if (!user || user.account_status === 'deactivated') {
-      await dbRun('DELETE FROM password_reset_pending WHERE id = ?', [pending.id]);
-      return res.json({
-        ok: true,
-        message: 'If an account exists for that email, we sent a reset code. Check your inbox and spam folder.',
-      });
+    const pending = await dbGet('SELECT * FROM password_reset_pending WHERE user_id = ?', [user.id]);
+    if (!pending) {
+      return res.status(404).json({ error: 'No active reset request found. Start again from Forgot password.' });
     }
 
     const code = generateOtpCode();
     const expires = otpExpiresAt();
     await dbRun(
-      'UPDATE password_reset_pending SET reset_code = ?, expires_at = ? WHERE id = ?',
-      [code, expires, pending.id],
+      'UPDATE password_reset_pending SET reset_code = ?, expires_at = ?, email = ? WHERE id = ?',
+      [code, expires, deliveryEmail, pending.id],
     );
 
-    const sent = await sendPasswordResetOtpEmail(email, user.username, code);
+    const sent = await sendPasswordResetOtpEmail(deliveryEmail, user.username, code);
     if (!sent.sent) {
+      console.error('[forgot-password] resend failed:', sent.reason);
       return res.status(502).json({ error: sent.reason || 'Could not send reset email.' });
     }
 
-    res.json({ ok: true, message: 'New reset code sent. Check your inbox and spam folder.' });
+    res.json({
+      ok: true,
+      sentTo: maskEmail(deliveryEmail),
+      message: `New reset code sent to ${maskEmail(deliveryEmail)}. Check your inbox and spam folder.`,
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error.' });
@@ -386,21 +450,27 @@ router.post('/forgot-password/resend-code', async (req, res) => {
 
 router.post('/forgot-password/reset', async (req, res) => {
   try {
-    const email = String(req.body?.email || '').trim().toLowerCase();
+    const identifier = parseResetIdentifier(req.body);
     const code = String(req.body?.code || '').replace(/\D/g, '').trim();
     const newPassword = req.body?.newPassword;
 
-    const emailErr = validateEmail(email);
-    if (emailErr) return res.status(400).json({ error: emailErr });
+    if (!identifier) {
+      return res.status(400).json({ error: 'Enter your email or username.' });
+    }
     if (!code || code.length !== 6) {
-      return res.status(400).json({ error: 'Email and 6-digit reset code are required.' });
+      return res.status(400).json({ error: 'Email/username and 6-digit reset code are required.' });
     }
     const pwErr = validatePassword(newPassword);
     if (pwErr) return res.status(400).json({ error: pwErr });
 
+    const user = await findUserForPasswordReset(identifier);
+    if (!user || user.account_status === 'deactivated') {
+      return res.status(400).json({ error: 'Invalid reset code.' });
+    }
+
     const pending = await dbGet(
-      'SELECT * FROM password_reset_pending WHERE LOWER(email) = ? AND reset_code = ?',
-      [email, code],
+      'SELECT * FROM password_reset_pending WHERE user_id = ? AND reset_code = ?',
+      [user.id, code],
     );
     if (!pending) {
       return res.status(400).json({ error: 'Invalid reset code.' });
@@ -408,15 +478,6 @@ router.post('/forgot-password/reset', async (req, res) => {
     if (new Date(pending.expires_at).getTime() < Date.now()) {
       await dbRun('DELETE FROM password_reset_pending WHERE id = ?', [pending.id]);
       return res.status(400).json({ error: 'Code expired. Request a new one.' });
-    }
-
-    const user = await dbGet(
-      'SELECT id, username, email, email_verified, account_status FROM users WHERE id = ?',
-      [pending.user_id],
-    );
-    if (!user || user.account_status === 'deactivated') {
-      await dbRun('DELETE FROM password_reset_pending WHERE id = ?', [pending.id]);
-      return res.status(400).json({ error: 'Invalid reset code.' });
     }
 
     const hash = await bcrypt.hash(newPassword, 12);

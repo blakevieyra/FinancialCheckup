@@ -160,24 +160,28 @@ export async function login(username, password) {
   });
 }
 
-export async function sendPasswordResetCode(email) {
+export async function sendPasswordResetCode(identifier) {
   return apiFetch('/api/auth/forgot-password/send-code', {
     method: 'POST',
-    body: { email },
+    body: { identifier: String(identifier || '').trim() },
   });
 }
 
-export async function resendPasswordResetCode(email) {
+export async function resendPasswordResetCode(identifier) {
   return apiFetch('/api/auth/forgot-password/resend-code', {
     method: 'POST',
-    body: { email },
+    body: { identifier: String(identifier || '').trim() },
   });
 }
 
-export async function resetPasswordWithCode(email, code, newPassword) {
+export async function resetPasswordWithCode(identifier, code, newPassword) {
   return apiFetch('/api/auth/forgot-password/reset', {
     method: 'POST',
-    body: { email, code: String(code || '').replace(/\D/g, ''), newPassword },
+    body: {
+      identifier: String(identifier || '').trim(),
+      code: String(code || '').replace(/\D/g, ''),
+      newPassword,
+    },
   });
 }
 

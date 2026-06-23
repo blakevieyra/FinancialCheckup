@@ -27,7 +27,7 @@ import { awardXp, loadXp, saveXp, xpProgressLabel } from './progression';
 import { buildCardStyles, buildShellStyle } from './theme';
 import { buildIncomePayload, ensureIncomeSources, sumIncomeSources } from './incomeSources';
 import { serializeExpensesForSave } from './expenseCategories';
-import { validateRegisterForm, validateResetPasswordForm, validateEmail } from './authValidation';
+import { validateRegisterForm, validateResetPasswordForm, validateResetIdentifier } from './authValidation';
 import {
   printReport,
   mailtoReport,
@@ -416,6 +416,7 @@ export default function App() {
 
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'reset'
   const [resetPhase, setResetPhase] = useState('email'); // 'email' | 'code'
+  const [resetSentTo, setResetSentTo] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -1210,7 +1211,6 @@ export default function App() {
     if (authMode === 'reset') {
       if (resetPhase === 'code') {
         const v = validateResetPasswordForm({
-          email: registerEmail,
           code: verifyCode,
           password,
           passwordConfirm,
@@ -1228,6 +1228,7 @@ export default function App() {
           const res = await api.resetPasswordWithCode(registerEmail.trim(), verifyCode.trim(), password);
           await completeAuthSession(res);
           setResetPhase('email');
+          setResetSentTo('');
           setPasswordConfirm('');
           setVerifyCode('');
         } catch (e2) {
@@ -1238,19 +1239,20 @@ export default function App() {
         return;
       }
 
-      const emailErr = validateEmail(registerEmail);
-      if (emailErr) {
-        setAuthFieldErrors({ email: emailErr });
+      const idErr = validateResetIdentifier(registerEmail);
+      if (idErr) {
+        setAuthFieldErrors({ email: idErr });
         return;
       }
       setBusy(true);
       try {
-        await api.sendPasswordResetCode(registerEmail.trim());
+        const res = await api.sendPasswordResetCode(registerEmail.trim());
         setResetPhase('code');
+        setResetSentTo(res.sentTo || '');
         setPassword('');
         setPasswordConfirm('');
         setVerifyCode('');
-        setAuthNotice(`If an account exists for ${registerEmail.trim()}, we sent a reset code. Check spam if needed.`);
+        setAuthNotice(res.message || `Reset code sent. Check your inbox and spam folder.`);
       } catch (e2) {
         setAuthError(e2.message);
       } finally {
@@ -1312,8 +1314,9 @@ export default function App() {
     setResendBusy(true);
     try {
       if (authMode === 'reset') {
-        await api.resendPasswordResetCode(registerEmail.trim());
-        setAuthNotice(`New reset code sent to ${registerEmail.trim()}. Check spam if needed.`);
+        const res = await api.resendPasswordResetCode(registerEmail.trim());
+        setResetSentTo(res.sentTo || resetSentTo);
+        setAuthNotice(res.message || `New reset code sent. Check spam if needed.`);
       } else {
         await api.resendRegisterCode(registerEmail.trim());
         setAuthNotice(`New code sent to ${registerEmail.trim()}. Check spam if needed.`);
@@ -1328,6 +1331,7 @@ export default function App() {
   function backToLoginFromReset() {
     setAuthMode('login');
     setResetPhase('email');
+    setResetSentTo('');
     setPassword('');
     setPasswordConfirm('');
     setVerifyCode('');
@@ -1954,6 +1958,7 @@ export default function App() {
             setAuthMode(mode);
             setRegisterPhase('form');
             setResetPhase('email');
+            setResetSentTo('');
             setAcceptedTerms(false);
             setPasswordConfirm('');
             setAuthError('');
@@ -1961,6 +1966,7 @@ export default function App() {
             setAuthNotice('');
           }}
           resetPhase={resetPhase}
+          resetSentTo={resetSentTo}
           onBackToLogin={backToLoginFromReset}
           username={username}
           setUsername={setUsername}

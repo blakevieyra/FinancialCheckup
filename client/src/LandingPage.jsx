@@ -15,6 +15,7 @@ export default function LandingPage({
   authMode,
   setAuthMode,
   resetPhase,
+  resetSentTo,
   onBackToLogin,
   username,
   setUsername,
@@ -71,8 +72,8 @@ export default function LandingPage({
   const subtext =
     authMode === 'reset'
       ? resetPhase === 'code'
-        ? `Enter the code we sent to ${registerEmail} and your new password.`
-        : 'Enter the email on your account — we will send a one-time reset code.'
+        ? `Enter the code we sent to ${resetSentTo || 'your email'} and your new password.`
+        : 'Enter the email or username on your account — we will send a one-time reset code.'
       : authMode === 'login'
         ? 'Welcome back — your dashboard picks up where you left off.'
         : registerPhase === 'code'
@@ -218,13 +219,12 @@ export default function LandingPage({
             ) : authMode === 'reset' ? (
               <>
                 <label style={{ display: 'grid', gap: 4, fontSize: 14 }}>
-                  Email
+                  Email or username
                   <input
-                    type="email"
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
-                    autoComplete="email"
-                    placeholder="you@example.com"
+                    autoComplete="username email"
+                    placeholder="you@example.com or your username"
                     style={{ ...inputStyle, width: '100%' }}
                   />
                   {authFieldErrors?.email ? <div style={{ color: '#fca5a5', fontSize: 12 }}>{authFieldErrors.email}</div> : null}

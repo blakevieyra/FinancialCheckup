@@ -55,7 +55,7 @@ Support: info@operone2i.com
 
 async function sendPasswordResetOtpEmail(email, username, code) {
   const app = clientBaseUrl();
-  const subject = 'Reset your Financial Checkup password';
+  const subject = 'Your Financial Checkup reset code';
   const text = `Hi ${username},
 
 Your password reset code is:

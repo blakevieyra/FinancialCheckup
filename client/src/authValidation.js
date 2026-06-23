@@ -37,18 +37,24 @@ export function validateRegisterForm({ username, email, password, acceptedTerms 
   };
 }
 
-export function validateResetPasswordForm({ email, code, password, passwordConfirm }) {
-  const emailErr = validateEmail(email);
+export function validateResetIdentifier(identifier) {
+  const v = String(identifier || '').trim();
+  if (!v) return 'Enter your email or username.';
+  if (v.includes('@')) return validateEmail(v);
+  if (v.length < 3) return 'Username must be at least 3 characters.';
+  return '';
+}
+
+export function validateResetPasswordForm({ code, password, passwordConfirm }) {
   const codeErr = String(code || '').replace(/\D/g, '').length === 6 ? '' : 'Enter the 6-digit code from your email.';
   const passwordErr = validatePassword(password);
   let confirmErr = '';
   if (!passwordConfirm) confirmErr = 'Confirm your new password.';
   else if (password !== passwordConfirm) confirmErr = 'Passwords do not match.';
   return {
-    email: emailErr,
     code: codeErr,
     password: passwordErr,
     passwordConfirm: confirmErr,
-    valid: !emailErr && !codeErr && !passwordErr && !confirmErr,
+    valid: !codeErr && !passwordErr && !confirmErr,
   };
 }
