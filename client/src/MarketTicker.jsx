@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as api from './api';
 
-export default function MarketTicker({ isMobile }) {
+export default function MarketTicker({ isMobile, align = 'start' }) {
   const [items, setItems] = useState([]);
   const [err, setErr] = useState(false);
 
@@ -25,10 +25,11 @@ export default function MarketTicker({ isMobile }) {
       style={{
         display: 'flex',
         flexWrap: 'wrap',
-        gap: isMobile ? 6 : 10,
+        gap: isMobile ? 6 : 8,
         alignItems: 'center',
+        justifyContent: align === 'end' ? 'flex-end' : 'flex-start',
         fontSize: isMobile ? 11 : 12,
-        maxWidth: isMobile ? '100%' : 420,
+        flexShrink: 0,
       }}
     >
       {items.map((q) => (

@@ -71,7 +71,7 @@ Support: info@operone2i.com
 
 — Financial Checkup · Operon E2I LLC`;
 
-  const html = buildBrandedOtpEmail({ username, code, appUrl: app });
+  const html = buildBrandedOtpEmail({ username, code, appUrl: app, purpose: 'reset' });
 
   return sendIfConfigured(email, subject, text, html);
 }

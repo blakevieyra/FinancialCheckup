@@ -9,6 +9,7 @@ import AppNav from './AppNav';
 import FinancialHistoryPanel from './FinancialHistoryPanel';
 import MoreToolsPanel from './MoreToolsPanel';
 import MarketTicker from './MarketTicker';
+import { LOGO_PX, logoStyle } from './brandConstants';
 import SupportPanel from './SupportPanel';
 import SubscriptionPortal from './SubscriptionPortal';
 import AppFooter from './AppFooter';
@@ -2066,11 +2067,26 @@ export default function App() {
           flexDirection: isMobile ? 'column' : 'row',
         }}
       >
-        <div style={{ minWidth: 0, display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
-          <img src="/logo.png" alt="" width={isMobile ? 40 : 48} height={isMobile ? 40 : 48} style={{ borderRadius: 10, flexShrink: 0 }} />
+        <div style={{ minWidth: 0, display: 'flex', gap: 14, alignItems: 'center', flex: 1 }}>
+          <img
+            src="/logo.png"
+            alt=""
+            width={isMobile ? LOGO_PX.headerMobile : LOGO_PX.headerDesktop}
+            height={isMobile ? LOGO_PX.headerMobile : LOGO_PX.headerDesktop}
+            style={logoStyle(isMobile ? LOGO_PX.headerMobile : LOGO_PX.headerDesktop)}
+          />
           <div style={{ minWidth: 0, flex: 1 }}>
-          <h1 style={{ marginBottom: 4, fontSize: isMobile ? '1.45rem' : undefined, lineHeight: 1.2 }}>Financial Checkup</h1>
-          <div style={{ opacity: 0.85, wordBreak: 'break-word' }}>
+          <h1 style={{ marginBottom: 4, fontSize: isMobile ? '1.55rem' : '1.85rem', lineHeight: 1.15, letterSpacing: '-0.02em' }}>Financial Checkup</h1>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ opacity: 0.85, wordBreak: 'break-word', flex: '1 1 200px', minWidth: 0 }}>
             Signed in as <strong>{user}</strong>
             {userId ? (
               <span> · Level <strong>{xpInfo.level}</strong> ({xpInfo.current}/{xpInfo.next} XP)</span>
@@ -2087,16 +2103,12 @@ export default function App() {
                 ) : null}
               </span>
             ) : null}
-          </div>
-          {!isMobile ? (
-            <div style={{ marginTop: 10 }}>
-              <MarketTicker isMobile={isMobile} />
             </div>
-          ) : null}
+            <MarketTicker isMobile={isMobile} align="end" />
+          </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        {isMobile ? <MarketTicker isMobile={isMobile} /> : null}
         <button
           type="button"
           onClick={() => setShowSupport(true)}

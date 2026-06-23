@@ -1,3 +1,5 @@
+import { LOGO_PX, logoStyle } from './brandConstants';
+
 const EXPECT = [
   { title: '6-dimension score', detail: 'Budget, debt, savings, investments, insurance, and retirement — updated as you enter data.' },
   { title: 'Personalized guide', detail: 'See what to fix next and jump straight to the right tool in the app.' },
@@ -85,9 +87,15 @@ export default function LandingPage({
       <div style={innerStyle}>
         <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/logo.png" alt="" width={40} height={40} style={{ borderRadius: 10 }} />
+            <img
+              src="/logo.png"
+              alt=""
+              width={LOGO_PX.landing}
+              height={LOGO_PX.landing}
+              style={logoStyle(LOGO_PX.landing, { borderRadius: 10 })}
+            />
             <div>
-              <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em' }}>Financial Checkup</div>
+              <div style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.02em' }}>Financial Checkup</div>
               <div style={{ fontSize: 13, opacity: 0.75, marginTop: 2 }}>Sign in to track your score</div>
             </div>
           </div>

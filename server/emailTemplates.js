@@ -21,6 +21,17 @@ function money(n) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 }
 
+const EMAIL_LOGO_PX = 64;
+const EMAIL_TITLE_PX = 24;
+
+function buildEmailFooterHtml(extraNote) {
+  const note = extraNote
+    ? `<div style="margin-bottom:12px;font-size:12px;color:#64748b;line-height:1.5;">${extraNote}</div>`
+    : '';
+  return `${note}Financial Checkup · Operon E2I LLC · Fresno, CA<br/>
+          <a href="mailto:info@operone2i.com" style="color:#2563eb;">info@operone2i.com</a>`;
+}
+
 /** Shared Financial Checkup email shell — header, footer, optional CTA. */
 function buildBrandedEmailShell({
   username,
@@ -51,10 +62,13 @@ function buildBrandedEmailShell({
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(15,23,42,0.12);">
         <tr>
           <td style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:28px 24px;color:#fff;">
-            <table width="100%"><tr>
-              <td><img src="${esc(logoUrl)}" alt="Financial Checkup" width="44" height="44" style="border-radius:10px;vertical-align:middle;margin-right:12px;display:inline-block;" /><span style="font-size:20px;font-weight:800;vertical-align:middle;">Financial Checkup</span></td>
+            <table width="100%" cellspacing="0" cellpadding="0"><tr>
+              <td style="vertical-align:middle;">
+                <img src="${esc(logoUrl)}" alt="Financial Checkup" width="${EMAIL_LOGO_PX}" height="${EMAIL_LOGO_PX}" style="border-radius:12px;vertical-align:middle;margin-right:14px;display:inline-block;" />
+                <span style="font-size:${EMAIL_TITLE_PX}px;font-weight:800;vertical-align:middle;letter-spacing:-0.02em;">Financial Checkup</span>
+              </td>
             </tr></table>
-            ${subtitle ? `<div style="margin-top:14px;font-size:13px;opacity:0.9;text-transform:uppercase;letter-spacing:0.08em;">${esc(subtitle)}</div>` : ''}
+            ${subtitle ? `<div style="margin-top:16px;font-size:13px;opacity:0.9;text-transform:uppercase;letter-spacing:0.08em;">${esc(subtitle)}</div>` : ''}
             <div style="margin-top:8px;font-size:15px;">Hi ${esc(username)},</div>
             ${headerExtra || ''}
           </td>
@@ -65,8 +79,7 @@ function buildBrandedEmailShell({
           ${noteBlock}
         </td></tr>
         <tr><td style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;line-height:1.5;text-align:center;">
-          Financial Checkup · Operon E2I LLC · Fresno, CA<br/>
-          <a href="mailto:info@operone2i.com" style="color:#2563eb;">info@operone2i.com</a>
+          ${buildEmailFooterHtml()}
         </td></tr>
       </table>
     </td></tr>
@@ -86,16 +99,23 @@ function buildBrandedSimpleEmail({ username, subtitle, paragraphs, ctaHref, ctaL
   return buildBrandedEmailShell({ username, subtitle, bodyHtml, ctaHref, ctaLabel, footerNote });
 }
 
-/** Registration OTP verification code. */
-function buildBrandedOtpEmail({ username, code, appUrl }) {
+/** Registration / password-reset OTP verification code. */
+function buildBrandedOtpEmail({ username, code, appUrl, purpose = 'register' }) {
+  const isReset = purpose === 'reset';
+  const intro = isReset
+    ? 'Use this code to reset your password:'
+    : 'Use this code to verify your email and finish creating your account:';
+  const ignoreLine = isReset
+    ? 'If you did not request a password reset, you can ignore this email — your password will stay the same.'
+    : 'If you did not request this, you can ignore this email.';
   const bodyHtml = `
-    <p style="margin:0 0 16px;color:#475569;line-height:1.6;font-size:15px;">Use this code to verify your email and finish creating your account:</p>
+    <p style="margin:0 0 16px;color:#475569;line-height:1.6;font-size:15px;">${intro}</p>
     <div style="font-size:32px;font-weight:800;letter-spacing:0.35em;text-align:center;padding:16px;background:#f1f5f9;border-radius:10px;color:#1e3a8a;">${esc(code)}</div>
     <p style="margin:16px 0 0;font-size:13px;color:#64748b;line-height:1.5;">Expires in 15 minutes. Check spam if you do not see this message.</p>
-    <p style="margin:14px 0 0;font-size:13px;color:#64748b;">If you did not request this, you can ignore this email.</p>`;
+    <p style="margin:14px 0 0;font-size:13px;color:#64748b;">${ignoreLine}</p>`;
   return buildBrandedEmailShell({
     username,
-    subtitle: 'Verify your email',
+    subtitle: isReset ? 'Reset your password' : 'Verify your email',
     bodyHtml,
     ctaHref: appUrl,
     ctaLabel: 'Open Financial Checkup',
@@ -174,7 +194,6 @@ function buildScoreSummaryEmail({
   budgetBullets,
 }) {
   const appUrl = clientBaseUrl();
-  const logoUrl = `${appUrl}/logo.png`;
   const score = overallScore != null ? Math.round(overallScore) : null;
 
   const dimRows = (dimensions || [])
@@ -199,32 +218,17 @@ function buildScoreSummaryEmail({
     .map((b) => `<li style="margin-bottom:6px;color:#334155;">${esc(b)}</li>`)
     .join('');
 
-  const html = `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#eef2ff;font-family:Inter,Segoe UI,Roboto,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef2ff;padding:24px 12px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(15,23,42,0.12);">
-        <tr>
-          <td style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:28px 24px;color:#fff;">
-            <table width="100%"><tr>
-              <td><img src="${esc(logoUrl)}" alt="Financial Checkup" width="44" height="44" style="border-radius:10px;vertical-align:middle;margin-right:12px;display:inline-block;" /><span style="font-size:20px;font-weight:800;vertical-align:middle;">Financial Checkup</span></td>
-            </tr></table>
-            <div style="margin-top:16px;font-size:13px;opacity:0.9;text-transform:uppercase;letter-spacing:0.08em;">${esc(frequencyLabel)} summary · ${esc(month)}</div>
-            <div style="margin-top:8px;font-size:15px;">Hi ${esc(username)},</div>
-          </td>
-        </tr>
-        ${
-          score != null
-            ? `<tr><td style="padding:24px;text-align:center;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+  const scoreHero =
+    score != null
+      ? `<div style="padding:20px 0 24px;text-align:center;background:#f8fafc;border-radius:12px;margin-bottom:20px;border:1px solid #e2e8f0;">
             <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Your score</div>
             <div style="font-size:52px;font-weight:800;color:${scoreColor(score)};line-height:1.1;margin:8px 0;">${score}</div>
             <div style="font-size:14px;color:#475569;max-width:420px;margin:0 auto;line-height:1.5;">${esc(headline || 'Keep updating Finances to track progress.')}</div>
-          </td></tr>`
-            : ''
-        }
-        <tr><td style="padding:24px;">
+          </div>`
+      : '';
+
+  const bodyHtml = `
+          ${scoreHero}
           <table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:20px;">
             <tr>
               <td style="width:25%;padding:12px;background:#f1f5f9;border-radius:10px;text-align:center;">
@@ -285,23 +289,16 @@ function buildScoreSummaryEmail({
             bulletRows
               ? `<div style="font-size:15px;font-weight:700;margin-bottom:8px;color:#0f172a;">Budget highlights</div><ul style="margin:0;padding-left:20px;">${bulletRows}</ul>`
               : ''
-          }
+          }`;
 
-          <div style="text-align:center;margin-top:28px;">
-            <a href="${esc(appUrl)}" style="display:inline-block;background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:10px;">Open Financial Checkup</a>
-          </div>
-        </td></tr>
-        <tr><td style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;line-height:1.5;text-align:center;">
-          Financial Checkup · Operon E2I · Educational only — not investment, tax, or legal advice.<br/>
-          <a href="mailto:info@operone2i.com" style="color:#2563eb;">info@operone2i.com</a>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-
-  return html;
+  return buildBrandedEmailShell({
+    username,
+    subtitle: `${frequencyLabel} summary · ${month}`,
+    bodyHtml,
+    ctaHref: appUrl,
+    ctaLabel: 'Open Financial Checkup',
+    footerNote: esc('Educational only — not investment, tax, or legal advice.'),
+  });
 }
 
 /** Branded HTML wrapper for AI / specialist report emails. */
