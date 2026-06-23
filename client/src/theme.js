@@ -88,7 +88,8 @@ export function buildCardStyles(isMobile) {
     color: FC_COLORS.text,
   };
   const btnBase = {
-    padding: '0.56rem 1rem',
+    padding: isMobile ? '0.65rem 1rem' : '0.56rem 1rem',
+    minHeight: isMobile ? 44 : undefined,
     cursor: 'pointer',
     color: FC_COLORS.text,
     borderRadius: 10,

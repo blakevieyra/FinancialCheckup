@@ -36,3 +36,19 @@ export function validateRegisterForm({ username, email, password, acceptedTerms 
     valid: !usernameErr && !emailErr && !passwordErr && !termsErr,
   };
 }
+
+export function validateResetPasswordForm({ email, code, password, passwordConfirm }) {
+  const emailErr = validateEmail(email);
+  const codeErr = String(code || '').replace(/\D/g, '').length === 6 ? '' : 'Enter the 6-digit code from your email.';
+  const passwordErr = validatePassword(password);
+  let confirmErr = '';
+  if (!passwordConfirm) confirmErr = 'Confirm your new password.';
+  else if (password !== passwordConfirm) confirmErr = 'Passwords do not match.';
+  return {
+    email: emailErr,
+    code: codeErr,
+    password: passwordErr,
+    passwordConfirm: confirmErr,
+    valid: !emailErr && !codeErr && !passwordErr && !confirmErr,
+  };
+}

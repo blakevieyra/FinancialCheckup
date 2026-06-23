@@ -52,6 +52,8 @@ export default function ExpandablePanel({
     >
       <button
         type="button"
+        aria-expanded={open}
+        aria-controls={panelId ? `${panelId}-content` : undefined}
         onClick={() => setOpen((v) => !v)}
         style={{
           width: '100%',
@@ -61,6 +63,7 @@ export default function ExpandablePanel({
           justifyContent: 'space-between',
           gap: 12,
           padding: gridCard ? '1rem 1.05rem' : '0.95rem 1.05rem',
+          minHeight: 48,
           background: open ? 'rgba(15, 23, 42, 0.35)' : 'transparent',
           border: 'none',
           borderLeft: `3px solid ${accentColor}`,
@@ -92,8 +95,10 @@ export default function ExpandablePanel({
           aria-hidden
           style={{
             flexShrink: 0,
-            width: 28,
-            height: 28,
+            width: 32,
+            height: 32,
+            minWidth: 32,
+            minHeight: 32,
             borderRadius: 8,
             display: 'flex',
             alignItems: 'center',
@@ -116,7 +121,10 @@ export default function ExpandablePanel({
           transition: 'max-height 420ms ease, opacity 320ms ease',
         }}
       >
-        <div style={{ padding: open ? '0 0.9rem 0.9rem' : 0, borderTop: open ? '1px solid rgba(148,163,184,0.12)' : 'none' }}>
+        <div
+          id={panelId ? `${panelId}-content` : undefined}
+          style={{ padding: open ? '0 0.9rem 0.9rem' : 0, borderTop: open ? '1px solid rgba(148,163,184,0.12)' : 'none' }}
+        >
           {open ? (
             <div className="fc-fade-in" style={{ paddingTop: 12 }}>
               {children}

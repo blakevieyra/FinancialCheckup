@@ -3,6 +3,7 @@ require('dotenv').config({ path: pathEnv.join(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const { initDb, closeDb, pingDb } = require('./db');
 const { startDigestScheduler, stopDigestScheduler } = require('./digestScheduler');
@@ -53,6 +54,7 @@ app.use(
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 
 app.use(express.json({ limit: '512kb' }));
+app.use(cookieParser());
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -66,6 +68,9 @@ app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/register/send-code', authLimiter);
 app.use('/api/auth/register/resend-code', authLimiter);
 app.use('/api/auth/register/verify', authLimiter);
+app.use('/api/auth/forgot-password/send-code', authLimiter);
+app.use('/api/auth/forgot-password/resend-code', authLimiter);
+app.use('/api/auth/forgot-password/reset', authLimiter);
 app.use('/api/auth/change-password', authLimiter);
 
 const apiLimiter = rateLimit({

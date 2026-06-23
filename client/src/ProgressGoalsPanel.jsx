@@ -109,6 +109,7 @@ export default function ProgressGoalsPanel({
   totalExpenses,
   savingsRate,
   isMobile,
+  isTablet,
   cardStyle,
   cardSoftStyle,
 }) {
@@ -124,7 +125,15 @@ export default function ProgressGoalsPanel({
   const showCategoryTotals =
     assessment.categoryTotals?.length > 0
     && assessment.metrics.some((m) => String(m.label).toLowerCase() === 'surplus');
-  const metricCols = isMobile ? '1fr' : showCategoryTotals ? 'repeat(4, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))';
+  const metricCols = isMobile
+    ? '1fr'
+    : isTablet && showCategoryTotals
+      ? 'repeat(2, minmax(0, 1fr))'
+      : showCategoryTotals
+        ? 'repeat(4, minmax(0, 1fr))'
+        : isTablet
+          ? 'repeat(2, minmax(0, 1fr))'
+          : 'repeat(3, minmax(0, 1fr))';
 
   return (
     <div

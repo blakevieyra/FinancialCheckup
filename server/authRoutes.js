@@ -1,14 +1,16 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { dbGet, dbRun } = require('./db');
-const { signToken, verifyToken } = require('./auth');
-const { validateRegistration, validateLogin, validatePassword } = require('./authValidation');
+const { signToken, verifyToken, resolveSession } = require('./auth');
+const { setAuthCookie, clearAuthCookie } = require('./authCookies');
+const { validateRegistration, validateLogin, validatePassword, validateEmail } = require('./authValidation');
 const {
   generateVerifyToken,
   generateOtpCode,
   sendWelcomeEmail,
   sendConfirmEmail,
   sendRegistrationOtpEmail,
+  sendPasswordResetOtpEmail,
   smtpConfigured,
 } = require('./transactionalEmail');
 
@@ -21,6 +23,25 @@ const DEFAULT_CATS = [
 
 function clientBaseUrl() {
   return (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
+}
+
+function authSuccessBody(user) {
+  return {
+    username: user.username,
+    userId: user.userId ?? user.id,
+    email: user.email ?? null,
+    emailVerified: user.emailVerified != null ? Boolean(user.emailVerified) : true,
+  };
+}
+
+function issueSession(res, user, status = 200) {
+  const username = user.username;
+  const userId = user.userId ?? user.id;
+  const jwtToken = signToken({ id: userId, username });
+  setAuthCookie(res, jwtToken);
+  const body = authSuccessBody({ ...user, username, userId });
+  if (status === 201) body.message = 'Account created.';
+  res.status(status).json(body);
 }
 
 function otpExpiresAt() {
@@ -181,14 +202,12 @@ router.post('/register/verify', async (req, res) => {
 
     await dbRun('DELETE FROM registration_pending WHERE id = ?', [pending.id]);
 
-    res.status(201).json({
-      token: signToken({ id: userId, username }),
+    issueSession(res, {
       username,
       userId,
       email: pending.email,
       emailVerified: true,
-      message: 'Account created.',
-    });
+    }, 201);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error.' });
@@ -233,14 +252,12 @@ router.post('/register', async (req, res) => {
       termsAcceptedAt: new Date().toISOString(),
     });
 
-    res.status(201).json({
-      token: signToken({ id: userId, username: uname }),
+    issueSession(res, {
       username: uname,
       userId,
       email,
       emailVerified: true,
-      message: 'Account created.',
-    });
+    }, 201);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error.' });
@@ -265,9 +282,149 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ error: 'This account has been deactivated. Contact info@operone2i.com.' });
     }
 
-    res.json({
-      token: signToken({ id: user.id, username }),
+    issueSession(res, {
       username,
+      userId: user.id,
+      email: user.email || null,
+      emailVerified: Boolean(user.email_verified),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+router.post('/forgot-password/send-code', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const emailErr = validateEmail(email);
+    if (emailErr) return res.status(400).json({ error: emailErr });
+
+    if (!smtpConfigured()) {
+      return res.status(503).json({
+        error: 'Password reset email is not configured yet. Contact info@operone2i.com.',
+      });
+    }
+
+    const user = await dbGet(
+      'SELECT id, username, email, account_status FROM users WHERE LOWER(email) = ?',
+      [email],
+    );
+
+    if (user && user.account_status !== 'deactivated') {
+      const code = generateOtpCode();
+      const expires = otpExpiresAt();
+      await dbRun('DELETE FROM password_reset_pending WHERE LOWER(email) = ?', [email]);
+      await dbRun(
+        `INSERT INTO password_reset_pending (user_id, email, reset_code, expires_at)
+         VALUES (?, ?, ?, ?)`,
+        [user.id, email, code, expires],
+      );
+      const sent = await sendPasswordResetOtpEmail(email, user.username, code);
+      if (!sent.sent) {
+        return res.status(502).json({ error: sent.reason || 'Could not send reset email.' });
+      }
+    }
+
+    res.json({
+      ok: true,
+      message: 'If an account exists for that email, we sent a reset code. Check your inbox and spam folder.',
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+router.post('/forgot-password/resend-code', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const emailErr = validateEmail(email);
+    if (emailErr) return res.status(400).json({ error: emailErr });
+
+    if (!smtpConfigured()) {
+      return res.status(503).json({
+        error: 'Password reset email is not configured yet. Contact info@operone2i.com.',
+      });
+    }
+
+    const pending = await dbGet('SELECT * FROM password_reset_pending WHERE LOWER(email) = ?', [email]);
+    if (!pending) {
+      return res.json({
+        ok: true,
+        message: 'If an account exists for that email, we sent a reset code. Check your inbox and spam folder.',
+      });
+    }
+
+    const user = await dbGet('SELECT username, account_status FROM users WHERE id = ?', [pending.user_id]);
+    if (!user || user.account_status === 'deactivated') {
+      await dbRun('DELETE FROM password_reset_pending WHERE id = ?', [pending.id]);
+      return res.json({
+        ok: true,
+        message: 'If an account exists for that email, we sent a reset code. Check your inbox and spam folder.',
+      });
+    }
+
+    const code = generateOtpCode();
+    const expires = otpExpiresAt();
+    await dbRun(
+      'UPDATE password_reset_pending SET reset_code = ?, expires_at = ? WHERE id = ?',
+      [code, expires, pending.id],
+    );
+
+    const sent = await sendPasswordResetOtpEmail(email, user.username, code);
+    if (!sent.sent) {
+      return res.status(502).json({ error: sent.reason || 'Could not send reset email.' });
+    }
+
+    res.json({ ok: true, message: 'New reset code sent. Check your inbox and spam folder.' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+router.post('/forgot-password/reset', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const code = String(req.body?.code || '').replace(/\D/g, '').trim();
+    const newPassword = req.body?.newPassword;
+
+    const emailErr = validateEmail(email);
+    if (emailErr) return res.status(400).json({ error: emailErr });
+    if (!code || code.length !== 6) {
+      return res.status(400).json({ error: 'Email and 6-digit reset code are required.' });
+    }
+    const pwErr = validatePassword(newPassword);
+    if (pwErr) return res.status(400).json({ error: pwErr });
+
+    const pending = await dbGet(
+      'SELECT * FROM password_reset_pending WHERE LOWER(email) = ? AND reset_code = ?',
+      [email, code],
+    );
+    if (!pending) {
+      return res.status(400).json({ error: 'Invalid reset code.' });
+    }
+    if (new Date(pending.expires_at).getTime() < Date.now()) {
+      await dbRun('DELETE FROM password_reset_pending WHERE id = ?', [pending.id]);
+      return res.status(400).json({ error: 'Code expired. Request a new one.' });
+    }
+
+    const user = await dbGet(
+      'SELECT id, username, email, email_verified, account_status FROM users WHERE id = ?',
+      [pending.user_id],
+    );
+    if (!user || user.account_status === 'deactivated') {
+      await dbRun('DELETE FROM password_reset_pending WHERE id = ?', [pending.id]);
+      return res.status(400).json({ error: 'Invalid reset code.' });
+    }
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await dbRun('UPDATE users SET password_hash = ? WHERE id = ?', [hash, user.id]);
+    await dbRun('DELETE FROM password_reset_pending WHERE id = ?', [pending.id]);
+
+    issueSession(res, {
+      username: user.username,
       userId: user.id,
       email: user.email || null,
       emailVerified: Boolean(user.email_verified),
@@ -340,6 +497,32 @@ router.post('/resend-verify', verifyToken, async (req, res) => {
     console.error(e);
     res.status(500).json({ error: e.message || 'Could not send email.' });
   }
+});
+
+router.get('/session', async (req, res) => {
+  try {
+    const session = await resolveSession(req);
+    if (!session) return res.json({ authenticated: false });
+    if (session.invalid) {
+      clearAuthCookie(res);
+      return res.json({ authenticated: false });
+    }
+    res.json({
+      authenticated: true,
+      userId: session.id,
+      username: session.username,
+      email: session.email,
+      emailVerified: session.emailVerified,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+router.post('/logout', (req, res) => {
+  clearAuthCookie(res);
+  res.json({ ok: true });
 });
 
 module.exports = router;

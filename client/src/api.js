@@ -7,6 +7,9 @@ const AUTH_PATH_PREFIXES = [
   '/api/auth/register/send-code',
   '/api/auth/register/resend-code',
   '/api/auth/register/verify',
+  '/api/auth/forgot-password/send-code',
+  '/api/auth/forgot-password/resend-code',
+  '/api/auth/forgot-password/reset',
 ];
 
 function isAuthPath(path) {
@@ -51,9 +54,12 @@ function apiUrl(path) {
 
 async function apiFetch(path, { method = 'GET', token, body } = {}) {
   const headers = { ...jsonHeaders };
-  const init = { method, headers };
+  const init = { method, headers, credentials: 'include' };
 
-  if (token) headers.Authorization = `Bearer ${token}`;
+  /** Legacy Bearer support (Capacitor / scripts). Web clients use httpOnly cookies. */
+  if (token && typeof token === 'string' && token !== 'session') {
+    headers.Authorization = `Bearer ${token}`;
+  }
   if (body !== undefined) init.body = JSON.stringify(body);
 
   const url = apiUrl(path);
@@ -61,9 +67,8 @@ async function apiFetch(path, { method = 'GET', token, body } = {}) {
   const data = await res.json().catch(() => null);
 
   if (!res.ok) {
-    /** A 401 on an authed call (token present, non-auth route) means the session is dead.
-     *  Clear it before throwing so the next render shows the login screen. */
-    if (res.status === 401 && token && !isAuthPath(path)) {
+    /** A 401 on a non-auth route means the session is dead — clear client state. */
+    if (res.status === 401 && !isAuthPath(path)) {
       clearStaleSession();
     }
     const base = data?.error || data?.message || `Request failed (${res.status})`;
@@ -78,6 +83,14 @@ async function apiFetch(path, { method = 'GET', token, body } = {}) {
 
 export async function health() {
   return apiFetch('/api/health');
+}
+
+export async function getSession() {
+  return apiFetch('/api/auth/session');
+}
+
+export async function logout() {
+  return apiFetch('/api/auth/logout', { method: 'POST' });
 }
 
 export async function getMarketTicker() {
@@ -144,6 +157,27 @@ export async function login(username, password) {
   return apiFetch('/api/auth/login', {
     method: 'POST',
     body: { username, password },
+  });
+}
+
+export async function sendPasswordResetCode(email) {
+  return apiFetch('/api/auth/forgot-password/send-code', {
+    method: 'POST',
+    body: { email },
+  });
+}
+
+export async function resendPasswordResetCode(email) {
+  return apiFetch('/api/auth/forgot-password/resend-code', {
+    method: 'POST',
+    body: { email },
+  });
+}
+
+export async function resetPasswordWithCode(email, code, newPassword) {
+  return apiFetch('/api/auth/forgot-password/reset', {
+    method: 'POST',
+    body: { email, code: String(code || '').replace(/\D/g, ''), newPassword },
   });
 }
 
@@ -220,10 +254,10 @@ export async function sendDigestTest(token, body) {
   return apiFetch('/api/me/digest/test', { method: 'POST', token, body });
 }
 
-export async function downloadMonthlyCsv(token, month) {
+export async function downloadMonthlyCsv(_token, month) {
   const m = encodeURIComponent(month);
   const res = await fetch(apiUrl(`/api/reports/csv?month=${m}`), {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: 'include',
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -232,10 +266,10 @@ export async function downloadMonthlyCsv(token, month) {
   return res.blob();
 }
 
-export async function downloadExecutivePdf(token, month) {
+export async function downloadExecutivePdf(_token, month) {
   const m = encodeURIComponent(month);
   const res = await fetch(apiUrl(`/api/reports/executive-pdf?month=${m}`), {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: 'include',
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -244,11 +278,11 @@ export async function downloadExecutivePdf(token, month) {
   return res.blob();
 }
 
-export async function downloadBusinessDocsPdf(token, month, months = 12) {
+export async function downloadBusinessDocsPdf(_token, month, months = 12) {
   const m = encodeURIComponent(month);
   const n = encodeURIComponent(months);
   const res = await fetch(apiUrl(`/api/reports/business-docs-pdf?month=${m}&months=${n}`), {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: 'include',
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);

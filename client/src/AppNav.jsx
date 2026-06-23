@@ -26,7 +26,8 @@ export default function AppNav({ active, onChange, isMobile, btnPrimary, btnNeut
             onClick={() => onChange(s.id)}
             style={{
               ...(isActive ? btnPrimary : btnNeutral),
-              padding: isMobile ? '0.55rem 0.45rem' : '0.6rem 0.5rem',
+              padding: isMobile ? '0.65rem 0.45rem' : '0.6rem 0.5rem',
+              minHeight: isMobile ? 44 : undefined,
               fontSize: isMobile ? 12 : 13,
               textAlign: 'center',
               lineHeight: 1.25,

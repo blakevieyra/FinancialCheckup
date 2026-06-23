@@ -74,8 +74,13 @@ async function initDb() {
     );
   }
 
-  /** Render-managed Postgres requires SSL; allow self-signed (Render uses an internal CA). */
+  /** Cloud Postgres (e.g. Render external URL) requires SSL; local Docker often does not. */
+  const isLocalDb =
+    /@(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(connectionString) ||
+    connectionString.includes('host=localhost') ||
+    connectionString.includes('host=127.0.0.1');
   const useSsl =
+    !isLocalDb ||
     /sslmode=require/i.test(connectionString) ||
     process.env.NODE_ENV === 'production' ||
     process.env.PGSSL === '1';
@@ -259,6 +264,18 @@ async function initDb() {
   `);
   await rawQuery(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registration_pending_email ON registration_pending (LOWER(email))`);
   await rawQuery(`ALTER TABLE registration_pending ADD COLUMN IF NOT EXISTS terms_accepted_at TEXT`);
+
+  await rawQuery(`
+    CREATE TABLE IF NOT EXISTS password_reset_pending (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      reset_code TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT ${ISO_NOW_DEFAULT}
+    )
+  `);
+  await rawQuery(`CREATE UNIQUE INDEX IF NOT EXISTS idx_password_reset_pending_email ON password_reset_pending (LOWER(email))`);
 
   await rawQuery(`
     CREATE TABLE IF NOT EXISTS stripe_webhook_events (

@@ -59,6 +59,7 @@ function DimensionCard({
   scoreLine,
   accent = 'default',
   defaultOpen = false,
+  isMobile = false,
   children,
 }) {
   const [showWhy, setShowWhy] = useState(false);
@@ -66,11 +67,11 @@ function DimensionCard({
 
   const includeLabel = (
     <label
-      style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, cursor: 'pointer', opacity: 0.88, fontWeight: 500 }}
+      style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: isMobile ? 11 : 12, cursor: 'pointer', opacity: 0.88, fontWeight: 500 }}
       onClick={(e) => e.stopPropagation()}
     >
       <input type="checkbox" checked={included} onChange={onToggleInclude} />
-      Include in overall score
+      {isMobile ? 'In score' : 'Include in overall score'}
     </label>
   );
 
@@ -83,6 +84,7 @@ function DimensionCard({
       defaultOpen={defaultOpen}
       titleAddon={includeLabel}
       headerActions={
+        !isMobile ? (
         <button
           type="button"
           onClick={() => setShowWhy((v) => !v)}
@@ -90,9 +92,19 @@ function DimensionCard({
         >
           {showWhy ? 'Hide' : 'Why this matters'}
         </button>
+        ) : null
       }
     >
       <div style={{ display: 'grid', gap: 12 }}>
+        {isMobile ? (
+          <button
+            type="button"
+            onClick={() => setShowWhy((v) => !v)}
+            style={{ ...btnNeutral, fontSize: 12, padding: '0.4rem 0.75rem', justifySelf: 'start' }}
+          >
+            {showWhy ? 'Hide' : 'Why this matters'}
+          </button>
+        ) : null}
         {basics ? (
           <div style={{ fontSize: 13, opacity: 0.82, lineHeight: 1.5, padding: '0.55rem 0.65rem', borderRadius: 8, background: 'rgba(148,163,184,0.08)' }}>
             <strong style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', opacity: 0.75 }}>Basics</strong>
@@ -774,6 +786,7 @@ export default function CheckupPanel({
         onToggleInclude={() => toggleScoreDimension('budget')}
         cardStyle={cardStyle}
         btnNeutral={btnNeutral}
+        isMobile={isMobile}
         scoreLine={dimScoreLine(result, 'budget')}
         accent="outlook"
       >
@@ -818,6 +831,7 @@ export default function CheckupPanel({
         onToggleInclude={() => toggleScoreDimension('savings')}
         cardStyle={cardStyle}
         btnNeutral={btnNeutral}
+        isMobile={isMobile}
         scoreLine={dimScoreLine(result, 'savings')}
       >
         <div style={grid}>
@@ -844,6 +858,7 @@ export default function CheckupPanel({
         onToggleInclude={() => toggleScoreDimension('debt')}
         cardStyle={cardStyle}
         btnNeutral={btnNeutral}
+        isMobile={isMobile}
         scoreLine={dimScoreLine(result, 'debt')}
       >
         <DebtEditor
@@ -871,6 +886,7 @@ export default function CheckupPanel({
         onToggleInclude={() => toggleScoreDimension('investments')}
         cardStyle={cardStyle}
         btnNeutral={btnNeutral}
+        isMobile={isMobile}
         scoreLine={dimScoreLine(result, 'investments')}
       >
         <TypedAccountsEditor
@@ -910,6 +926,7 @@ export default function CheckupPanel({
         onToggleInclude={() => toggleScoreDimension('insurance')}
         cardStyle={cardStyle}
         btnNeutral={btnNeutral}
+        isMobile={isMobile}
         scoreLine={dimScoreLine(result, 'insurance')}
       >
         <InsuranceEditor extended={extended} onToggle={setField} cardSoftStyle={cardSoftStyle} />
@@ -932,6 +949,7 @@ export default function CheckupPanel({
         onToggleInclude={() => toggleScoreDimension('retirement')}
         cardStyle={cardStyle}
         btnNeutral={btnNeutral}
+        isMobile={isMobile}
         scoreLine={dimScoreLine(result, 'retirement')}
       >
         <TypedAccountsEditor

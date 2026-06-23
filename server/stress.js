@@ -1,58 +1,25 @@
 'use strict';
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
 /**
- * Local stress test — requires DATABASE_URL.
+ * Local stress test — requires DATABASE_URL in repo root .env.
  * Usage: STRESS_CONCURRENCY=25 STRESS_ROUNDS=3 node stress.js
  */
-const http = require('http');
 const { spawn } = require('child_process');
+const { createTestClient } = require('./testHttp');
 
 const PORT = 30200 + (process.pid % 500);
 const CONCURRENCY = Math.min(Math.max(Number(process.env.STRESS_CONCURRENCY) || 20, 5), 80);
 const ROUNDS = Math.min(Math.max(Number(process.env.STRESS_ROUNDS) || 2, 1), 10);
 
 if (!process.env.DATABASE_URL) {
-  console.log('Stress SKIPPED — set DATABASE_URL.');
+  console.log('Stress SKIPPED — set DATABASE_URL in the repo root .env.');
   process.exit(0);
 }
 
-function req(method, pathname, token, jsonBody) {
-  return new Promise((resolve, reject) => {
-    const body = jsonBody === undefined ? null : JSON.stringify(jsonBody);
-    const opts = {
-      hostname: '127.0.0.1',
-      port: PORT,
-      path: pathname,
-      method,
-      headers: {},
-    };
-    if (body) {
-      opts.headers['Content-Type'] = 'application/json';
-      opts.headers['Content-Length'] = Buffer.byteLength(body);
-    }
-    if (token) opts.headers.Authorization = `Bearer ${token}`;
-    const client = http.request(opts, (res) => {
-      let raw = '';
-      res.on('data', (c) => { raw += c; });
-      res.on('end', () => {
-        let parsed;
-        try { parsed = JSON.parse(raw); } catch { parsed = raw; }
-        resolve({ status: res.statusCode, body: parsed, ms: 0 });
-      });
-    });
-    client.on('error', reject);
-    const start = Date.now();
-    client.on('response', () => {
-      client.responseStart = Date.now();
-    });
-    client.on('close', () => {});
-    if (body) client.write(body);
-    client.end();
-    client.setTimeout(30000, () => client.destroy(new Error('timeout')));
-  });
-}
-
-async function timedReq(...args) {
+async function timedReq(req, ...args) {
   const start = Date.now();
   try {
     const r = await req(...args);
@@ -66,7 +33,7 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function waitForReady(child) {
+async function waitForReady(child, req) {
   for (let i = 0; i < 80; i += 1) {
     if (child.exitCode !== null) throw new Error('Server exited early.');
     try {
@@ -92,6 +59,8 @@ async function runPool(tasks, limit) {
 }
 
 (async () => {
+  const { req } = createTestClient(PORT);
+
   const child = spawn(process.execPath, ['index.js'], {
     cwd: __dirname,
     env: {
@@ -104,7 +73,7 @@ async function runPool(tasks, limit) {
   });
 
   try {
-    await waitForReady(child);
+    await waitForReady(child, req);
 
     const user = `stress_${Date.now()}`;
     const reg = await req('POST', '/api/auth/register', {
@@ -114,10 +83,9 @@ async function runPool(tasks, limit) {
       acceptedTerms: true,
     });
     if (reg.status !== 201) throw new Error(`register failed ${reg.status}`);
-    const token = reg.body.token;
 
-    await req('POST', '/api/income', token, { amount: 6000, month: '2026-06' });
-    const exp = await req('GET', '/api/expenses?month=2026-06', token);
+    await req('POST', '/api/income', { amount: 6000, month: '2026-06' });
+    const exp = await req('GET', '/api/expenses?month=2026-06');
     const cat = exp.body[0]?.category || 'Other';
 
     const scenarios = [];
@@ -125,10 +93,10 @@ async function runPool(tasks, limit) {
       for (let i = 0; i < CONCURRENCY; i += 1) {
         const n = i + round * CONCURRENCY;
         if (n % 4 === 0) {
-          scenarios.push(() => timedReq('GET', '/api/health'));
+          scenarios.push(() => timedReq(req, 'GET', '/api/health'));
         } else if (n % 4 === 1) {
           scenarios.push(() =>
-            timedReq('POST', '/api/checkup/preview', null, {
+            timedReq(req, 'POST', '/api/checkup/preview', {
               income: 5000 + n,
               expenses: [{ category: cat, amount: 100 + n }],
               totalExpenses: 2000 + n,
@@ -136,13 +104,13 @@ async function runPool(tasks, limit) {
           );
         } else if (n % 4 === 2) {
           scenarios.push(() =>
-            timedReq('PUT', '/api/expenses', token, {
+            timedReq(req, 'PUT', '/api/expenses', {
               month: '2026-06',
               expenses: [{ category: cat, amount: 50 + (n % 200) }],
             }),
           );
         } else {
-          scenarios.push(() => timedReq('GET', '/api/market/ticker'));
+          scenarios.push(() => timedReq(req, 'GET', '/api/market/ticker'));
         }
       }
     }

@@ -53,6 +53,29 @@ Support: info@operone2i.com
   return sendIfConfigured(email, subject, text, html);
 }
 
+async function sendPasswordResetOtpEmail(email, username, code) {
+  const app = clientBaseUrl();
+  const subject = 'Reset your Financial Checkup password';
+  const text = `Hi ${username},
+
+Your password reset code is:
+
+${code}
+
+Enter this code in the app to choose a new password. It expires in 15 minutes.
+
+If you did not request a password reset, you can ignore this email — your password will stay the same.
+
+Sign in: ${app}
+Support: info@operone2i.com
+
+— Financial Checkup · Operon E2I LLC`;
+
+  const html = buildBrandedOtpEmail({ username, code, appUrl: app });
+
+  return sendIfConfigured(email, subject, text, html);
+}
+
 async function sendIfConfigured(to, subject, text, html) {
   if (!to || !smtpConfigured()) return { sent: false, reason: 'no_email_or_smtp' };
   try {
@@ -357,6 +380,7 @@ module.exports = {
   sendWelcomeEmail,
   sendConfirmEmail,
   sendRegistrationOtpEmail,
+  sendPasswordResetOtpEmail,
   sendSubscribedEmail,
   sendDeactivatedEmail,
   sendReportEmail,

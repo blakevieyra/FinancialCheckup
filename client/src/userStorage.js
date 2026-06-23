@@ -43,16 +43,24 @@ export function clearCrossUserSessionState() {
   }
 }
 
-export function persistAuthSession({ token, username, userId }) {
-  localStorage.setItem('token', token);
+export function persistAuthSession({ username, userId }) {
   localStorage.setItem('username', username);
   if (userId != null) localStorage.setItem('fc-user-id', String(userId));
+  try {
+    localStorage.removeItem('token');
+  } catch {
+    /** migrated off localStorage JWT */
+  }
 }
 
 export function clearAuthSession() {
-  localStorage.removeItem('token');
   localStorage.removeItem('username');
   localStorage.removeItem('fc-user-id');
+  try {
+    localStorage.removeItem('token');
+  } catch {
+    /** ignore */
+  }
 }
 
 export function getStoredUserId() {

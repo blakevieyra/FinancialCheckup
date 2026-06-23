@@ -27,7 +27,7 @@ import { awardXp, loadXp, saveXp, xpProgressLabel } from './progression';
 import { buildCardStyles, buildShellStyle } from './theme';
 import { buildIncomePayload, ensureIncomeSources, sumIncomeSources } from './incomeSources';
 import { serializeExpensesForSave } from './expenseCategories';
-import { validateRegisterForm } from './authValidation';
+import { validateRegisterForm, validateResetPasswordForm, validateEmail } from './authValidation';
 import {
   printReport,
   mailtoReport,
@@ -402,17 +402,23 @@ function TrendDualLineSvg({ series, compact }) {
 }
 
 export default function App() {
-  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
+  const [isAuthed, setIsAuthed] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const [user, setUser] = useState(() => localStorage.getItem('username') || '');
   const [userId, setUserId] = useState(() => getStoredUserId());
+
+  /** Sentinel for child components / api helpers — auth is cookie-based; never a real JWT string. */
+  const token = isAuthed ? 'session' : '';
 
   const [subscription, setSubscription] = useState(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingErr, setBillingErr] = useState('');
 
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register' | 'reset'
+  const [resetPhase, setResetPhase] = useState('email'); // 'email' | 'code'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPhase, setRegisterPhase] = useState('form'); // form | code
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -495,7 +501,7 @@ export default function App() {
   const [goalTarget, setGoalTarget] = useState('');
 
   async function loadOnboardingStatus() {
-    if (!token) return;
+    if (!isAuthed) return;
     try {
       const o = await api.getOnboarding(token);
       setPrimaryGoal(o.primaryGoal || '');
@@ -534,7 +540,7 @@ export default function App() {
   }
 
   async function loadSubscription() {
-    if (!token) return;
+    if (!isAuthed) return;
     setBillingErr('');
     try {
       const data = await api.getSubscriptionStatus(token);
@@ -619,13 +625,12 @@ export default function App() {
     typeof window !== 'undefined' ? window.innerWidth : 1280,
   );
 
-  const isAuthed = useMemo(() => Boolean(token), [token]);
   const isTablet = viewportW < 1024;
   const isMobile = viewportW < 720;
   const isDesktop = viewportW >= 1024;
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isAuthed) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -647,7 +652,7 @@ export default function App() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [isAuthed]);
 
   useEffect(() => {
     if (userId) setUserXp((prev) => Math.max(prev, loadXp(userId)));
@@ -664,7 +669,7 @@ export default function App() {
    *  need to drop in-memory state so the auth screen renders on the next paint. */
   useEffect(() => {
     const onUnauth = () => {
-      setToken('');
+      setIsAuthed(false);
       setUser('');
       setExpenses([]);
       setIncome(0);
@@ -680,6 +685,28 @@ export default function App() {
     };
     window.addEventListener('fc-unauthorized', onUnauth);
     return () => window.removeEventListener('fc-unauthorized', onUnauth);
+  }, []);
+
+  useEffect(() => {
+    api
+      .getSession()
+      .then((s) => {
+        if (s?.authenticated) {
+          setIsAuthed(true);
+          setUser(s.username || localStorage.getItem('username') || '');
+          setUserId(s.userId ?? getStoredUserId());
+          if (s.email) setAccountEmail(s.email);
+        } else {
+          clearAuthSession();
+          setIsAuthed(false);
+        }
+      })
+      .catch(() => {
+        clearAuthSession();
+        setIsAuthed(false);
+      })
+      .finally(() => setAuthChecking(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -703,11 +730,10 @@ export default function App() {
       setExpenses(Array.isArray(expensesRes) ? expensesRes : []);
     } catch (e) {
       setError(e.message);
-      // If token is invalid/expired, force logout
-      if (/token/i.test(e.message)) {
-        localStorage.removeItem('token');
+      // Session invalid/expired — api.js already cleared storage
+      if (/token|unauthorized|session/i.test(e.message)) {
         localStorage.removeItem('username');
-        setToken('');
+        setIsAuthed(false);
         setUser('');
       }
     } finally {
@@ -756,7 +782,7 @@ export default function App() {
   }
 
   async function loadGoals() {
-    if (!token) return;
+    if (!isAuthed) return;
     setGoalsErr('');
     setGoalsBusy(true);
     try {
@@ -873,7 +899,7 @@ export default function App() {
   }
 
   async function loadLeaderboardAndTrends() {
-    if (!token) return;
+    if (!isAuthed) return;
     setRankErr('');
     setTrendsErr('');
     setRankBusy(true);
@@ -896,7 +922,7 @@ export default function App() {
   }
 
   async function loadForecastAndDocs() {
-    if (!token) return;
+    if (!isAuthed) return;
     setForecastErr('');
     setForecastBusy(true);
     try {
@@ -923,7 +949,7 @@ export default function App() {
   }
 
   async function loadCategoryAverages() {
-    if (!token) return;
+    if (!isAuthed) return;
     try {
       const data = await api.getCategoryAverages(token, month);
       const cats = data?.categories || [];
@@ -936,7 +962,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isAuthed) return undefined;
     if (features.goals === false) {
       setGoals([]);
       return undefined;
@@ -947,21 +973,21 @@ export default function App() {
   }, [token, features.goals]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isAuthed) return undefined;
     loadLeaderboardAndTrends();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, month, rankMaskOthers]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isAuthed) return undefined;
     loadForecastAndDocs();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, month]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isAuthed) return undefined;
     if (features.categoryCompare === false) {
       setCategoryAverages({});
       return undefined;
@@ -972,22 +998,22 @@ export default function App() {
   }, [token, month, features.categoryCompare]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isAuthed) return undefined;
     loadSubscription();
     loadOnboardingStatus();
     loadDigestSettings();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [isAuthed]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isAuthed) return undefined;
     const params = new URLSearchParams(window.location.search);
     const billing = params.get('billing');
     if (billing === 'success') {
       loadSubscription();
       const pending = readOnboardingPending();
-      if (params.get('onboarding') === '1' && pending?.token) {
+      if (params.get('onboarding') === '1' && pending) {
         setAppLoading('Calculating your score…');
         finishOnboardingWithCheckup(pending)
           .then(() => completeOnboarding())
@@ -1001,7 +1027,7 @@ export default function App() {
     }
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [isAuthed]);
 
   useEffect(() => {
     if (!token || showOnboarding) return undefined;
@@ -1144,8 +1170,8 @@ export default function App() {
 
   async function completeAuthSession(res, { isNewAccount = false } = {}) {
     resetSessionForNewUser();
-    persistAuthSession({ token: res.token, username: res.username, userId: res.userId });
-    setToken(res.token);
+    persistAuthSession({ username: res.username, userId: res.userId });
+    setIsAuthed(true);
     setUser(res.username);
     setUserId(res.userId ?? null);
     setAccountEmail(res.email || registerEmail.trim() || '');
@@ -1168,7 +1194,7 @@ export default function App() {
     try {
       const pendingTips = localStorage.getItem('fc-tips-email');
       if (pendingTips) {
-        await api.signupMoneyTips(res.token, pendingTips);
+        await api.signupMoneyTips(undefined, pendingTips);
         localStorage.removeItem('fc-tips-email');
       }
     } catch {
@@ -1180,6 +1206,58 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     setAuthFieldErrors({});
+
+    if (authMode === 'reset') {
+      if (resetPhase === 'code') {
+        const v = validateResetPasswordForm({
+          email: registerEmail,
+          code: verifyCode,
+          password,
+          passwordConfirm,
+        });
+        if (!v.valid) {
+          setAuthFieldErrors({
+            code: v.code,
+            password: v.password,
+            passwordConfirm: v.passwordConfirm,
+          });
+          return;
+        }
+        setBusy(true);
+        try {
+          const res = await api.resetPasswordWithCode(registerEmail.trim(), verifyCode.trim(), password);
+          await completeAuthSession(res);
+          setResetPhase('email');
+          setPasswordConfirm('');
+          setVerifyCode('');
+        } catch (e2) {
+          setAuthError(e2.message);
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
+
+      const emailErr = validateEmail(registerEmail);
+      if (emailErr) {
+        setAuthFieldErrors({ email: emailErr });
+        return;
+      }
+      setBusy(true);
+      try {
+        await api.sendPasswordResetCode(registerEmail.trim());
+        setResetPhase('code');
+        setPassword('');
+        setPasswordConfirm('');
+        setVerifyCode('');
+        setAuthNotice(`If an account exists for ${registerEmail.trim()}, we sent a reset code. Check spam if needed.`);
+      } catch (e2) {
+        setAuthError(e2.message);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
 
     if (authMode === 'register') {
       if (registerPhase === 'code') {
@@ -1233,13 +1311,29 @@ export default function App() {
     setAuthError('');
     setResendBusy(true);
     try {
-      await api.resendRegisterCode(registerEmail.trim());
-      setAuthNotice(`New code sent to ${registerEmail.trim()}. Check spam if needed.`);
+      if (authMode === 'reset') {
+        await api.resendPasswordResetCode(registerEmail.trim());
+        setAuthNotice(`New reset code sent to ${registerEmail.trim()}. Check spam if needed.`);
+      } else {
+        await api.resendRegisterCode(registerEmail.trim());
+        setAuthNotice(`New code sent to ${registerEmail.trim()}. Check spam if needed.`);
+      }
     } catch (e) {
       setAuthError(e.message);
     } finally {
       setResendBusy(false);
     }
+  }
+
+  function backToLoginFromReset() {
+    setAuthMode('login');
+    setResetPhase('email');
+    setPassword('');
+    setPasswordConfirm('');
+    setVerifyCode('');
+    setAuthError('');
+    setAuthFieldErrors({});
+    setAuthNotice('');
   }
 
   async function saveAll() {
@@ -1776,7 +1870,7 @@ export default function App() {
       setTipsErr('Enter your email address.');
       return;
     }
-    if (token) {
+    if (isAuthed) {
       setTipsBusy(true);
       try {
         const r = await api.signupMoneyTips(token, email);
@@ -1796,10 +1890,15 @@ export default function App() {
     setTipsMsg('Create a free account below — we will save your email when you register.');
   }
 
-  function logout() {
+  async function logout() {
+    try {
+      await api.logout();
+    } catch {
+      /** best-effort */
+    }
     clearAuthSession();
     clearCrossUserSessionState();
-    setToken('');
+    setIsAuthed(false);
     setUser('');
     setUserId(null);
     setSubscription(null);
@@ -1831,6 +1930,14 @@ export default function App() {
   const containerStyle = { width: '100%', maxWidth: '100%', margin: 0, minWidth: 0 };
   const { cardStyle, cardSoftStyle, inputStyle, btnPrimary, btnNeutral, btnDanger } = buildCardStyles(isMobile);
 
+  if (authChecking) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#94a3b8' }}>
+        Loading…
+      </div>
+    );
+  }
+
   if (!isAuthed) {
     return (
       <>
@@ -1846,15 +1953,21 @@ export default function App() {
           setAuthMode={(mode) => {
             setAuthMode(mode);
             setRegisterPhase('form');
+            setResetPhase('email');
             setAcceptedTerms(false);
+            setPasswordConfirm('');
             setAuthError('');
             setAuthFieldErrors({});
             setAuthNotice('');
           }}
+          resetPhase={resetPhase}
+          onBackToLogin={backToLoginFromReset}
           username={username}
           setUsername={setUsername}
           password={password}
           setPassword={setPassword}
+          passwordConfirm={passwordConfirm}
+          setPasswordConfirm={setPasswordConfirm}
           registerEmail={registerEmail}
           setRegisterEmail={setRegisterEmail}
           registerPhase={registerPhase}
@@ -2065,6 +2178,7 @@ export default function App() {
           totalExpenses={totalExpenses}
           savingsRate={savingsRate}
           isMobile={isMobile}
+          isTablet={isTablet}
           cardStyle={cardStyle}
           cardSoftStyle={cardSoftStyle}
         />

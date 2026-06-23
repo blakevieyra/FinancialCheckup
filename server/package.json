@@ -10,6 +10,7 @@
     "smoke": "node smoke.js",
     "smoke:remote": "node remoteSmoke.js",
     "stress": "node stress.js",
+    "pre-release": "node test/unit.js && node smoke.js && node stress.js",
     "test": "node test/unit.js && node remoteSmoke.js"
   },
   "engines": {
@@ -17,6 +18,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
