@@ -24,7 +24,7 @@ export default function LeaderboardSnapshot({ rankData, busy, error, cardSoftSty
   return (
     <SnapshotCard
       title="Leaderboard"
-      subtitle={`Budget score · ${rankData.month}`}
+      subtitle="Level & XP · all-time"
       cardSoftStyle={cardSoftStyle}
       accent="#3b82f6"
     >
@@ -32,12 +32,12 @@ export default function LeaderboardSnapshot({ rankData, busy, error, cardSoftSty
         #{rankData.yourRankLabel} of {rankData.totalRanked}
       </div>
 
-      {rankData.you?.eligible ? (
+      {rankData.you ? (
         <FieldSummary hasValue>
-          You: {Number(rankData.you.healthScore).toFixed(1)} · {rankData.you.expenseRatio != null ? `${rankData.you.expenseRatio}% expense ratio` : '—'}
+          You: Level <strong>{rankData.you.level}</strong> · {Number(rankData.you.xp).toLocaleString()} XP
         </FieldSummary>
       ) : (
-        <FieldSummary hasValue={false}>Add income this month to appear on the board.</FieldSummary>
+        <FieldSummary hasValue={false}>Complete a checkup to start earning XP.</FieldSummary>
       )}
 
       {rows.length ? (
@@ -60,7 +60,12 @@ export default function LeaderboardSnapshot({ rankData, busy, error, cardSoftSty
                 {row.username}
                 {row.isYou ? ' (you)' : ''}
               </span>
-              <span style={{ fontWeight: 700 }}>{row.healthScore != null ? Number(row.healthScore).toFixed(1) : '—'}</span>
+              <span style={{ fontWeight: 700, textAlign: 'right' }}>
+                Lv {row.level}
+                <span style={{ color: '#94a3b8', fontWeight: 500, marginLeft: 6 }}>
+                  {Number(row.xp).toLocaleString()} XP
+                </span>
+              </span>
             </div>
           ))}
         </div>
