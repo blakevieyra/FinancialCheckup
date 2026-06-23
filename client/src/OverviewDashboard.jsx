@@ -197,7 +197,6 @@ export default function OverviewDashboard({
       accent: 'outlook',
       title: 'Plan & outlook',
       hint: planOutlookHint(checkupResult, forecastData, isPro),
-      fullWidth: true,
       panelId: 'plan-outlook-card',
       controlledOpen: planOutlookOpen,
       onOpenChange: setPlanOutlookOpen,
@@ -248,23 +247,19 @@ export default function OverviewDashboard({
             }}
           >
             {insightPanels.map((panel) => (
-              <div
+              <ExpandablePanel
                 key={panel.key}
-                style={panel.fullWidth && !isMobile ? { gridColumn: '1 / -1' } : undefined}
+                title={panel.title}
+                hint={panel.hint}
+                accent={panel.accent}
+                gridCard
+                cardSoftStyle={cardSoftStyle}
+                panelId={panel.panelId}
+                open={panel.controlledOpen}
+                onOpenChange={panel.onOpenChange}
               >
-                <ExpandablePanel
-                  title={panel.title}
-                  hint={panel.hint}
-                  accent={panel.accent}
-                  gridCard
-                  cardSoftStyle={cardSoftStyle}
-                  panelId={panel.panelId}
-                  open={panel.controlledOpen}
-                  onOpenChange={panel.onOpenChange}
-                >
-                  {panel.body}
-                </ExpandablePanel>
-              </div>
+                {panel.body}
+              </ExpandablePanel>
             ))}
           </div>
         </div>

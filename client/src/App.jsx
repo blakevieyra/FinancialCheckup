@@ -2300,6 +2300,7 @@ export default function App() {
           onSelectMonth={openHistoryMonth}
           isMobile={isMobile}
           cardStyle={cardStyle}
+          cardSoftStyle={cardSoftStyle}
           btnNeutral={btnNeutral}
         />
           </>

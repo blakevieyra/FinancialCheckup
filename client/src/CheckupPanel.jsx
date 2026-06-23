@@ -16,7 +16,7 @@ import ExpenseCategoriesEditor from './ExpenseCategoriesEditor';
 import { sumIncomeSources, ensureIncomeSources } from './incomeSources';
 import { sumExpenses } from './expenseCategories';
 import ExpandablePanel from './ExpandablePanel';
-import { formatMoney } from './panelPrimitives';
+import { formatMoney, TotalBar } from './panelPrimitives';
 import {
   loadExtendedProfile,
   saveExtendedProfile,
@@ -33,6 +33,18 @@ function dimScoreLine(result, key) {
   const d = result?.dimensions?.find((x) => x.key === key);
   if (!d) return null;
   return `${Math.round(d.score)}/100`;
+}
+
+function sumDebtBalances(debts) {
+  return (debts || []).reduce((s, d) => s + (Number(d.balance) || 0), 0);
+}
+
+function countInsuranceCoverage(extended) {
+  return INSURANCE_COVERAGE_TYPES.filter((item) => Boolean(extended[item.field])).length;
+}
+
+function DimensionTotals({ children }) {
+  return <div style={{ display: 'grid', gap: 8 }}>{children}</div>;
 }
 
 function DimensionCard({
@@ -744,6 +756,13 @@ export default function CheckupPanel({
   const income = isGuest ? sumIncomeSources(guestBudget.incomeSources) : ledger?.income;
   const expenses = isGuest ? guestBudget.monthlyExpenses : ledger?.totalExpenses;
   const isDimIncluded = (key) => !(extended.excludedFromScore || []).includes(key);
+  const emergencyFund = Number(extended.emergencyFund) || 0;
+  const monthlySavings = Number(extended.monthlySavings) || 0;
+  const totalDebt = sumDebtBalances(extended.debts);
+  const investmentTotal = Number(extended.investmentTotal) || 0;
+  const insuranceCount = countInsuranceCoverage(extended);
+  const retirementBalance = Number(extended.retirementBalance) || 0;
+  const monthlyRetirement = Number(extended.monthlyRetirementContribution) || 0;
 
   const dimensionFormCards = dimensionCardLayout ? (
     <>
@@ -793,7 +812,7 @@ export default function CheckupPanel({
 
       <DimensionCard
         title="Savings"
-        hint="Emergency fund & monthly savings"
+        hint={`${formatMoney(emergencyFund, { decimals: 0 })} emergency fund · ${formatMoney(monthlySavings, { decimals: 0 })}/mo`}
         importance={DIMENSION_IMPORTANCE.savings}
         included={isDimIncluded('savings')}
         onToggleInclude={() => toggleScoreDimension('savings')}
@@ -811,11 +830,15 @@ export default function CheckupPanel({
             <input type="number" value={extended.monthlySavings} onChange={(e) => setField('monthlySavings', e.target.value)} style={inputStyle} />
           </label>
         </div>
+        <DimensionTotals>
+          <TotalBar label="Emergency fund total" value={formatMoney(emergencyFund, { decimals: 0 })} variant="income" compact />
+          <TotalBar label="Monthly savings" value={formatMoney(monthlySavings, { decimals: 0 })} variant="income" compact />
+        </DimensionTotals>
       </DimensionCard>
 
       <DimensionCard
         title="Debt"
-        hint="Loans, cards & payoff details"
+        hint={`${formatMoney(totalDebt, { decimals: 0 })} total balance`}
         importance={DIMENSION_IMPORTANCE.debt}
         included={isDimIncluded('debt')}
         onToggleInclude={() => toggleScoreDimension('debt')}
@@ -834,11 +857,14 @@ export default function CheckupPanel({
           cardSoftStyle={cardSoftStyle}
           isMobile={isMobile}
         />
+        <DimensionTotals>
+          <TotalBar label="Total debt balance" value={formatMoney(totalDebt, { decimals: 0 })} variant="expense" compact />
+        </DimensionTotals>
       </DimensionCard>
 
       <DimensionCard
         title="Investments"
-        hint="Accounts, allocation & fees"
+        hint={`${formatMoney(investmentTotal, { decimals: 0 })} portfolio total`}
         importance={DIMENSION_IMPORTANCE.investments}
         basics={DIMENSION_BASICS.investments}
         included={isDimIncluded('investments')}
@@ -860,9 +886,6 @@ export default function CheckupPanel({
           sectionLabel="Add each investment account — remove any that do not apply, or add another."
           typePlaceholder="Choose investment type"
         />
-        <div style={{ fontSize: 13, opacity: 0.85 }}>
-          Portfolio total: <strong>${Number(extended.investmentTotal || 0).toLocaleString()}</strong> (auto-summed from accounts)
-        </div>
         <div style={grid}>
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
             Fees %/yr
@@ -873,11 +896,14 @@ export default function CheckupPanel({
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Intl %<input type="number" value={extended.internationalPct} onChange={(e) => setField('internationalPct', e.target.value)} style={inputStyle} /></label>
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Cash %<input type="number" value={extended.cashPct} onChange={(e) => setField('cashPct', e.target.value)} style={inputStyle} /></label>
         </div>
+        <DimensionTotals>
+          <TotalBar label="Portfolio total" value={formatMoney(investmentTotal, { decimals: 0 })} variant="income" compact />
+        </DimensionTotals>
       </DimensionCard>
 
       <DimensionCard
         title="Insurance"
-        hint="Coverage types you carry today"
+        hint={`${insuranceCount} of ${INSURANCE_COVERAGE_TYPES.length} coverage types`}
         importance={DIMENSION_IMPORTANCE.insurance}
         basics={DIMENSION_BASICS.insurance}
         included={isDimIncluded('insurance')}
@@ -887,11 +913,19 @@ export default function CheckupPanel({
         scoreLine={dimScoreLine(result, 'insurance')}
       >
         <InsuranceEditor extended={extended} onToggle={setField} cardSoftStyle={cardSoftStyle} />
+        <DimensionTotals>
+          <TotalBar
+            label="Coverage types active"
+            value={`${insuranceCount} / ${INSURANCE_COVERAGE_TYPES.length}`}
+            variant="income"
+            compact
+          />
+        </DimensionTotals>
       </DimensionCard>
 
       <DimensionCard
         title="Retirement"
-        hint="Accounts, contributions & timeline"
+        hint={`${formatMoney(retirementBalance, { decimals: 0 })} saved · ${formatMoney(monthlyRetirement, { decimals: 0 })}/mo`}
         importance={DIMENSION_IMPORTANCE.retirement}
         basics={DIMENSION_BASICS.retirement}
         included={isDimIncluded('retirement')}
@@ -914,18 +948,14 @@ export default function CheckupPanel({
           sectionLabel="Add each retirement account — remove any that do not apply, or add another."
           typePlaceholder="Choose retirement account type"
         />
-        <div style={{ fontSize: 13, opacity: 0.85, display: 'grid', gap: 4 }}>
-          <div>
-            Total saved: <strong>${Number(extended.retirementBalance || 0).toLocaleString()}</strong>
-          </div>
-          <div>
-            Monthly contributions: <strong>${Number(extended.monthlyRetirementContribution || 0).toLocaleString()}</strong>
-          </div>
-        </div>
         <div style={grid}>
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Age<input type="number" value={extended.age} onChange={(e) => setField('age', e.target.value)} style={inputStyle} /></label>
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>Retire at<input type="number" value={extended.targetRetirementAge} onChange={(e) => setField('targetRetirementAge', e.target.value)} style={inputStyle} /></label>
         </div>
+        <DimensionTotals>
+          <TotalBar label="Retirement balance" value={formatMoney(retirementBalance, { decimals: 0 })} variant="income" compact />
+          <TotalBar label="Monthly contributions" value={formatMoney(monthlyRetirement, { decimals: 0 })} variant="income" compact />
+        </DimensionTotals>
       </DimensionCard>
 
       {autoSync && busy ? (

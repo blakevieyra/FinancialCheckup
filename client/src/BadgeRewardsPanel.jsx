@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { earnedBadges, nextLevelBadge, nextXpBadge, levelUpMessage } from './badgeProgression';
-import { xpProgressLabel } from './progression';
+import { levelTier, xpProgressLabel, xpRewardMultiplier } from './progression';
 import { FieldSummary, SectionHeader, SnapshotCard, TotalBar } from './panelPrimitives';
 
 export default function BadgeRewardsPanel({ userXp, cardSoftStyle }) {
@@ -14,19 +14,26 @@ export default function BadgeRewardsPanel({ userXp, cardSoftStyle }) {
   }, [userXp]);
 
   const xpInfo = xpProgressLabel(userXp);
+  const tier = levelTier(xpInfo.level);
+  const multPct = Math.round(xpRewardMultiplier(xpInfo.level) * 100);
   const badges = earnedBadges(userXp);
   const nextLevel = nextLevelBadge(userXp);
   const nextXp = nextXpBadge(userXp);
-  const pct = Math.round((xpInfo.current / xpInfo.next) * 100);
+  const pct = xpInfo.next > 0 ? Math.round((xpInfo.current / xpInfo.next) * 100) : 0;
 
   return (
     <SnapshotCard
       title="Level & rewards"
-      subtitle="Earn XP by saving data and running checkups."
+      subtitle={`${tier.name} tier — earn ${multPct}% XP on checkups & saves. Higher levels need more XP but pay bigger bonuses.`}
       cardSoftStyle={cardSoftStyle}
       accent="#3b82f6"
     >
-      <TotalBar label={`Level ${xpInfo.level}`} value={`${xpInfo.current} / ${xpInfo.next} XP`} variant="neutral" compact />
+      <TotalBar
+        label={`Level ${xpInfo.level}`}
+        value={`${xpInfo.current.toLocaleString()} / ${xpInfo.next.toLocaleString()} XP`}
+        variant="neutral"
+        compact
+      />
 
       <FieldSummary hasValue>
         {pct}% to next level

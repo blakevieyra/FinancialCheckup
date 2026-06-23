@@ -6,7 +6,7 @@ const { cancelStripeBillingForUser } = require('./billingRoutes');
 
 router.use(verifyToken);
 
-const { XP_REWARDS, XP_PER_LEVEL, levelFromXp, computeBaselineXp } = require('./progression');
+const { XP_REWARDS, levelFromXp, scaledXpReward, levelUpBonus, xpProgressForTotal, computeBaselineXp } = require('./progression');
 
 /** GET /api/me/profile — lightweight session identity */
 router.get('/profile', async (req, res) => {
@@ -41,9 +41,10 @@ router.get('/progress', async (req, res) => {
     );
     res.json({
       xp,
-      level: levelFromXp(xp),
-      xpPerLevel: XP_PER_LEVEL,
-      xpInLevel: xp % XP_PER_LEVEL,
+      ...xpProgressForTotal(xp),
+      xpPerLevel: xpProgressForTotal(xp).next,
+      xpInLevel: xpProgressForTotal(xp).current,
+      multiplier: scaledXpReward('checkup', levelFromXp(xp)) / XP_REWARDS.checkup,
     });
   } catch (e) {
     console.error(e);
@@ -55,24 +56,33 @@ router.get('/progress', async (req, res) => {
 router.post('/progress/award', async (req, res) => {
   try {
     const reason = String(req.body?.reason || '').trim();
-    const amount = XP_REWARDS[reason];
-    if (!amount) return res.status(400).json({ error: 'Invalid progress reason.' });
+    if (!XP_REWARDS[reason]) return res.status(400).json({ error: 'Invalid progress reason.' });
 
     const uid = req.user.id;
     const current = await computeBaselineXp(dbGet, uid);
-    const next = current + amount;
+    const startLevel = levelFromXp(current);
+    const amount = scaledXpReward(reason, startLevel);
+    let next = current + amount;
+    const endLevel = levelFromXp(next);
+    if (endLevel > startLevel) {
+      for (let l = startLevel + 1; l <= endLevel; l += 1) {
+        next += levelUpBonus(l);
+      }
+    }
     await dbRun(
       `INSERT INTO user_preferences (user_id, xp_total)
        VALUES (?, ?)
        ON CONFLICT (user_id) DO UPDATE SET xp_total = ?`,
       [uid, next, next],
     );
+    const progress = xpProgressForTotal(next);
     res.json({
       xp: next,
-      level: levelFromXp(next),
-      xpPerLevel: XP_PER_LEVEL,
-      xpInLevel: next % XP_PER_LEVEL,
+      ...progress,
+      xpPerLevel: progress.next,
+      xpInLevel: progress.current,
       awarded: amount,
+      multiplier: scaledXpReward(reason, startLevel) / (XP_REWARDS[reason] || 1),
     });
   } catch (e) {
     console.error(e);
