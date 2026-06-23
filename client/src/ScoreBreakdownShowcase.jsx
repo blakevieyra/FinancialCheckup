@@ -189,6 +189,7 @@ export default function ScoreBreakdownShowcase({
             opacity: 0.95,
             lineHeight: 1.45,
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            minHeight: large ? '2.9em' : '2.6em',
           }}
         >
           {displayHeadline}
@@ -196,7 +197,7 @@ export default function ScoreBreakdownShowcase({
       </div>
 
       {dimensions.length ? (
-        <div style={{ display: 'grid', gap: 4, width: '100%' }}>
+        <div style={{ display: 'grid', gap: 4, width: '100%', minHeight: large ? 280 : 248 }}>
           {dimensions.map((d) => (
             <BarRow
               key={d.key}
@@ -216,12 +217,21 @@ export default function ScoreBreakdownShowcase({
           style={{
             borderTop: '1px solid rgba(148,163,184,0.15)',
             paddingTop: 14,
-            minHeight: large ? 120 : 96,
+            minHeight: large ? 260 : 220,
           }}
         >
           {renderDetail(selected)}
         </div>
-      ) : null}
+      ) : (
+        <div
+          aria-hidden
+          style={{
+            borderTop: '1px solid rgba(148,163,184,0.08)',
+            minHeight: large ? 260 : 220,
+            visibility: 'hidden',
+          }}
+        />
+      )}
       </div>
     </div>
   );

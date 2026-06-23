@@ -72,8 +72,10 @@ export default function ScoreHero({
                 borderRadius: 14,
                 background: `linear-gradient(135deg, ${color}14, rgba(15,23,42,0.55))`,
                 border: `1px solid ${color}40`,
-                display: 'grid',
+                display: 'flex',
+                flexDirection: 'column',
                 gap: 12,
+                minHeight: isMobile ? 210 : 230,
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -92,10 +94,12 @@ export default function ScoreHero({
               </div>
 
               {explanation ? (
-                <p style={{ margin: 0, fontSize: 15, color: '#f1f5f9', lineHeight: 1.55, fontWeight: 500 }}>
+                <p style={{ margin: 0, fontSize: 15, color: '#f1f5f9', lineHeight: 1.55, fontWeight: 500, minHeight: '3.1em' }}>
                   {explanation}
                 </p>
-              ) : null}
+              ) : (
+                <div style={{ minHeight: '3.1em' }} aria-hidden />
+              )}
 
               {dim.key === 'budget' && inc > 0 ? (
                 <div style={{ fontSize: 14, color: '#cbd5e1', lineHeight: 1.5 }}>
@@ -118,6 +122,7 @@ export default function ScoreHero({
                     fontSize: 14,
                     color: '#e2e8f0',
                     lineHeight: 1.5,
+                    minHeight: '3.2em',
                   }}
                 >
                   <span style={{ fontWeight: 700, color: '#f8fafc' }}>What to do next: </span>
@@ -125,6 +130,7 @@ export default function ScoreHero({
                 </div>
               ) : null}
 
+              <div style={{ marginTop: 'auto', paddingTop: 4 }}>
               <button
                 type="button"
                 onClick={onGoFinances}
@@ -141,6 +147,7 @@ export default function ScoreHero({
               >
                 Improve this in Finances →
               </button>
+              </div>
             </div>
           );
         }}
