@@ -20,6 +20,7 @@ export default function IncomeSourcesEditor({
   isMobile,
   isTablet,
   disabled,
+  embedded = false,
 }) {
   const grid = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
   const rows = sources?.length ? sources : [newIncomeSource()];
@@ -46,10 +47,12 @@ export default function IncomeSourcesEditor({
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <SectionHeader
-        title="Monthly income sources"
-        subtitle="Add each paycheck or income stream — your monthly total updates automatically."
-      />
+      {!embedded ? (
+        <SectionHeader
+          title="Monthly income sources"
+          subtitle="Add each paycheck or income stream — your monthly total updates automatically."
+        />
+      ) : null}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         <select

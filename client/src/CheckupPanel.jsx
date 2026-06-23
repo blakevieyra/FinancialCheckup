@@ -14,7 +14,9 @@ import CategorySelect from './CategorySelect';
 import IncomeSourcesEditor from './IncomeSourcesEditor';
 import ExpenseCategoriesEditor from './ExpenseCategoriesEditor';
 import { sumIncomeSources, ensureIncomeSources } from './incomeSources';
-import { NetSummaryBar, SectionHeader, TotalBar, formatMoney } from './panelPrimitives';
+import { sumExpenses } from './expenseCategories';
+import ExpandablePanel from './ExpandablePanel';
+import { formatMoney } from './panelPrimitives';
 import {
   loadExtendedProfile,
   saveExtendedProfile,
@@ -35,6 +37,7 @@ function dimScoreLine(result, key) {
 
 function DimensionCard({
   title,
+  hint,
   importance,
   basics,
   included,
@@ -42,80 +45,66 @@ function DimensionCard({
   cardStyle,
   btnNeutral,
   scoreLine,
-  scoreAtBottom = false,
-  footerExtra,
+  accent = 'default',
+  defaultOpen = false,
   children,
 }) {
   const [showWhy, setShowWhy] = useState(false);
+  const collapsedHint = [scoreLine, hint].filter(Boolean).join(' · ');
 
-  const scoreBlock = (
-    <>
-      {scoreLine ? <div style={{ fontSize: 13, opacity: 0.85 }}>{scoreLine}</div> : null}
-      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
-        <input type="checkbox" checked={included} onChange={onToggleInclude} />
-        Include in overall score
-      </label>
-    </>
+  const includeLabel = (
+    <label
+      style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, cursor: 'pointer', opacity: 0.88, fontWeight: 500 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input type="checkbox" checked={included} onChange={onToggleInclude} />
+      Include in overall score
+    </label>
   );
 
   return (
-    <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 180 }}>
-          <SectionHeader title={title} subtitle={!scoreAtBottom && scoreLine ? scoreLine : undefined} />
-          {basics ? (
-            <div style={{ fontSize: 13, opacity: 0.82, lineHeight: 1.5, marginTop: 8, padding: '0.55rem 0.65rem', borderRadius: 8, background: 'rgba(148,163,184,0.08)' }}>
-              <strong style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', opacity: 0.75 }}>Basics</strong>
-              <div style={{ marginTop: 4 }}>{basics}</div>
-            </div>
-          ) : null}
-          {!scoreAtBottom ? (
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 8, cursor: 'pointer' }}>
-              <input type="checkbox" checked={included} onChange={onToggleInclude} />
-              Include in overall score
-            </label>
-          ) : null}
-        </div>
+    <ExpandablePanel
+      title={title}
+      hint={collapsedHint}
+      cardSoftStyle={cardStyle}
+      accent={accent}
+      defaultOpen={defaultOpen}
+      titleAddon={includeLabel}
+      headerActions={
         <button
           type="button"
           onClick={() => setShowWhy((v) => !v)}
-          style={{ ...btnNeutral, fontSize: 12, padding: '0.4rem 0.75rem', flexShrink: 0 }}
+          style={{ ...btnNeutral, fontSize: 12, padding: '0.4rem 0.75rem' }}
         >
           {showWhy ? 'Hide' : 'Why this matters'}
         </button>
+      }
+    >
+      <div style={{ display: 'grid', gap: 12 }}>
+        {basics ? (
+          <div style={{ fontSize: 13, opacity: 0.82, lineHeight: 1.5, padding: '0.55rem 0.65rem', borderRadius: 8, background: 'rgba(148,163,184,0.08)' }}>
+            <strong style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', opacity: 0.75 }}>Basics</strong>
+            <div style={{ marginTop: 4 }}>{basics}</div>
+          </div>
+        ) : null}
+        {showWhy ? (
+          <div
+            style={{
+              fontSize: 13,
+              opacity: 0.88,
+              lineHeight: 1.55,
+              padding: '0.65rem 0.75rem',
+              borderRadius: 8,
+              background: 'rgba(59,130,246,0.08)',
+              border: '1px solid rgba(77,166,255,0.2)',
+            }}
+          >
+            {importance}
+          </div>
+        ) : null}
+        {children}
       </div>
-      {showWhy ? (
-        <div
-          style={{
-            fontSize: 13,
-            opacity: 0.88,
-            lineHeight: 1.55,
-            padding: '0.65rem 0.75rem',
-            borderRadius: 8,
-            background: 'rgba(59,130,246,0.08)',
-            border: '1px solid rgba(77,166,255,0.2)',
-          }}
-        >
-          {importance}
-        </div>
-      ) : null}
-      {children}
-      {scoreAtBottom ? (
-        <div
-          style={{
-            paddingTop: 12,
-            borderTop: '1px solid rgba(148,163,184,0.15)',
-            display: 'grid',
-            gap: 10,
-            fontSize: 13,
-            opacity: 0.9,
-          }}
-        >
-          {scoreBlock}
-          {footerExtra}
-        </div>
-      ) : null}
-    </div>
+    </ExpandablePanel>
   );
 }
 
@@ -139,6 +128,9 @@ function BudgetLedgerEditor({
     onExpenseChange,
     busy,
   } = editor;
+
+  const inc = Number(income) || 0;
+  const expTotal = sumExpenses(expenses);
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -164,26 +156,51 @@ function BudgetLedgerEditor({
         <span style={{ fontSize: 12, opacity: 0.65 }}>Month: {month}</span>
       </div>
 
-      <IncomeSourcesEditor
-        sources={incomeSources}
-        onChange={onIncomeSourcesChange}
-        inputStyle={inputStyle}
-        btnNeutral={btnNeutral}
-        cardSoftStyle={cardSoftStyle}
-        isMobile={isMobile}
-        isTablet={isTablet}
-        disabled={busy}
-      />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+          gap: 14,
+          alignItems: 'start',
+        }}
+      >
+        <ExpandablePanel
+          title="Income"
+          hint={`${formatMoney(inc, { decimals: 0 })} monthly — tap to expand`}
+          cardSoftStyle={cardSoftStyle}
+          accent="default"
+        >
+          <IncomeSourcesEditor
+            sources={incomeSources}
+            onChange={onIncomeSourcesChange}
+            inputStyle={inputStyle}
+            btnNeutral={btnNeutral}
+            cardSoftStyle={cardSoftStyle}
+            isMobile={isMobile}
+            isTablet={isTablet}
+            disabled={busy}
+            embedded
+          />
+        </ExpandablePanel>
 
-      <ExpenseCategoriesEditor
-        expenses={expenses}
-        onExpenseChange={onExpenseChange}
-        income={income}
-        inputStyle={inputStyle}
-        isMobile={isMobile}
-        isTablet={isTablet}
-        disabled={busy}
-      />
+        <ExpandablePanel
+          title="Expenses"
+          hint={`${formatMoney(expTotal, { decimals: 0 })} this month — tap to expand`}
+          cardSoftStyle={cardSoftStyle}
+          accent="default"
+        >
+          <ExpenseCategoriesEditor
+            expenses={expenses}
+            onExpenseChange={onExpenseChange}
+            income={income}
+            inputStyle={inputStyle}
+            isMobile={isMobile}
+            isTablet={isTablet}
+            disabled={busy}
+            embedded
+          />
+        </ExpandablePanel>
+      </div>
     </div>
   );
 }
@@ -727,29 +744,19 @@ export default function CheckupPanel({
   const income = isGuest ? sumIncomeSources(guestBudget.incomeSources) : ledger?.income;
   const expenses = isGuest ? guestBudget.monthlyExpenses : ledger?.totalExpenses;
   const isDimIncluded = (key) => !(extended.excludedFromScore || []).includes(key);
-  const inc = Number(income) || 0;
-  const exp = Number(expenses) || 0;
-
-  const budgetFooter = ledgerEditor ? (
-    <div style={{ display: 'grid', gap: 8 }}>
-      <TotalBar label="Income" value={formatMoney(inc, { decimals: 0 })} variant="income" compact />
-      <TotalBar label="Expenses" value={formatMoney(exp, { decimals: 0 })} variant="expense" compact />
-      <NetSummaryBar income={inc} expenses={exp} />
-    </div>
-  ) : null;
 
   const dimensionFormCards = dimensionCardLayout ? (
     <>
       <DimensionCard
         title="Budget"
+        hint="Income & spending by category"
         importance={DIMENSION_IMPORTANCE.budget}
         included={isDimIncluded('budget')}
         onToggleInclude={() => toggleScoreDimension('budget')}
         cardStyle={cardStyle}
         btnNeutral={btnNeutral}
         scoreLine={dimScoreLine(result, 'budget')}
-        scoreAtBottom={Boolean(ledgerEditor)}
-        footerExtra={budgetFooter}
+        accent="outlook"
       >
         {ledgerEditor ? (
           <BudgetLedgerEditor
@@ -786,6 +793,7 @@ export default function CheckupPanel({
 
       <DimensionCard
         title="Savings"
+        hint="Emergency fund & monthly savings"
         importance={DIMENSION_IMPORTANCE.savings}
         included={isDimIncluded('savings')}
         onToggleInclude={() => toggleScoreDimension('savings')}
@@ -807,6 +815,7 @@ export default function CheckupPanel({
 
       <DimensionCard
         title="Debt"
+        hint="Loans, cards & payoff details"
         importance={DIMENSION_IMPORTANCE.debt}
         included={isDimIncluded('debt')}
         onToggleInclude={() => toggleScoreDimension('debt')}
@@ -829,6 +838,7 @@ export default function CheckupPanel({
 
       <DimensionCard
         title="Investments"
+        hint="Accounts, allocation & fees"
         importance={DIMENSION_IMPORTANCE.investments}
         basics={DIMENSION_BASICS.investments}
         included={isDimIncluded('investments')}
@@ -867,6 +877,7 @@ export default function CheckupPanel({
 
       <DimensionCard
         title="Insurance"
+        hint="Coverage types you carry today"
         importance={DIMENSION_IMPORTANCE.insurance}
         basics={DIMENSION_BASICS.insurance}
         included={isDimIncluded('insurance')}
@@ -880,6 +891,7 @@ export default function CheckupPanel({
 
       <DimensionCard
         title="Retirement"
+        hint="Accounts, contributions & timeline"
         importance={DIMENSION_IMPORTANCE.retirement}
         basics={DIMENSION_BASICS.retirement}
         included={isDimIncluded('retirement')}

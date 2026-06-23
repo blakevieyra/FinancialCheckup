@@ -23,6 +23,8 @@ export default function ExpandablePanel({
   open: controlledOpen,
   onOpenChange,
   panelId,
+  titleAddon,
+  headerActions,
 }) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -67,12 +69,25 @@ export default function ExpandablePanel({
           textAlign: 'left',
         }}
       >
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: gridCard ? 15 : 15, letterSpacing: '-0.01em' }}>{title}</div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 12px' }}>
+            <div style={{ fontWeight: 700, fontSize: gridCard ? 15 : 15, letterSpacing: '-0.01em' }}>{title}</div>
+            {titleAddon}
+          </div>
           {hint && !open ? (
             <div style={{ fontSize: 12, color: PANEL_SUMMARY.meta, marginTop: 6, lineHeight: 1.45 }}>{hint}</div>
           ) : null}
         </div>
+        {headerActions ? (
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            {headerActions}
+          </div>
+        ) : null}
         <span
           aria-hidden
           style={{

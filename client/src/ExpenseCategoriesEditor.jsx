@@ -9,7 +9,6 @@ import {
   CollapsibleGroup,
   FieldSummary,
   formatMoney,
-  NetSummaryBar,
   SectionHeader,
   TotalBar,
 } from './panelPrimitives';
@@ -46,6 +45,7 @@ export default function ExpenseCategoriesEditor({
   isMobile,
   isTablet,
   disabled,
+  embedded = false,
 }) {
   const grid = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
   const totalExpenses = sumExpenses(expenses);
@@ -64,10 +64,12 @@ export default function ExpenseCategoriesEditor({
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <SectionHeader
-        title="Monthly expenses by category"
-        subtitle="Enter what you spent in each category — totals and share of income update automatically."
-      />
+      {!embedded ? (
+        <SectionHeader
+          title="Monthly expenses by category"
+          subtitle="Enter what you spent in each category — totals and share of income update automatically."
+        />
+      ) : null}
 
       <div style={{ display: 'grid', gap: 10 }}>
         {grouped.map((group) => {
@@ -123,10 +125,7 @@ export default function ExpenseCategoriesEditor({
         ) : null}
       </div>
 
-      <div style={{ display: 'grid', gap: 8 }}>
-        <TotalBar label="Monthly expenses total" value={formatMoney(totalExpenses, { decimals: 2 })} variant="expense" />
-        <NetSummaryBar income={inc} expenses={totalExpenses} />
-      </div>
+      <TotalBar label="Monthly expenses total" value={formatMoney(totalExpenses, { decimals: 2 })} variant="expense" />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import LandingPage from './LandingPage';
 import CheckupPanel from './CheckupPanel';
 import OverviewDashboard from './OverviewDashboard';
 import FinancesPage from './FinancesPage';
-import ProgressGoalsPanel from './ProgressGoalsPanel';
+import ProgressGoalsPanel, { AdditionalTargetsPanel } from './ProgressGoalsPanel';
 import AppNav from './AppNav';
 import FinancialHistoryPanel from './FinancialHistoryPanel';
 import MoreToolsPanel from './MoreToolsPanel';
@@ -2064,25 +2064,9 @@ export default function App() {
           income={income}
           totalExpenses={totalExpenses}
           savingsRate={savingsRate}
-          goals={goals}
-          goalsBusy={goalsBusy}
-          goalsErr={goalsErr}
-          goalName={goalName}
-          onGoalNameChange={setGoalName}
-          goalType={goalType}
-          onGoalTypeChange={setGoalType}
-          goalTarget={goalTarget}
-          onGoalTargetChange={setGoalTarget}
-          onCreateGoal={createGoalItem}
-          onDeleteGoal={deleteGoalItem}
-          onAddGoalProgress={addGoalProgress}
           isMobile={isMobile}
           cardStyle={cardStyle}
           cardSoftStyle={cardSoftStyle}
-          inputStyle={inputStyle}
-          btnPrimary={btnPrimary}
-          btnNeutral={btnNeutral}
-          btnDanger={btnDanger}
         />
 
         <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12 }}>
@@ -2235,6 +2219,27 @@ export default function App() {
             </div>
           </div>
         </div>
+
+        <AdditionalTargetsPanel
+          goals={goals}
+          goalsBusy={goalsBusy}
+          goalsErr={goalsErr}
+          goalName={goalName}
+          onGoalNameChange={setGoalName}
+          goalType={goalType}
+          onGoalTypeChange={setGoalType}
+          goalTarget={goalTarget}
+          onGoalTargetChange={setGoalTarget}
+          onCreateGoal={createGoalItem}
+          onDeleteGoal={deleteGoalItem}
+          onAddGoalProgress={addGoalProgress}
+          isMobile={isMobile}
+          cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
+          btnPrimary={btnPrimary}
+          btnNeutral={btnNeutral}
+          btnDanger={btnDanger}
+        />
 
         <ExpandablePanel title="Budget trend" hint="Score and expense ratio over time — tap to expand" cardSoftStyle={cardSoftStyle}>
           <div style={{ display: 'grid', gap: 18 }}>
