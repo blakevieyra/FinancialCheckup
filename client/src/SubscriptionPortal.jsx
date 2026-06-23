@@ -4,6 +4,7 @@ import {
   CHECKUP_DIMENSIONS,
 } from './planConstants';
 import AccountSettingsPanel from './AccountSettingsPanel';
+import ScoreSummaryPanel from './ScoreSummaryPanel';
 
 function statusLabel(status) {
   switch (status) {
@@ -127,6 +128,22 @@ export default function SubscriptionPortal({
   billingMsg,
   token,
   accountEmail,
+  digestEnabled,
+  onDigestEnabledChange,
+  digestFrequency,
+  onDigestFrequencyChange,
+  digestEmail,
+  onDigestEmailChange,
+  digestWeekday,
+  onDigestWeekdayChange,
+  digestMsg,
+  digestErr,
+  digestPreview,
+  digestSmtpReady,
+  digestSaveBusy,
+  digestTestBusy,
+  onSaveDigest,
+  onTestDigest,
   inputStyle,
   onSubscribeMonthly,
   onSubscribeAnnual,
@@ -198,14 +215,56 @@ export default function SubscriptionPortal({
       {billingErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{billingErr}</div> : null}
 
       {token ? (
-        <AccountSettingsPanel
-          token={token}
-          accountEmail={accountEmail}
-          cardSoftStyle={cardSoftStyle}
-          inputStyle={inputStyle}
-          btnPrimary={btnPrimary}
-          btnNeutral={btnNeutral}
-        />
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Account settings</div>
+            <p style={{ margin: '6px 0 0', fontSize: 14, color: '#94a3b8', lineHeight: 1.45 }}>
+              {accountEmail ? (
+                <>Signed in as <strong style={{ color: '#e2e8f0' }}>{accountEmail}</strong></>
+              ) : (
+                <>Add an email at registration for support replies and score summaries.</>
+              )}
+            </p>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+              gap: 16,
+              alignItems: 'stretch',
+            }}
+          >
+            <AccountSettingsPanel
+              token={token}
+              cardSoftStyle={cardSoftStyle}
+              inputStyle={inputStyle}
+              btnPrimary={btnPrimary}
+            />
+            <ScoreSummaryPanel
+              cardSoftStyle={cardSoftStyle}
+              inputStyle={inputStyle}
+              btnPrimary={btnPrimary}
+              btnNeutral={btnNeutral}
+              accountEmail={accountEmail}
+              digestEnabled={digestEnabled}
+              onDigestEnabledChange={onDigestEnabledChange}
+              digestFrequency={digestFrequency}
+              onDigestFrequencyChange={onDigestFrequencyChange}
+              digestEmail={digestEmail}
+              onDigestEmailChange={onDigestEmailChange}
+              digestWeekday={digestWeekday}
+              onDigestWeekdayChange={onDigestWeekdayChange}
+              digestMsg={digestMsg}
+              digestErr={digestErr}
+              digestPreview={digestPreview}
+              smtpReady={digestSmtpReady}
+              saveBusy={digestSaveBusy}
+              testBusy={digestTestBusy}
+              onSave={onSaveDigest}
+              onTest={onTestDigest}
+            />
+          </div>
+        </div>
       ) : null}
 
       <div style={{ ...cardStyle, display: 'grid', gap: 16 }}>

@@ -24,6 +24,7 @@ import {
   loadExtendedProfile,
 } from './userStorage';
 import { awardXp, loadXp, saveXp, xpProgressLabel } from './progression';
+import { buildCardStyles, buildShellStyle } from './theme';
 import { validateRegisterForm } from './authValidation';
 import {
   printReport,
@@ -914,14 +915,9 @@ export default function App() {
   }
 
   function scrollToProjections(focus) {
-    const map = {
-      outcomes: 'projections-outcomes',
-      longterm: 'longterm-health',
-      bizdocs: 'biz-docs',
-    };
-    const id = map[focus] || 'projections-results';
+    window.dispatchEvent(new CustomEvent('fc-focus-outlook', { detail: focus }));
     setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('plan-outlook-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 150);
   }
 
@@ -1870,53 +1866,9 @@ export default function App() {
     setActiveSection('overview');
   }
 
-  const shellStyle = {
-    fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-    minHeight: '100vh',
-    boxSizing: 'border-box',
-    width: '100%',
-    padding: isMobile
-      ? `max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left))`
-      : isDesktop
-        ? `1rem max(1.75rem, env(safe-area-inset-right)) 1.5rem max(1.75rem, env(safe-area-inset-left))`
-        : `1.25rem max(1.25rem, env(safe-area-inset-right)) 1.5rem max(1.25rem, env(safe-area-inset-left))`,
-    color: '#e6edf3',
-    background:
-      'radial-gradient(1600px 700px at 10% -5%, rgba(77,166,255,0.2), transparent 55%), radial-gradient(1200px 550px at 95% 0%, rgba(52,211,153,0.14), transparent 50%), #1a2744',
-  };
+  const shellStyle = buildShellStyle({ isMobile, isDesktop });
   const containerStyle = { width: '100%', maxWidth: '100%', margin: 0, minWidth: 0 };
-  const cardStyle = {
-    border: '1px solid rgba(148,163,184,0.25)',
-    borderRadius: 14,
-    padding: isMobile ? '0.65rem 0.75rem' : '0.85rem 1rem',
-    background: 'rgba(15,23,42,0.62)',
-    backdropFilter: 'blur(10px)',
-    boxShadow: '0 10px 28px rgba(2,6,23,0.28)',
-  };
-  const cardSoftStyle = {
-    border: '1px solid rgba(148,163,184,0.22)',
-    borderRadius: 12,
-    background: 'rgba(15,23,42,0.5)',
-    backdropFilter: 'blur(8px)',
-  };
-  const inputStyle = {
-    padding: 10,
-    borderRadius: 10,
-    border: '1px solid rgba(148,163,184,0.35)',
-    background: '#0b1220',
-    color: '#fff',
-  };
-  const btnBase = {
-    padding: '0.56rem 1rem',
-    cursor: 'pointer',
-    color: '#fff',
-    borderRadius: 10,
-    border: '1px solid rgba(148,163,184,0.35)',
-    transition: 'all 120ms ease',
-  };
-  const btnPrimary = { ...btnBase, background: 'linear-gradient(135deg, #2563eb, #0ea5e9)', border: 'none' };
-  const btnNeutral = { ...btnBase, background: '#101827' };
-  const btnDanger = { ...btnBase, background: 'linear-gradient(135deg, #7f1d1d, #991b1b)' };
+  const { cardStyle, cardSoftStyle, inputStyle, btnPrimary, btnNeutral, btnDanger } = buildCardStyles(isMobile);
 
   if (!isAuthed) {
     return (
@@ -2137,23 +2089,6 @@ export default function App() {
             onResult={handleCheckupResult}
             onAutoCheckup={handleAutoCheckupFromProfile}
             totalExpenses={totalExpenses}
-            accountEmail={accountEmail}
-            digestEnabled={digestEnabled}
-            onDigestEnabledChange={setDigestEnabled}
-            digestFrequency={digestFrequency}
-            onDigestFrequencyChange={setDigestFrequency}
-            digestEmail={digestEmail}
-            onDigestEmailChange={setDigestEmail}
-            digestWeekday={digestWeekday}
-            onDigestWeekdayChange={setDigestWeekday}
-            digestMsg={digestMsg}
-            digestErr={digestErr}
-            digestPreview={digestPreview}
-            digestSmtpReady={digestSmtpReady}
-            digestSaveBusy={digestSaveBusy}
-            digestTestBusy={digestTestBusy}
-            onSaveDigest={saveDigestSettings}
-            onTestDigest={sendWeeklyDigestTest}
           />
         )}
 
@@ -2409,6 +2344,22 @@ export default function App() {
             billingErr={billingErr}
             token={token}
             accountEmail={accountEmail}
+            digestEnabled={digestEnabled}
+            onDigestEnabledChange={setDigestEnabled}
+            digestFrequency={digestFrequency}
+            onDigestFrequencyChange={setDigestFrequency}
+            digestEmail={digestEmail}
+            onDigestEmailChange={setDigestEmail}
+            digestWeekday={digestWeekday}
+            onDigestWeekdayChange={setDigestWeekday}
+            digestMsg={digestMsg}
+            digestErr={digestErr}
+            digestPreview={digestPreview}
+            digestSmtpReady={digestSmtpReady}
+            digestSaveBusy={digestSaveBusy}
+            digestTestBusy={digestTestBusy}
+            onSaveDigest={saveDigestSettings}
+            onTestDigest={sendWeeklyDigestTest}
             onSubscribeMonthly={() => startCheckout('monthly')}
             onSubscribeAnnual={() => startCheckout('annual')}
             onManageBilling={openBillingPortal}
@@ -2434,6 +2385,7 @@ export default function App() {
             btnPrimary={btnPrimary}
             btnNeutral={btnNeutral}
             onGoPlan={() => setActiveSection('plan')}
+            onGoFinances={() => setActiveSection('finances')}
             exportBusy={exportBusy}
             pdfBusy={pdfBusy}
             businessPdfBusy={businessPdfBusy}

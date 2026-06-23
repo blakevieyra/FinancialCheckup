@@ -69,13 +69,6 @@ export const MORE_TOOL_SECTIONS = [
     ],
   },
   {
-    id: 'projections',
-    title: 'Projections & long-term health',
-    intro: 'Based on your trailing history — 3, 6, and 12 month outlooks, long-term health status, and generated business statements appear below when you have Pro access.',
-    pro: true,
-    tools: [],
-  },
-  {
     id: 'ai',
     title: 'AI & personalized advice',
     intro: 'Data-driven insights tailored to your profile — personal, business, or organizational.',

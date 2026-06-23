@@ -33,9 +33,9 @@ export default function ScoreSummaryPanel({
   const content = (
     <>
       <div>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>Email score summaries</div>
-        <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.85, lineHeight: 1.5, maxWidth: 560 }}>
-          Get your overall score, category breakdown, budget snapshot, and top action item by email — daily, weekly, or monthly.
+        <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.02em' }}>Email & score summaries</div>
+        <p style={{ margin: '6px 0 0', fontSize: 13, color: '#94a3b8', lineHeight: 1.5, maxWidth: 520 }}>
+          Your score, category breakdown, and top priority — delivered on a schedule you choose.
         </p>
       </div>
 
@@ -126,7 +126,7 @@ export default function ScoreSummaryPanel({
   }
 
   return (
-    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', display: 'grid', gap: 12 }}>
+    <div style={{ ...cardSoftStyle, padding: '1.15rem 1.2rem', display: 'grid', gap: 14, height: '100%', borderLeft: '3px solid #3b82f6' }}>
       {content}
     </div>
   );

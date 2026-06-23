@@ -2,8 +2,6 @@ import ScoreHero from './ScoreHero';
 import ImprovementRoadmap from './ImprovementRoadmap';
 import ScoreExplainer from './ScoreExplainer';
 import GuidePanel from './GuidePanel';
-import PrioritiesPanel from './PrioritiesPanel';
-import RecommendationTimeline from './RecommendationTimeline';
 import ExpandablePanel from './ExpandablePanel';
 import BadgeRewardsPanel from './BadgeRewardsPanel';
 import LeaderboardSnapshot from './LeaderboardSnapshot';
@@ -154,6 +152,48 @@ export default function OverviewDashboard({
     </div>
   );
 
+  const insightGrid = isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))';
+
+  const insightPanels = [
+    checkupResult?.improvementRoadmap
+      ? {
+          key: 'roadmap',
+          accent: 'roadmap',
+          title: 'Improvement roadmap',
+          hint: 'Security vs wealth tracks — tap to expand',
+          body: (
+            <ImprovementRoadmap
+              roadmap={checkupResult.improvementRoadmap}
+              compact
+              cardSoftStyle={cardSoftStyle}
+              onGoTab={onGoTab}
+              btnNeutral={btnNeutral}
+              bare
+            />
+          ),
+        }
+      : null,
+    checkupResult?.scoreExplanation
+      ? {
+          key: 'score',
+          accent: 'score',
+          title: 'Score breakdown',
+          hint: 'Security vs long-term wealth — tap to expand',
+          body: (
+            <ScoreExplainer
+              explanation={checkupResult.scoreExplanation}
+              isMobile={isMobile}
+              cardSoftStyle={cardSoftStyle}
+              compact={false}
+              bare
+              onGoTab={onGoTab}
+              btnNeutral={btnNeutral}
+            />
+          ),
+        }
+      : null,
+  ].filter(Boolean);
+
   return (
     <div style={{ display: 'grid', gap: isDesktop ? 24 : 18, width: '100%' }}>
       <div style={{ display: 'grid', gridTemplateColumns: gridOverview, gap: isDesktop ? 20 : 16, alignItems: 'start' }}>
@@ -161,70 +201,36 @@ export default function OverviewDashboard({
         {sideColumn}
       </div>
 
-      {checkupResult?.actionPlan?.length ? (
-        <ExpandablePanel
-          title="Top priorities"
-          hint={`${checkupResult.actionPlan.length} actions — tap to expand`}
-          cardSoftStyle={cardSoftStyle}
-        >
-          <PrioritiesPanel
-            actionPlan={checkupResult.actionPlan}
-            cardSoftStyle={cardSoftStyle}
-            onGoFinances={onGoFinances}
-            btnNeutral={btnNeutral}
-            bare
-          />
-        </ExpandablePanel>
-      ) : null}
-
-      {checkupResult?.recommendationTimeline?.length ? (
-        <ExpandablePanel
-          title="Action timeline"
-          hint="Now, this month, and long-term — tap to expand"
-          cardSoftStyle={cardSoftStyle}
-        >
-          <RecommendationTimeline
-            timeline={checkupResult.recommendationTimeline}
-            cardSoftStyle={cardSoftStyle}
-            isMobile={isMobile}
-            bare
-          />
-        </ExpandablePanel>
-      ) : null}
-
-      {checkupResult?.improvementRoadmap ? (
-        <ExpandablePanel
-          title="Improvement roadmap"
-          hint="Security vs wealth tracks — tap to expand"
-          cardSoftStyle={cardSoftStyle}
-        >
-          <ImprovementRoadmap
-            roadmap={checkupResult.improvementRoadmap}
-            compact
-            cardSoftStyle={cardSoftStyle}
-            onGoTab={onGoTab}
-            btnNeutral={btnNeutral}
-            bare
-          />
-        </ExpandablePanel>
-      ) : null}
-
-      {checkupResult?.scoreExplanation ? (
-        <ExpandablePanel
-          title="Score breakdown"
-          hint="Security vs long-term wealth scores — tap to expand"
-          cardSoftStyle={cardSoftStyle}
-        >
-          <ScoreExplainer
-            explanation={checkupResult.scoreExplanation}
-            isMobile={isMobile}
-            cardSoftStyle={cardSoftStyle}
-            compact={false}
-            bare
-            onGoTab={onGoTab}
-            btnNeutral={btnNeutral}
-          />
-        </ExpandablePanel>
+      {insightPanels.length ? (
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Score & roadmap</div>
+            <p style={{ margin: '6px 0 0', fontSize: 14, color: '#94a3b8', lineHeight: 1.45 }}>
+              Improvement tracks and dimension scores. Priorities & projections are on Tools.
+            </p>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: insightGrid,
+              gap: 14,
+              alignItems: 'stretch',
+            }}
+          >
+            {insightPanels.map((panel) => (
+              <ExpandablePanel
+                key={panel.key}
+                title={panel.title}
+                hint={panel.hint}
+                accent={panel.accent}
+                gridCard
+                cardSoftStyle={cardSoftStyle}
+              >
+                {panel.body}
+              </ExpandablePanel>
+            ))}
+          </div>
+        </div>
       ) : null}
     </div>
   );

@@ -1,5 +1,4 @@
 import CheckupPanel from './CheckupPanel';
-import ScoreSummaryPanel from './ScoreSummaryPanel';
 
 export default function FinancesPage({
   profile,
@@ -30,92 +29,46 @@ export default function FinancesPage({
   onResult,
   onAutoCheckup,
   totalExpenses,
-  accountEmail,
-  digestEnabled,
-  onDigestEnabledChange,
-  digestFrequency,
-  onDigestFrequencyChange,
-  digestEmail,
-  onDigestEmailChange,
-  digestWeekday,
-  onDigestWeekdayChange,
-  digestMsg,
-  digestErr,
-  digestPreview,
-  digestSmtpReady,
-  digestSaveBusy,
-  digestTestBusy,
-  onSaveDigest,
-  onTestDigest,
 }) {
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
-        <ScoreSummaryPanel
-          bare
-          cardSoftStyle={cardSoftStyle}
-          inputStyle={inputStyle}
-          btnPrimary={btnPrimary}
-          btnNeutral={btnNeutral}
-          accountEmail={accountEmail}
-          digestEnabled={digestEnabled}
-          onDigestEnabledChange={onDigestEnabledChange}
-          digestFrequency={digestFrequency}
-          onDigestFrequencyChange={onDigestFrequencyChange}
-          digestEmail={digestEmail}
-          onDigestEmailChange={onDigestEmailChange}
-          digestWeekday={digestWeekday}
-          onDigestWeekdayChange={onDigestWeekdayChange}
-          digestMsg={digestMsg}
-          digestErr={digestErr}
-          digestPreview={digestPreview}
-          smtpReady={digestSmtpReady}
-          saveBusy={digestSaveBusy}
-          testBusy={digestTestBusy}
-          onSave={onSaveDigest}
-          onTest={onTestDigest}
-        />
-      </div>
-
-      <CheckupPanel
-        token={token}
-        userId={userId}
-        month={month}
-        isMobile={isMobile}
-        isTablet={isTablet}
-        cardStyle={cardStyle}
-        cardSoftStyle={cardSoftStyle}
-        inputStyle={inputStyle}
-        btnPrimary={btnPrimary}
-        btnNeutral={btnNeutral}
-        ledger={{ income, totalExpenses }}
-        ledgerEditor={{
-          profile,
-          onProfileChange,
-          month,
-          income,
-          onIncomeChange,
-          expenses,
-          onExpenseChange,
-          newCategory,
-          onNewCategoryChange,
-          onAddCategory,
-          onDeleteCategory,
-          catBusy,
-          busy,
-        }}
-        onResult={onResult}
-        showForm
-        showDetails={false}
-        showHistory={false}
-        profile={profile}
-        primaryGoal={primaryGoal}
-        isPro={isPro}
-        onGoPlan={onGoPlan}
-        autoSync
-        onAutoCheckup={onAutoCheckup}
-        dimensionCardLayout
-      />
-    </div>
+    <CheckupPanel
+      token={token}
+      userId={userId}
+      month={month}
+      isMobile={isMobile}
+      isTablet={isTablet}
+      cardStyle={cardStyle}
+      cardSoftStyle={cardSoftStyle}
+      inputStyle={inputStyle}
+      btnPrimary={btnPrimary}
+      btnNeutral={btnNeutral}
+      ledger={{ income, totalExpenses }}
+      ledgerEditor={{
+        profile,
+        onProfileChange,
+        month,
+        income,
+        onIncomeChange,
+        expenses,
+        onExpenseChange,
+        newCategory,
+        onNewCategoryChange,
+        onAddCategory,
+        onDeleteCategory,
+        catBusy,
+        busy,
+      }}
+      onResult={onResult}
+      showForm
+      showDetails={false}
+      showHistory={false}
+      profile={profile}
+      primaryGoal={primaryGoal}
+      isPro={isPro}
+      onGoPlan={onGoPlan}
+      autoSync
+      onAutoCheckup={onAutoCheckup}
+      dimensionCardLayout
+    />
   );
 }

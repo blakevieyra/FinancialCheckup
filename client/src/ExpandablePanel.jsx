@@ -1,43 +1,93 @@
 import { useState } from 'react';
 
-/** Collapsed by default — reduces dashboard overload until user opens a section */
-export default function ExpandablePanel({ title, hint, children, cardSoftStyle, defaultOpen = false }) {
+const ACCENT = {
+  default: '#3b82f6',
+  priorities: '#f59e0b',
+  timeline: '#8b5cf6',
+  roadmap: '#10b981',
+  score: '#3b82f6',
+};
+
+/** Collapsed by default — card-style panels for dashboard insights. */
+export default function ExpandablePanel({
+  title,
+  hint,
+  children,
+  cardSoftStyle,
+  defaultOpen = false,
+  accent = 'default',
+  gridCard = false,
+}) {
   const [open, setOpen] = useState(defaultOpen);
+  const accentColor = ACCENT[accent] || ACCENT.default;
 
   return (
-    <div style={{ ...cardSoftStyle, padding: 0, overflow: 'hidden' }}>
+    <div
+      style={{
+        ...cardSoftStyle,
+        padding: 0,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: gridCard && !open ? 108 : undefined,
+        boxShadow: gridCard ? '0 2px 16px rgba(2, 6, 23, 0.18)' : undefined,
+        transition: 'box-shadow 200ms ease, border-color 200ms ease',
+      }}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         style={{
           width: '100%',
+          flex: gridCard && !open ? 1 : undefined,
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'space-between',
           gap: 12,
-          padding: '0.9rem 1rem',
-          background: 'transparent',
+          padding: gridCard ? '1rem 1.05rem' : '0.95rem 1.05rem',
+          background: open ? 'rgba(15, 23, 42, 0.35)' : 'transparent',
           border: 'none',
+          borderLeft: `3px solid ${accentColor}`,
           color: 'inherit',
           cursor: 'pointer',
           textAlign: 'left',
         }}
       >
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>{title}</div>
-          {hint && !open ? <div style={{ fontSize: 13, opacity: 0.72, marginTop: 4 }}>{hint}</div> : null}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: gridCard ? 15 : 15, letterSpacing: '-0.01em' }}>{title}</div>
+          {hint && !open ? (
+            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 6, lineHeight: 1.45 }}>{hint}</div>
+          ) : null}
         </div>
-        <span style={{ opacity: 0.6, fontSize: 18, flexShrink: 0 }}>{open ? '−' : '+'}</span>
+        <span
+          aria-hidden
+          style={{
+            flexShrink: 0,
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 16,
+            fontWeight: 600,
+            color: accentColor,
+            background: 'rgba(15, 23, 42, 0.55)',
+            border: '1px solid rgba(148, 163, 184, 0.2)',
+          }}
+        >
+          {open ? '−' : '+'}
+        </span>
       </button>
       <div
         style={{
           maxHeight: open ? 4000 : 0,
           opacity: open ? 1 : 0,
           overflow: 'hidden',
-          transition: 'max-height 420ms ease, opacity 380ms ease',
+          transition: 'max-height 420ms ease, opacity 320ms ease',
         }}
       >
-        <div style={{ padding: open ? '0 1rem 1rem' : 0, borderTop: open ? '1px solid rgba(148,163,184,0.12)' : 'none' }}>
+        <div style={{ padding: open ? '0 1.05rem 1.05rem' : 0, borderTop: open ? '1px solid rgba(148,163,184,0.12)' : 'none' }}>
           {open ? (
             <div className="fc-fade-in" style={{ paddingTop: 12 }}>
               {children}

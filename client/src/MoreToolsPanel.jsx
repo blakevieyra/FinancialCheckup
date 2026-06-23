@@ -1,6 +1,7 @@
 import { MORE_TOOL_SECTIONS, RESOURCE_LINKS } from './planConstants';
 import SpecialistReportsGrid from './SpecialistReportsGrid';
 import AdviceToolsGrid from './AdviceToolsGrid';
+import PlanOutlookCard from './PlanOutlookCard';
 import { TOOL_ETA_SECONDS, useGenerationTimer } from './useGenerationTimer';
 
 function ProBadge() {
@@ -77,6 +78,7 @@ export default function MoreToolsPanel({
   btnPrimary,
   btnNeutral,
   onGoPlan,
+  onGoFinances,
   exportBusy,
   pdfBusy,
   businessPdfBusy,
@@ -179,6 +181,22 @@ export default function MoreToolsPanel({
           ) : null}
         </p>
       </div>
+
+      <PlanOutlookCard
+        checkupResult={checkupResult}
+        isPro={isPro}
+        isMobile={isMobile}
+        cardStyle={cardStyle}
+        cardSoftStyle={cardSoftStyle}
+        btnNeutral={btnNeutral}
+        onGoFinances={onGoFinances}
+        onGoPlan={onGoPlan}
+        forecastBusy={forecastBusy}
+        forecastErr={forecastErr}
+        forecastData={forecastData}
+        businessDocs={businessDocs}
+        onRefreshProjections={onOpenProjections}
+      />
 
       {MORE_TOOL_SECTIONS.map((section) => (
         <div key={section.id} style={{ ...cardStyle, display: 'grid', gap: 14 }}>
@@ -293,60 +311,6 @@ export default function MoreToolsPanel({
                   </div>
                 )}
               </div>
-            </div>
-          ) : null}
-          {section.id === 'projections' ? (
-            <div id="projections-results" style={{ display: 'grid', gap: 12 }}>
-              {forecastBusy ? <div style={{ opacity: 0.8, fontSize: 14 }}>Building financial outlook…</div> : null}
-              {forecastErr ? <div style={{ color: '#ffb3b3', fontSize: 14 }}>{forecastErr}</div> : null}
-              {!isPro ? (
-                <p style={{ margin: 0, fontSize: 14, opacity: 0.85 }}>
-                  Upgrade in Account to unlock projections. Data loads automatically when you have Pro access.
-                </p>
-              ) : null}
-              {isPro && !forecastBusy && !forecastData && !forecastErr ? (
-                <div style={{ opacity: 0.8, fontSize: 14 }}>Loading your financial outlook…</div>
-              ) : null}
-              {isPro && forecastData?.outcomes?.length ? (
-                <div id="projections-outcomes" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-                  {forecastData.outcomes.map((o) => (
-                    <div key={o.months} style={{ ...cardSoftStyle, padding: '0.75rem', fontSize: 13 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{o.months}-month outlook</div>
-                      <div style={{ opacity: 0.8, marginTop: 2 }}>Through {o.endMonth}</div>
-                      <div style={{ marginTop: 8 }}>Income: <strong>${Number(o.projectedIncome).toLocaleString()}</strong></div>
-                      <div>Expenses: <strong>${Number(o.projectedExpenses).toLocaleString()}</strong></div>
-                      <div>Net: <strong>${Number(o.projectedNet).toLocaleString()}</strong></div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {isPro && forecastData?.longTermHealth ? (
-                <div id="longterm-health" style={{ ...cardSoftStyle, padding: '0.85rem' }}>
-                  <div style={{ fontWeight: 700 }}>
-                    Long-term health: <span style={{ textTransform: 'capitalize' }}>{forecastData.longTermHealth.status}</span>
-                  </div>
-                  <div style={{ fontSize: 14, opacity: 0.9, marginTop: 6, lineHeight: 1.45 }}>{forecastData.longTermHealth.summary}</div>
-                </div>
-              ) : null}
-              {isPro && businessDocs ? (
-                <div id="biz-docs" style={{ ...cardSoftStyle, padding: '0.85rem', fontSize: 13 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Business documents (generated)</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>Balance sheet</div>
-                      <div>Assets: ${Number(businessDocs.balanceSheet?.assets?.totalAssets || 0).toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>Income statement</div>
-                      <div>Net: ${Number(businessDocs.incomeStatement?.netIncome || 0).toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>Cash flow</div>
-                      <div>Trend: {businessDocs.cashFlowSummary?.trend || 'n/a'}</div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
             </div>
           ) : null}
         </div>
