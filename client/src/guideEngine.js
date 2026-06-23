@@ -37,6 +37,37 @@ const DIM_META = {
   },
 };
 
+function tabForActionTitle(title = '') {
+  const lower = title.toLowerCase();
+  if (lower.includes('invest') || lower.includes('insurance') || lower.includes('saving') || lower.includes('emergency')) {
+    return 'tools';
+  }
+  return 'finances';
+}
+
+function toolForActionTitle(title = '') {
+  const lower = title.toLowerCase();
+  if (lower.includes('invest')) return 'specialist-investments';
+  if (lower.includes('insurance')) return 'specialist-insurance';
+  if (lower.includes('saving') || lower.includes('emergency')) return 'specialist-savings';
+  return null;
+}
+
+function actionToGuideStep(action, idx) {
+  return {
+    id: idx === 0 ? 'action-top' : `action-${idx + 1}`,
+    title: action.title,
+    detail: action.detail || action.steps?.[0] || 'Ranked priority from your checkup.',
+    tab: tabForActionTitle(action.title),
+    tool: toolForActionTitle(action.title),
+    priority: action.priority || (idx === 0 ? 'HIGH' : 'MED'),
+    cta: 'Take action',
+    isTopPriority: idx === 0,
+    rank: idx === 0 ? undefined : idx + 1,
+    timeline: action.timeline || null,
+  };
+}
+
 export function buildGuideSteps(checkupResult, primaryGoal = '') {
   if (!checkupResult?.dimensions?.length) {
     return [
@@ -57,39 +88,30 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
     .sort((a, b) => a.score - b.score);
 
   const steps = [];
+  const rankedActions = (checkupResult.actionPlan || []).slice(0, 3);
+
+  if (rankedActions.length) {
+    rankedActions.forEach((action, idx) => steps.push(actionToGuideStep(action, idx)));
+    return steps;
+  }
+
   const weakest = dims[0];
   if (weakest) {
     const meta = DIM_META[weakest.key] || { tab: 'finances', focus: weakest.label };
-    steps.push({
-      id: `fix-${weakest.key}`,
-      title: `Strengthen ${meta.label || weakest.label}`,
-      detail: `${weakest.summary || `Score ${Math.round(weakest.score)}/100 — focus on ${meta.focus}.`}`,
-      tab: meta.tab,
-      tool: meta.tool,
-      dimension: weakest.key,
-      score: weakest.score,
-      priority: weakest.score < 55 ? 'HIGH' : 'MED',
-      cta: meta.tool ? 'Open AI report in Tools' : 'Edit in Finances',
-    });
-  }
-
-  const topAction = checkupResult.actionPlan?.[0];
-  if (topAction) {
-    steps.push({
-      id: 'action-top',
-      title: topAction.title,
-      detail: topAction.detail || topAction.steps?.[0] || 'Your highest-impact next step.',
-      tab: topAction.title?.toLowerCase().includes('invest') || topAction.title?.toLowerCase().includes('insurance')
-        || topAction.title?.toLowerCase().includes('saving') || topAction.title?.toLowerCase().includes('emergency')
-        ? 'tools' : 'finances',
-      tool: topAction.title?.toLowerCase().includes('invest') ? 'specialist-investments'
-        : topAction.title?.toLowerCase().includes('insurance') ? 'specialist-insurance'
-          : topAction.title?.toLowerCase().includes('saving') || topAction.title?.toLowerCase().includes('emergency')
-            ? 'specialist-savings'
-            : null,
-      priority: topAction.priority || 'HIGH',
-      cta: 'Take action',
-    });
+    const fixTitle = `Strengthen ${meta.label || weakest.label}`;
+    if (!steps.some((s) => s.title === fixTitle)) {
+      steps.push({
+        id: `fix-${weakest.key}`,
+        title: fixTitle,
+        detail: `${weakest.summary || `Score ${Math.round(weakest.score)}/100 — focus on ${meta.focus}.`}`,
+        tab: meta.tab,
+        tool: meta.tool,
+        dimension: weakest.key,
+        score: weakest.score,
+        priority: weakest.score < 55 ? 'HIGH' : 'MED',
+        cta: meta.tool ? 'Open AI report in Tools' : 'Edit in Finances',
+      });
+    }
   }
 
   if (primaryGoal === 'debt_free' && dims.find((d) => d.key === 'debt' && d.score < 75)) {
@@ -177,5 +199,5 @@ export function buildGuideSteps(checkupResult, primaryGoal = '') {
     });
   }
 
-  return steps.slice(0, 4);
+  return steps.slice(0, 3);
 }

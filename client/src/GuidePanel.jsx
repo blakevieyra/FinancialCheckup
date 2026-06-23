@@ -31,8 +31,8 @@ export default function GuidePanel({
       <SectionHeader
         title="What to do next"
         subtitle={primaryGoal
-          ? `Personalized for your goal: ${goalLabel(primaryGoal)} — tap a step to expand.`
-          : 'Tap any step to reveal details and actions.'}
+          ? `#1 ranked priority first — personalized for ${goalLabel(primaryGoal)}. Tap a step to expand.`
+          : '#1 ranked priority first — tap any step to reveal details and actions.'}
       />
 
       <div style={{ display: 'grid', gap: 8 }}>
@@ -78,9 +78,13 @@ export default function GuidePanel({
                     >
                       {step.priority}
                     </span>
-                    {i === 0 ? (
+                    {step.isTopPriority ? (
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(77,166,255,0.2)', color: '#93c5fd' }}>
-                        Start here
+                        #1 priority
+                      </span>
+                    ) : step.rank ? (
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(148,163,184,0.15)', color: '#cbd5e1' }}>
+                        #{step.rank}
                       </span>
                     ) : null}
                   </div>
@@ -94,6 +98,9 @@ export default function GuidePanel({
               {open ? (
                 <div style={{ padding: '0 1rem 1rem', borderTop: '1px solid rgba(148,163,184,0.12)' }}>
                   <div style={{ fontSize: 13, opacity: 0.88, lineHeight: 1.45, marginTop: 10 }}>{step.detail}</div>
+                  {step.timeline ? (
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>{step.timeline}</div>
+                  ) : null}
                   {step.score != null ? (
                     <div style={{ fontSize: 12, color: scoreBarColor(step.score), marginTop: 8 }}>
                       Current: {Math.round(step.score)}/100

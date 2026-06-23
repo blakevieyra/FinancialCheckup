@@ -97,9 +97,10 @@ function ProfileSnapshot({ summary, cardSoftStyle }) {
 
 function planOutlookHint(checkupResult) {
   const parts = [];
-  if (checkupResult?.actionPlan?.length) parts.push(`${checkupResult.actionPlan.length} priorities`);
+  if (checkupResult?.actionPlan?.length) parts.push('3 priorities');
+  parts.push('3 / 6 / 12 mo outlook');
   if (checkupResult?.recommendationTimeline?.some((p) => p.items?.length)) parts.push('timeline');
-  return parts.length ? `${parts.join(' · ')} — tap to expand` : 'Priorities & timeline — tap to expand';
+  return `${parts.join(' · ')} — tap to expand`;
 }
 
 export default function OverviewDashboard({
@@ -173,6 +174,10 @@ export default function OverviewDashboard({
 
   const sideColumn = (
     <div style={{ display: 'grid', gap: 12, minWidth: 0, alignContent: 'start' }}>
+      {profileSummary ? <ProfileSnapshot summary={profileSummary} cardSoftStyle={cardSoftStyle} /> : null}
+
+      <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
+
       <GoalCard
         primaryGoal={primaryGoal}
         cardSoftStyle={cardSoftStyle}
@@ -180,10 +185,6 @@ export default function OverviewDashboard({
         onPrimaryGoalChange={onPrimaryGoalChange}
         primaryGoalBusy={primaryGoalBusy}
       />
-
-      <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
-
-      {profileSummary ? <ProfileSnapshot summary={profileSummary} cardSoftStyle={cardSoftStyle} /> : null}
 
       {userXp != null ? (
         <BadgeRewardsPanel userXp={userXp} cardSoftStyle={cardSoftStyle} />
@@ -204,9 +205,16 @@ export default function OverviewDashboard({
     <PlanOutlookContent
       checkupResult={checkupResult}
       isMobile={isMobile}
+      isPro={isPro}
       cardSoftStyle={cardSoftStyle}
       btnNeutral={btnNeutral}
       onGoFinances={onGoFinances}
+      onGoPlan={onGoPlan}
+      onRefreshProjections={onRefreshProjections}
+      forecastBusy={forecastBusy}
+      forecastErr={forecastErr}
+      forecastData={forecastData}
+      businessDocs={businessDocs}
     />
   );
 

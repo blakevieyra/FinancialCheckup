@@ -4,6 +4,7 @@ import RecommendationTimeline from './RecommendationTimeline';
 
 const TABS = [
   { id: 'priorities', label: 'Priorities', needsCheckup: true },
+  { id: 'outlook', label: 'Outlook', needsCheckup: false },
   { id: 'timeline', label: 'Timeline', needsCheckup: true },
 ];
 
@@ -51,20 +52,25 @@ export function ProjectionsPane({
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       {forecastData.outcomes?.length ? (
-        <div id="projections-outcomes" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-          {forecastData.outcomes.map((o) => (
-            <div key={o.months} style={{ ...cardSoftStyle, padding: '0.8rem 0.9rem', fontSize: 13 }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{o.months}-month outlook</div>
-              <div style={{ color: '#94a3b8', marginTop: 2, fontSize: 12 }}>Through {o.endMonth}</div>
-              <div style={{ marginTop: 10, display: 'grid', gap: 4 }}>
-                <div>Income <strong>${Number(o.projectedIncome).toLocaleString()}</strong></div>
-                <div>Expenses <strong>${Number(o.projectedExpenses).toLocaleString()}</strong></div>
-                <div style={{ color: Number(o.projectedNet) >= 0 ? '#86efac' : '#fca5a5' }}>
-                  Net <strong>${Number(o.projectedNet).toLocaleString()}</strong>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+            Health outlook — 3 / 6 / 12 months
+          </div>
+          <div id="projections-outcomes" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+            {forecastData.outcomes.map((o) => (
+              <div key={o.months} style={{ ...cardSoftStyle, padding: '0.8rem 0.9rem', fontSize: 13 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{o.months}-month health</div>
+                <div style={{ color: '#94a3b8', marginTop: 2, fontSize: 12 }}>Through {o.endMonth}</div>
+                <div style={{ marginTop: 10, display: 'grid', gap: 4 }}>
+                  <div>Income <strong>${Number(o.projectedIncome).toLocaleString()}</strong></div>
+                  <div>Expenses <strong>${Number(o.projectedExpenses).toLocaleString()}</strong></div>
+                  <div style={{ color: Number(o.projectedNet) >= 0 ? '#86efac' : '#fca5a5' }}>
+                    Net <strong>${Number(o.projectedNet).toLocaleString()}</strong>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -109,31 +115,51 @@ export function ProjectionsPane({
 export function PlanOutlookContent({
   checkupResult,
   isMobile,
+  isPro,
   cardSoftStyle,
   btnNeutral,
   onGoFinances,
+  onGoPlan,
+  onRefreshProjections,
+  forecastBusy,
+  forecastErr,
+  forecastData,
+  businessDocs,
 }) {
   const hasPriorities = Boolean(checkupResult?.actionPlan?.length);
   const hasTimeline = Boolean(checkupResult?.recommendationTimeline?.some((p) => p.items?.length));
+  const hasOutlook = true;
 
-  const defaultTab = hasPriorities ? 'priorities' : 'timeline';
+  const defaultTab = hasPriorities ? 'priorities' : 'outlook';
   const [tab, setTab] = useState(defaultTab);
 
   useEffect(() => {
-    function onFocusOutlook() {
-      setTab(hasPriorities ? 'priorities' : 'timeline');
+    function onFocusOutlook(e) {
+      const focus = e?.detail;
+      if (focus === 'projections' || focus === 'outcomes' || focus === 'longterm-health') {
+        setTab('outlook');
+        return;
+      }
+      setTab(hasPriorities ? 'priorities' : 'outlook');
     }
     window.addEventListener('fc-focus-outlook', onFocusOutlook);
     return () => window.removeEventListener('fc-focus-outlook', onFocusOutlook);
   }, [hasPriorities]);
 
   useEffect(() => {
-    if (tab === 'priorities' && !hasPriorities) setTab('timeline');
-    if (tab === 'timeline' && !hasTimeline) setTab('priorities');
+    if (tab === 'priorities' && !hasPriorities) setTab('outlook');
+    if (tab === 'timeline' && !hasTimeline) setTab(hasPriorities ? 'priorities' : 'outlook');
   }, [hasPriorities, hasTimeline, tab]);
+
+  useEffect(() => {
+    if (tab === 'outlook' && isPro && !forecastData && !forecastBusy && onRefreshProjections) {
+      onRefreshProjections();
+    }
+  }, [tab, isPro, forecastData, forecastBusy, onRefreshProjections]);
 
   const visibleTabs = TABS.filter((t) => {
     if (t.id === 'priorities') return hasPriorities;
+    if (t.id === 'outlook') return hasOutlook;
     if (t.id === 'timeline') return hasTimeline;
     return false;
   });
@@ -206,6 +232,20 @@ export function PlanOutlookContent({
             onGoFinances={onGoFinances}
             btnNeutral={btnNeutral}
             bare
+            maxItems={3}
+          />
+        ) : null}
+
+        {tab === 'outlook' ? (
+          <ProjectionsPane
+            isPro={isPro}
+            isMobile={isMobile}
+            forecastBusy={forecastBusy}
+            forecastErr={forecastErr}
+            forecastData={forecastData}
+            businessDocs={businessDocs}
+            cardSoftStyle={cardSoftStyle}
+            onGoPlan={onGoPlan}
           />
         ) : null}
 

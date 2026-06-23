@@ -15,8 +15,8 @@ function SectionShell({ title, subtitle, children, cardSoftStyle }) {
   );
 }
 
-export default function PrioritiesPanel({ actionPlan, cardSoftStyle, onGoFinances, btnNeutral, bare = false }) {
-  const items = (actionPlan || []).slice(0, 5);
+export default function PrioritiesPanel({ actionPlan, cardSoftStyle, onGoFinances, btnNeutral, bare = false, maxItems = 3 }) {
+  const items = (actionPlan || []).slice(0, maxItems);
   if (!items.length) return null;
 
   const content = (
