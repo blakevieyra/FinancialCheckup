@@ -107,9 +107,12 @@ router.delete('/category', async (req, res) => {
   try {
     const { category, month } = req.body;
     const m = month || new Date().toISOString().slice(0, 7);
+    const cat = normalizeCategory(category);
+    if (!cat) return res.status(400).json({ error: 'Category name required.' });
+    if (!/^\d{4}-\d{2}$/.test(m)) return res.status(400).json({ error: 'month must be YYYY-MM.' });
     await dbRun(
       'DELETE FROM expenses WHERE user_id = ? AND category = ? AND month = ?',
-      [req.user.id, category, m],
+      [req.user.id, cat, m],
     );
     res.json({ success: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error.' }); }

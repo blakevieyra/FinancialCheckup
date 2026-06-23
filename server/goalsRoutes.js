@@ -39,8 +39,14 @@ router.post('/', async (req, res) => {
     const name = String(req.body?.name || '').trim();
     const goalType = String(req.body?.goalType || 'custom').trim().toLowerCase();
     const targetAmount = Number(req.body?.targetAmount);
-    const currentAmount = 0;
-    const targetMonth = null;
+    const currentAmount =
+      req.body?.currentAmount != null && Number.isFinite(Number(req.body.currentAmount))
+        ? Math.max(0, Number(req.body.currentAmount))
+        : 0;
+    const targetMonth =
+      req.body?.targetMonth != null && /^\d{4}-\d{2}$/.test(String(req.body.targetMonth).trim())
+        ? String(req.body.targetMonth).trim()
+        : null;
     const status = req.body?.status ? String(req.body.status) : 'active';
 
     if (!name) return res.status(400).json({ error: 'Goal name is required.' });

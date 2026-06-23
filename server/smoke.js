@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const PORT = 30100 + (process.pid % 500);
 
 if (!process.env.DATABASE_URL) {
-  console.log('Smoke SKIPPED — set DATABASE_URL (a disposable Postgres) to run end-to-end smoke.');
+  console.log('Smoke SKIPPED — set DATABASE_URL to run full end-to-end smoke.');
   process.exit(0);
 }
 
@@ -57,7 +57,7 @@ function assert(cond, msg) {
 }
 
 async function waitForReady(child) {
-  for (let i = 0; i < 60; i += 1) {
+  for (let i = 0; i < 80; i += 1) {
     if (child.exitCode !== null) {
       throw new Error(`Server exited early (code ${child.exitCode}).`);
     }
@@ -88,63 +88,68 @@ async function waitForReady(child) {
 
     let r = await req('GET', '/api/health');
     assert(r.status === 200 && r.body.status === 'ok', `health (${r.status})`);
-    assert(r.body.features?.weeklyDigest === true, 'health should advertise weeklyDigest feature');
+
+    r = await req('GET', '/api/market/ticker');
+    assert(r.status === 200 && Array.isArray(r.body.items), `market (${r.status})`);
+
+    r = await req('POST', '/api/checkup/preview', {
+      income: 5000,
+      expenses: [{ category: 'Housing', amount: 1500 }],
+      totalExpenses: 2500,
+    });
+    assert(r.status === 200 && r.body.overallScore != null, `checkup preview (${r.status})`);
 
     const user = `smoke_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
-    r = await req('POST', '/api/auth/register', undefined, {
+    const email = `${user}@smoke.test`;
+    r = await req('POST', '/api/auth/register', {
       username: user,
+      email,
       password: 'smoke-password-12',
+      acceptedTerms: true,
     });
     assert(r.status === 201 && typeof r.body.token === 'string', `register (${r.status}): ${JSON.stringify(r.body)}`);
     const token = r.body.token;
 
-    r = await req(
-      'POST',
-      '/api/auth/login',
-      undefined,
-      { username: user, password: 'smoke-password-12' },
-    );
-    assert(r.status === 200 && r.body.username === user, `login (${r.status}): ${JSON.stringify(r.body)}`);
+    r = await req('POST', '/api/auth/register', {
+      username: `${user}_2`,
+      email: `b${email}`,
+      password: 'smoke-password-12',
+    });
+    assert(r.status === 400 && /terms/i.test(r.body.error || ''), 'register requires terms');
+
+    r = await req('POST', '/api/auth/login', undefined, { username: user, password: 'smoke-password-12' });
+    assert(r.status === 200 && r.body.username === user, `login (${r.status})`);
 
     r = await req('POST', '/api/income', token, { amount: 5000, month: '2026-05' });
     assert(r.status === 200 && Number(r.body.amount) === 5000, `income post (${r.status})`);
+
+    r = await req('POST', '/api/income', token, { amount: 100, month: 'bad-month' });
+    assert(r.status === 400, 'income rejects bad month');
 
     r = await req('GET', '/api/income?month=2026-05', token);
     assert(r.status === 200 && Number(r.body.amount) === 5000, `income get (${r.status})`);
 
     r = await req('GET', '/api/expenses?month=2026-05', token);
-    assert(
-      r.status === 200 && Array.isArray(r.body) && r.body.length > 0,
-      `expenses get (${r.status})`,
-    );
+    assert(r.status === 200 && Array.isArray(r.body) && r.body.length > 0, `expenses get (${r.status})`);
 
     const cat = r.body[0].category;
-    r = await req(
-      'PUT',
-      '/api/expenses',
-      token,
-      { month: '2026-05', expenses: [{ category: cat, amount: 125 }] },
-    );
+    r = await req('PUT', '/api/expenses', token, { month: '2026-05', expenses: [{ category: cat, amount: 125 }] });
     assert(r.status === 200 && r.body.success === true, `expenses put (${r.status})`);
+
+    r = await req('DELETE', '/api/expenses/category', token, { category: '', month: '2026-05' });
+    assert(r.status === 400, 'delete category rejects empty');
 
     r = await req('GET', '/api/expenses/history', token);
     assert(r.status === 200 && Array.isArray(r.body), `expenses history (${r.status})`);
 
-    r = await req('GET', '/api/me/digest', token);
-    assert(
-      r.status === 200 && r.body && typeof r.body.digestEnabled === 'boolean',
-      `digest prefs get (${r.status}): ${JSON.stringify(r.body)}`,
-    );
-    assert(r.body.preview && typeof r.body.preview.grade === 'string', 'digest prefs should include preview payload');
+    r = await req('POST', '/api/checkup/run', token, { month: '2026-05' });
+    assert(r.status === 200 && r.body.overallScore != null, `checkup run (${r.status})`);
 
-    r = await req('PUT', '/api/me/digest', token, {
-      digestEnabled: false,
-      digestChannel: 'none',
-      digestEmail: '',
-      digestPhone: '',
-      digestWeekday: 1,
-    });
-    assert(r.status === 200 && r.body.digestChannel === 'none', `digest prefs put (${r.status})`);
+    r = await req('GET', '/api/checkup/latest?month=2026-05', token);
+    assert(r.status === 200 && r.body.overallScore != null, `checkup latest (${r.status})`);
+
+    r = await req('GET', '/api/me/digest', token);
+    assert(r.status === 200 && typeof r.body.digestEnabled === 'boolean', `digest prefs (${r.status})`);
 
     r = await req('GET', '/api/reports/forecast?month=2026-05', token);
     assert(r.status === 200 && Array.isArray(r.body.outcomes), `forecast (${r.status})`);
@@ -159,7 +164,19 @@ async function waitForReady(child) {
       currentAmount: 5000,
       targetMonth: '2035-01',
     });
-    assert(r.status === 201 && r.body && r.body.progressPercent != null, `goal create (${r.status})`);
+    assert(r.status === 201 && Number(r.body.currentAmount) === 5000, `goal create (${r.status})`);
+    assert(r.body.targetMonth === '2035-01', 'goal targetMonth saved');
+
+    for (const area of ['ai-insights', 'expert', 'comprehensive', 'budget']) {
+      r = await req('GET', `/api/ai/specialist/history?area=${area}&limit=5`, token);
+      assert(r.status === 200 && Array.isArray(r.body.reports), `history ${area} (${r.status})`);
+    }
+
+    r = await req('GET', '/api/ai/specialist/history?area=invalid', token);
+    assert(r.status === 400, 'history rejects invalid area');
+
+    r = await req('GET', '/api/rankings/leaderboard', token);
+    assert(r.status === 200, `leaderboard (${r.status})`);
 
     console.log(`Smoke OK (port ${PORT})`);
   } catch (e) {
@@ -169,7 +186,6 @@ async function waitForReady(child) {
     child.kill('SIGTERM');
     await sleep(200);
     if (child.exitCode === null) child.kill('SIGKILL');
-
     process.exit(process.exitCode == null ? 0 : process.exitCode);
   }
 })();

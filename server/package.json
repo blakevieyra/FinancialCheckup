@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "smoke": "node smoke.js"
+    "smoke": "node smoke.js",
+    "smoke:remote": "node remoteSmoke.js",
+    "stress": "node stress.js",
+    "test": "node test/unit.js && node remoteSmoke.js"
   },
   "engines": {
     "node": ">=18"

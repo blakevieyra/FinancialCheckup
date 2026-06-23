@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const { isProd } = require('./safeError');
 const { verifyToken } = require('./auth');
 const { createMessage, parseJsonFromText } = require('./anthropicClient');
 const { snapshotForUserMonth } = require('./ledgerSnapshot');
@@ -138,7 +139,9 @@ Return ONLY valid JSON (no markdown) with this exact shape:
   } catch (e) {
     console.error('Expert briefing error:', e.message);
     const status = /ANTHROPIC_API_KEY|not set/i.test(e.message) ? 400 : 502;
-    res.status(status).json({ error: e.message || 'Expert briefing failed.' });
+    res.status(status).json({
+      error: isProd ? 'Expert briefing failed. Please try again.' : e.message || 'Expert briefing failed.',
+    });
   }
 });
 

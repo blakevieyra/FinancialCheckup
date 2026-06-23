@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const { isProd } = require('./safeError');
 const { verifyToken } = require('./auth');
 const { createMessage, parseJsonFromText } = require('./anthropicClient');
 const { requireFeature } = require('./requireFeature');
@@ -257,7 +258,11 @@ Return ONLY valid JSON:
     res.json({ ...result, reportId, emailSent: Boolean(emailResult?.sent) });
   } catch (err) {
     console.error('AI specialist error:', err.message);
-    res.status(502).json({ error: err.message || 'Specialist AI failed.' });
+    res.status(502).json({
+      error: isProd
+        ? 'Specialist report failed. Please try again.'
+        : err.message || 'Specialist AI failed.',
+    });
   }
 });
 

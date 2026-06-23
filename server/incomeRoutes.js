@@ -6,6 +6,7 @@ router.use(verifyToken);
 router.get('/', async (req, res) => {
   try {
     const m = req.query.month || new Date().toISOString().slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(m)) return res.status(400).json({ error: 'month must be YYYY-MM.' });
     const row = await dbGet(
       'SELECT amount FROM income WHERE user_id = ? AND month = ? ORDER BY created_at DESC LIMIT 1',
       [req.user.id, m],
@@ -30,6 +31,7 @@ router.post('/', async (req, res) => {
     const amount = Number(rawAmount);
     if (!Number.isFinite(amount) || amount < 0) return res.status(400).json({ error: 'Invalid amount.' });
     const m = month || new Date().toISOString().slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(m)) return res.status(400).json({ error: 'month must be YYYY-MM.' });
     const existing = await dbGet('SELECT id FROM income WHERE user_id = ? AND month = ?', [req.user.id, m]);
     if (existing) await dbRun('UPDATE income SET amount = ? WHERE user_id = ? AND month = ?', [amount, req.user.id, m]);
     else await dbRun('INSERT INTO income (user_id, amount, month) VALUES (?, ?, ?)', [req.user.id, amount, m]);
