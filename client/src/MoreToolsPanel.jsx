@@ -1,7 +1,6 @@
 import { MORE_TOOL_SECTIONS, RESOURCE_LINKS } from './planConstants';
 import SpecialistReportsGrid from './SpecialistReportsGrid';
 import AdviceToolsGrid from './AdviceToolsGrid';
-import PlanOutlookCard from './PlanOutlookCard';
 import { TOOL_ETA_SECONDS, useGenerationTimer } from './useGenerationTimer';
 
 function ProBadge() {
@@ -181,22 +180,6 @@ export default function MoreToolsPanel({
           ) : null}
         </p>
       </div>
-
-      <PlanOutlookCard
-        checkupResult={checkupResult}
-        isPro={isPro}
-        isMobile={isMobile}
-        cardStyle={cardStyle}
-        cardSoftStyle={cardSoftStyle}
-        btnNeutral={btnNeutral}
-        onGoFinances={onGoFinances}
-        onGoPlan={onGoPlan}
-        forecastBusy={forecastBusy}
-        forecastErr={forecastErr}
-        forecastData={forecastData}
-        businessDocs={businessDocs}
-        onRefreshProjections={onOpenProjections}
-      />
 
       {MORE_TOOL_SECTIONS.map((section) => (
         <div key={section.id} style={{ ...cardStyle, display: 'grid', gap: 14 }}>

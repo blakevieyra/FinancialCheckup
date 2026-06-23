@@ -1,10 +1,11 @@
+import { useEffect, useState } from 'react';
 import ScoreHero from './ScoreHero';
 import ImprovementRoadmap from './ImprovementRoadmap';
 import ScoreExplainer from './ScoreExplainer';
 import GuidePanel from './GuidePanel';
 import PrioritiesPanel from './PrioritiesPanel';
 import RecommendationTimeline from './RecommendationTimeline';
-import { ProjectionsPane } from './PlanOutlookCard';
+import { ProjectionsPane, PlanOutlookContent } from './PlanOutlookCard';
 import ExpandablePanel from './ExpandablePanel';
 import BadgeRewardsPanel from './BadgeRewardsPanel';
 import LeaderboardSnapshot from './LeaderboardSnapshot';
@@ -83,6 +84,16 @@ function ProfileSnapshot({ summary, cardSoftStyle }) {
   );
 }
 
+function planOutlookHint(checkupResult, forecastData, isPro) {
+  const parts = [];
+  if (checkupResult?.actionPlan?.length) parts.push(`${checkupResult.actionPlan.length} priorities`);
+  if (checkupResult?.recommendationTimeline?.some((p) => p.items?.length)) parts.push('timeline');
+  if (forecastData?.longTermHealth) parts.push(forecastData.longTermHealth.status);
+  else if (isPro) parts.push('projections');
+  else parts.push('projections (Pro)');
+  return `${parts.join(' · ')} — tap to expand`;
+}
+
 export default function OverviewDashboard({
   isMobile,
   isDesktop,
@@ -109,7 +120,18 @@ export default function OverviewDashboard({
   forecastData,
   businessDocs,
   onGoPlan,
+  onRefreshProjections,
 }) {
+  const [planOutlookOpen, setPlanOutlookOpen] = useState(false);
+
+  useEffect(() => {
+    function openPlanOutlook() {
+      setPlanOutlookOpen(true);
+    }
+    window.addEventListener('fc-focus-outlook', openPlanOutlook);
+    return () => window.removeEventListener('fc-focus-outlook', openPlanOutlook);
+  }, []);
+
   const gridOverview = isMobile
     ? '1fr'
     : isDesktop
@@ -161,7 +183,35 @@ export default function OverviewDashboard({
 
   const insightGrid = isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))';
 
+  const planOutlookBody = (
+    <PlanOutlookContent
+      checkupResult={checkupResult}
+      isPro={isPro}
+      isMobile={isMobile}
+      cardSoftStyle={cardSoftStyle}
+      btnNeutral={btnNeutral}
+      onGoFinances={onGoFinances}
+      onGoPlan={onGoPlan}
+      forecastBusy={forecastBusy}
+      forecastErr={forecastErr}
+      forecastData={forecastData}
+      businessDocs={businessDocs}
+      onRefreshProjections={onRefreshProjections}
+    />
+  );
+
   const insightPanels = [
+    {
+      key: 'plan-outlook',
+      accent: 'outlook',
+      title: 'Plan & outlook',
+      hint: planOutlookHint(checkupResult, forecastData, isPro),
+      fullWidth: true,
+      panelId: 'plan-outlook-card',
+      controlledOpen: planOutlookOpen,
+      onOpenChange: setPlanOutlookOpen,
+      body: planOutlookBody,
+    },
     checkupResult?.actionPlan?.length
       ? {
           key: 'priorities',
@@ -268,7 +318,7 @@ export default function OverviewDashboard({
           <div>
             <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Your financial plan</div>
             <p style={{ margin: '6px 0 0', fontSize: 14, color: '#94a3b8', lineHeight: 1.45 }}>
-              Priorities, timeline, projections, and score details — open any card to dive in.
+              Six quick views — priorities, timeline, projections, roadmap, and scores. Open any card to dive in.
             </p>
           </div>
           <div
@@ -280,16 +330,23 @@ export default function OverviewDashboard({
             }}
           >
             {insightPanels.map((panel) => (
-              <ExpandablePanel
+              <div
                 key={panel.key}
-                title={panel.title}
-                hint={panel.hint}
-                accent={panel.accent}
-                gridCard
-                cardSoftStyle={cardSoftStyle}
+                style={panel.fullWidth && !isMobile ? { gridColumn: '1 / -1' } : undefined}
               >
-                {panel.body}
-              </ExpandablePanel>
+                <ExpandablePanel
+                  title={panel.title}
+                  hint={panel.hint}
+                  accent={panel.accent}
+                  gridCard
+                  cardSoftStyle={cardSoftStyle}
+                  panelId={panel.panelId}
+                  open={panel.controlledOpen}
+                  onOpenChange={panel.onOpenChange}
+                >
+                  {panel.body}
+                </ExpandablePanel>
+              </div>
             ))}
           </div>
         </div>

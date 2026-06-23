@@ -106,12 +106,11 @@ export function ProjectionsPane({
   );
 }
 
-/** Unified priorities, timeline, and projections — top of Tools page. */
-export default function PlanOutlookCard({
+/** Tabbed priorities, timeline, and projections — used inside Overview expandable card. */
+export function PlanOutlookContent({
   checkupResult,
   isPro,
   isMobile,
-  cardStyle,
   cardSoftStyle,
   btnNeutral,
   onGoFinances,
@@ -165,23 +164,7 @@ export default function PlanOutlookCard({
   if (!visibleTabs.length) return null;
 
   return (
-    <div
-      id="plan-outlook-card"
-      style={{
-        ...cardStyle,
-        padding: isMobile ? '1rem' : '1.2rem 1.35rem',
-        display: 'grid',
-        gap: 16,
-        borderLeft: '3px solid #3b82f6',
-      }}
-    >
-      <div>
-        <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Your plan & outlook</div>
-        <p style={{ margin: '6px 0 0', fontSize: 14, color: '#94a3b8', lineHeight: 1.45 }}>
-          Top priorities, action timeline, and long-term projections — all in one place.
-        </p>
-      </div>
-
+    <div id="plan-outlook-content" style={{ display: 'grid', gap: 14 }}>
       <div
         role="tablist"
         style={{
@@ -274,6 +257,31 @@ export default function PlanOutlookCard({
           ) : null}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/** Standalone card wrapper (legacy / scroll targets). */
+export default function PlanOutlookCard(props) {
+  const { cardStyle, isMobile } = props;
+  return (
+    <div
+      id="plan-outlook-card"
+      style={{
+        ...cardStyle,
+        padding: isMobile ? '1rem' : '1.2rem 1.35rem',
+        display: 'grid',
+        gap: 16,
+        borderLeft: '3px solid #3b82f6',
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Your plan & outlook</div>
+        <p style={{ margin: '6px 0 0', fontSize: 14, color: '#94a3b8', lineHeight: 1.45 }}>
+          Top priorities, action timeline, and long-term projections — all in one place.
+        </p>
+      </div>
+      <PlanOutlookContent {...props} />
     </div>
   );
 }

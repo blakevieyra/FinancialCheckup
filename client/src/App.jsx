@@ -2499,6 +2499,7 @@ export default function App() {
             forecastData={forecastData}
             businessDocs={businessDocs}
             onGoPlan={() => setActiveSection('plan')}
+            onRefreshProjections={loadForecastAndDocs}
           />
         )}
         </>

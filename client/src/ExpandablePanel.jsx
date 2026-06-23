@@ -7,6 +7,7 @@ const ACCENT = {
   roadmap: '#10b981',
   score: '#3b82f6',
   projections: '#06b6d4',
+  outlook: '#3b82f6',
 };
 
 /** Collapsed by default — card-style panels for dashboard insights. */
@@ -18,12 +19,23 @@ export default function ExpandablePanel({
   defaultOpen = false,
   accent = 'default',
   gridCard = false,
+  open: controlledOpen,
+  onOpenChange,
+  panelId,
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+
+  function setOpen(next) {
+    const value = typeof next === 'function' ? next(open) : next;
+    if (onOpenChange) onOpenChange(value);
+    else setInternalOpen(value);
+  }
   const accentColor = ACCENT[accent] || ACCENT.default;
 
   return (
     <div
+      id={panelId}
       style={{
         ...cardSoftStyle,
         padding: 0,
