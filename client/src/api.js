@@ -156,11 +156,11 @@ export async function getIncome(token, month) {
   return apiFetch(`/api/income?month=${m}`, { token });
 }
 
-export async function setIncome(token, { amount, month }) {
+export async function setIncome(token, { amount, month, sources }) {
   return apiFetch('/api/income', {
     method: 'POST',
     token,
-    body: { amount, month },
+    body: { amount, month, sources },
   });
 }
 

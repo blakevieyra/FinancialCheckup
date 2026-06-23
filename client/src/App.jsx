@@ -25,6 +25,7 @@ import {
 } from './userStorage';
 import { awardXp, loadXp, saveXp, xpProgressLabel } from './progression';
 import { buildCardStyles, buildShellStyle } from './theme';
+import { buildIncomePayload, ensureIncomeSources, sumIncomeSources } from './incomeSources';
 import { validateRegisterForm } from './authValidation';
 import {
   printReport,
@@ -422,6 +423,7 @@ export default function App() {
 
   const [month, setMonth] = useState(currentMonth());
   const [income, setIncome] = useState(0);
+  const [incomeSources, setIncomeSources] = useState(() => ensureIncomeSources(null, 0));
   const [expenses, setExpenses] = useState([]);
 
   const [profile, setProfile] = useState('personal'); // personal | business | organizational
@@ -669,6 +671,7 @@ export default function App() {
       setUser('');
       setExpenses([]);
       setIncome(0);
+      setIncomeSources(ensureIncomeSources(null, 0));
       setAiPlan(null);
       setExpertData(null);
       setRankData(null);
@@ -699,6 +702,7 @@ export default function App() {
         api.getExpenses(token, month, profile),
       ]);
       setIncome(Number(incomeRes.amount) || 0);
+      setIncomeSources(ensureIncomeSources(incomeRes.sources, incomeRes.amount));
       setExpenses(Array.isArray(expensesRes) ? expensesRes : []);
     } catch (e) {
       setError(e.message);
@@ -1068,10 +1072,15 @@ export default function App() {
     loadHistory();
   }
 
+  function handleIncomeSourcesChange(sources) {
+    setIncomeSources(sources);
+    setIncome(sumIncomeSources(sources));
+  }
+
   async function saveLedgerSilent() {
     if (!token || showOnboarding) return;
     try {
-      await api.setIncome(token, { amount: Number(income), month });
+      await api.setIncome(token, buildIncomePayload(month, incomeSources));
       const payloadExpenses = expenses.map((e) => ({
         category: e.category,
         amount: Number(e.amount) || 0,
@@ -1137,7 +1146,7 @@ export default function App() {
     }, 1400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [income, expenses, isAuthed, showOnboarding, month]);
+  }, [income, incomeSources, expenses, isAuthed, showOnboarding, month]);
 
   async function completeAuthSession(res, { isNewAccount = false } = {}) {
     resetSessionForNewUser();
@@ -1148,6 +1157,7 @@ export default function App() {
     setAccountEmail(res.email || registerEmail.trim() || '');
     if (isNewAccount) {
       setIncome(0);
+      setIncomeSources(ensureIncomeSources(null, 0));
       setExpenses([]);
       setCheckupResult(null);
       setLastCheckupScore(null);
@@ -1242,7 +1252,7 @@ export default function App() {
     setError('');
     setBusy(true);
     try {
-      await api.setIncome(token, { amount: Number(income), month });
+      await api.setIncome(token, buildIncomePayload(month, incomeSources));
 
       const payloadExpenses = expenses.map((e) => ({
         category: e.category,
@@ -1267,7 +1277,7 @@ export default function App() {
     setError('');
     setBusy(true);
     try {
-      await api.setIncome(token, { amount: Number(income), month });
+      await api.setIncome(token, buildIncomePayload(month, incomeSources));
       await loadMonthData();
       await loadHistory();
       await loadLeaderboardAndTrends();
@@ -1845,6 +1855,7 @@ export default function App() {
     setSubscription(null);
     setExpenses([]);
     setIncome(0);
+    setIncomeSources(ensureIncomeSources(null, 0));
     setAiPlan(null);
     setAiError('');
     setHistoryError('');
@@ -2069,7 +2080,8 @@ export default function App() {
             btnPrimary={btnPrimary}
             btnNeutral={btnNeutral}
             income={income}
-            onIncomeChange={setIncome}
+            incomeSources={incomeSources}
+            onIncomeSourcesChange={handleIncomeSourcesChange}
             expenses={expenses}
             onExpenseChange={(category, val) => {
               setExpenses((prev) => prev.map((row) => (row.category === category ? { ...row, amount: val } : row)));

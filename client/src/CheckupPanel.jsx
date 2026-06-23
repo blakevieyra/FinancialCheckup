@@ -12,6 +12,8 @@ import {
   RETIREMENT_STARTER_ACCOUNTS,
 } from './categoryOptions';
 import CategorySelect from './CategorySelect';
+import IncomeSourcesEditor from './IncomeSourcesEditor';
+import { sumIncomeSources, ensureIncomeSources } from './incomeSources';
 import {
   loadExtendedProfile,
   saveExtendedProfile,
@@ -131,8 +133,8 @@ function BudgetLedgerEditor({
     profile,
     onProfileChange,
     month,
-    income,
-    onIncomeChange,
+    incomeSources,
+    onIncomeSourcesChange,
     expenses,
     onExpenseChange,
     newCategory,
@@ -167,10 +169,16 @@ function BudgetLedgerEditor({
         <span style={{ fontSize: 12, opacity: 0.65 }}>Month: {month}</span>
       </div>
 
-      <label style={{ display: 'grid', gap: 6, fontSize: 14, maxWidth: 320 }}>
-        Monthly income ($)
-        <input type="number" value={income} step="0.01" onChange={(e) => onIncomeChange(e.target.value)} style={inputStyle} />
-      </label>
+      <IncomeSourcesEditor
+        sources={incomeSources}
+        onChange={onIncomeSourcesChange}
+        inputStyle={inputStyle}
+        btnNeutral={btnNeutral}
+        cardSoftStyle={cardSoftStyle}
+        isMobile={isMobile}
+        isTablet={isTablet}
+        disabled={busy}
+      />
 
       <div>
         <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>Expenses by category</div>
@@ -469,7 +477,10 @@ export default function CheckupPanel({
 }) {
   const isGuest = !token;
   const [extended, setExtended] = useState(() => loadExtendedProfile(userId, isGuest));
-  const [guestBudget, setGuestBudget] = useState({ income: DEFAULT_SNAPSHOT.income, monthlyExpenses: DEFAULT_SNAPSHOT.monthlyExpenses });
+  const [guestBudget, setGuestBudget] = useState({
+    incomeSources: ensureIncomeSources(null, DEFAULT_SNAPSHOT.income),
+    monthlyExpenses: DEFAULT_SNAPSHOT.monthlyExpenses,
+  });
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -734,7 +745,11 @@ export default function CheckupPanel({
     if (!silent) setBusy(true);
     try {
       const payload = isGuest
-        ? { ...extractExtendedOnly(extended), ...guestBudget }
+        ? {
+            ...extractExtendedOnly(extended),
+            income: sumIncomeSources(guestBudget.incomeSources),
+            monthlyExpenses: guestBudget.monthlyExpenses,
+          }
         : extractExtendedOnly(extended);
       const data = token
         ? await api.runCheckup(token, { month, snapshot: payload })
@@ -754,7 +769,7 @@ export default function CheckupPanel({
   }
 
   const grid = fieldGrid(isMobile);
-  const income = isGuest ? guestBudget.income : ledger?.income;
+  const income = isGuest ? sumIncomeSources(guestBudget.incomeSources) : ledger?.income;
   const expenses = isGuest ? guestBudget.monthlyExpenses : ledger?.totalExpenses;
   const isDimIncluded = (key) => !(extended.excludedFromScore || []).includes(key);
   const inc = Number(income) || 0;
@@ -805,10 +820,15 @@ export default function CheckupPanel({
           />
         ) : isGuest ? (
           <div style={grid}>
-            <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-              Monthly income ($)
-              <input type="number" value={guestBudget.income} onChange={(e) => setGuestBudget((p) => ({ ...p, income: e.target.value }))} style={inputStyle} />
-            </label>
+            <IncomeSourcesEditor
+              sources={guestBudget.incomeSources}
+              onChange={(sources) => setGuestBudget((p) => ({ ...p, incomeSources: sources }))}
+              inputStyle={inputStyle}
+              btnNeutral={btnNeutral}
+              cardSoftStyle={cardSoftStyle}
+              isMobile={isMobile}
+              isTablet={isTablet}
+            />
             <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
               Monthly expenses ($)
               <input type="number" value={guestBudget.monthlyExpenses} onChange={(e) => setGuestBudget((p) => ({ ...p, monthlyExpenses: e.target.value }))} style={inputStyle} />
@@ -1020,10 +1040,15 @@ export default function CheckupPanel({
             <div style={{ ...cardSoftStyle, padding: '0.75rem' }}>
               <div style={{ fontWeight: 700, marginBottom: 8 }}>Income & spending</div>
               <div style={grid}>
-                <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-                  Monthly income ($)
-                  <input type="number" value={guestBudget.income} onChange={(e) => setGuestBudget((p) => ({ ...p, income: e.target.value }))} style={inputStyle} />
-                </label>
+                <IncomeSourcesEditor
+                  sources={guestBudget.incomeSources}
+                  onChange={(sources) => setGuestBudget((p) => ({ ...p, incomeSources: sources }))}
+                  inputStyle={inputStyle}
+                  btnNeutral={btnNeutral}
+                  cardSoftStyle={cardSoftStyle}
+                  isMobile={isMobile}
+                  isTablet={isTablet}
+                />
                 <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
                   Monthly expenses ($)
                   <input type="number" value={guestBudget.monthlyExpenses} onChange={(e) => setGuestBudget((p) => ({ ...p, monthlyExpenses: e.target.value }))} style={inputStyle} />

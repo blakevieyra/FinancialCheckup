@@ -133,6 +133,7 @@ async function initDb() {
 
   await rawQuery(`CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_unique ON expenses(user_id, category, month)`);
   await rawQuery(`CREATE INDEX IF NOT EXISTS idx_income_user ON income(user_id, month)`);
+  await rawQuery(`ALTER TABLE income ADD COLUMN IF NOT EXISTS sources TEXT`);
   await rawQuery(`CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id, month)`);
 
   await rawQuery(`
