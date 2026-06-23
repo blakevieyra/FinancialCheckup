@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { scoreBarColor, scoreHeadline } from './theme';
 
 function ProgressBar({ score, height = 8 }) {
@@ -65,9 +65,13 @@ export default function ScoreBreakdownShowcase({
   isMobile,
   renderDetail,
   initialSelectedKey,
+  autoCycle = false,
+  cycleIntervalMs = 4500,
 }) {
   const [selectedKey, setSelectedKey] = useState(initialSelectedKey || dimensions[0]?.key || null);
   const [fadeKey, setFadeKey] = useState(0);
+  const [cyclePaused, setCyclePaused] = useState(false);
+  const pauseTimerRef = useRef(null);
 
   useEffect(() => {
     if (dimensions.length && !dimensions.find((d) => d.key === selectedKey)) {
@@ -75,12 +79,33 @@ export default function ScoreBreakdownShowcase({
     }
   }, [dimensions, selectedKey]);
 
+  useEffect(() => {
+    if (!autoCycle || cyclePaused || dimensions.length < 2) return undefined;
+    const id = setInterval(() => {
+      setSelectedKey((current) => {
+        const idx = dimensions.findIndex((d) => d.key === current);
+        const nextIdx = idx < 0 ? 0 : (idx + 1) % dimensions.length;
+        return dimensions[nextIdx].key;
+      });
+      setFadeKey((k) => k + 1);
+    }, cycleIntervalMs);
+    return () => clearInterval(id);
+  }, [autoCycle, cyclePaused, cycleIntervalMs, dimensions]);
+
+  useEffect(() => () => {
+    if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+  }, []);
+
   const selected = dimensions.find((d) => d.key === selectedKey);
   const displayHeadline = headline || scoreHeadline(overallScore);
   const scoreColor = scoreBarColor(overallScore);
 
   function selectKey(key) {
-    if (key === selectedKey) {
+    if (autoCycle) {
+      setCyclePaused(true);
+      if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = setTimeout(() => setCyclePaused(false), 12000);
+    } else if (key === selectedKey) {
       setSelectedKey(null);
       return;
     }
@@ -185,7 +210,15 @@ export default function ScoreBreakdownShowcase({
       ) : null}
 
       {selected && renderDetail ? (
-        <div key={fadeKey} className="fc-fade-in" style={{ borderTop: '1px solid rgba(148,163,184,0.15)', paddingTop: 14 }}>
+        <div
+          key={fadeKey}
+          className="fc-fade-in"
+          style={{
+            borderTop: '1px solid rgba(148,163,184,0.15)',
+            paddingTop: 14,
+            minHeight: large ? 120 : 96,
+          }}
+        >
           {renderDetail(selected)}
         </div>
       ) : null}

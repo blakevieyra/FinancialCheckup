@@ -6,6 +6,7 @@ const ACCENT = {
   timeline: '#8b5cf6',
   roadmap: '#10b981',
   score: '#3b82f6',
+  projections: '#06b6d4',
 };
 
 /** Collapsed by default — card-style panels for dashboard insights. */

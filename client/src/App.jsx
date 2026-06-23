@@ -2479,7 +2479,6 @@ export default function App() {
             checkupResult={checkupResult}
             income={income}
             totalExpenses={totalExpenses}
-            budgetGrade={grade}
             cardSoftStyle={cardSoftStyle}
             btnPrimary={btnPrimary}
             btnNeutral={btnNeutral}
@@ -2494,6 +2493,12 @@ export default function App() {
             rankData={rankData}
             rankBusy={rankBusy}
             rankErr={rankErr}
+            isPro={isPro}
+            forecastBusy={forecastBusy}
+            forecastErr={forecastErr}
+            forecastData={forecastData}
+            businessDocs={businessDocs}
+            onGoPlan={() => setActiveSection('plan')}
           />
         )}
         </>

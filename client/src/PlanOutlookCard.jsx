@@ -8,7 +8,8 @@ const TABS = [
   { id: 'outlook', label: 'Projections', pro: true },
 ];
 
-function ProjectionsPane({
+/** Shared projections / long-term health content for Tools and Overview. */
+export function ProjectionsPane({
   isPro,
   isMobile,
   forecastBusy,

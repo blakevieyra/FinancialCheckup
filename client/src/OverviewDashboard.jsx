@@ -2,6 +2,9 @@ import ScoreHero from './ScoreHero';
 import ImprovementRoadmap from './ImprovementRoadmap';
 import ScoreExplainer from './ScoreExplainer';
 import GuidePanel from './GuidePanel';
+import PrioritiesPanel from './PrioritiesPanel';
+import RecommendationTimeline from './RecommendationTimeline';
+import { ProjectionsPane } from './PlanOutlookCard';
 import ExpandablePanel from './ExpandablePanel';
 import BadgeRewardsPanel from './BadgeRewardsPanel';
 import LeaderboardSnapshot from './LeaderboardSnapshot';
@@ -86,7 +89,6 @@ export default function OverviewDashboard({
   checkupResult,
   income,
   totalExpenses,
-  budgetGrade,
   cardSoftStyle,
   btnPrimary,
   btnNeutral,
@@ -101,6 +103,12 @@ export default function OverviewDashboard({
   rankData,
   rankBusy,
   rankErr,
+  isPro,
+  forecastBusy,
+  forecastErr,
+  forecastData,
+  businessDocs,
+  onGoPlan,
 }) {
   const gridOverview = isMobile
     ? '1fr'
@@ -114,7 +122,6 @@ export default function OverviewDashboard({
         result={checkupResult}
         income={income}
         totalExpenses={totalExpenses}
-        budgetGrade={budgetGrade}
         isMobile={isMobile}
         cardSoftStyle={cardSoftStyle}
         checkupBusy={checkupBusy}
@@ -155,6 +162,61 @@ export default function OverviewDashboard({
   const insightGrid = isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))';
 
   const insightPanels = [
+    checkupResult?.actionPlan?.length
+      ? {
+          key: 'priorities',
+          accent: 'priorities',
+          title: 'Top priorities',
+          hint: `${checkupResult.actionPlan.length} actions — tap to expand`,
+          body: (
+            <PrioritiesPanel
+              actionPlan={checkupResult.actionPlan}
+              cardSoftStyle={cardSoftStyle}
+              onGoFinances={onGoFinances}
+              btnNeutral={btnNeutral}
+              bare
+            />
+          ),
+        }
+      : null,
+    checkupResult?.recommendationTimeline?.length
+      ? {
+          key: 'timeline',
+          accent: 'timeline',
+          title: 'Action timeline',
+          hint: 'Now, this month, and long-term — tap to expand',
+          body: (
+            <RecommendationTimeline
+              timeline={checkupResult.recommendationTimeline}
+              cardSoftStyle={cardSoftStyle}
+              isMobile={isMobile}
+              bare
+            />
+          ),
+        }
+      : null,
+    {
+      key: 'projections',
+      accent: 'projections',
+      title: 'Projections & long-term health',
+      hint: forecastData?.longTermHealth
+        ? `${forecastData.longTermHealth.status} — tap to expand`
+        : isPro
+          ? '3 / 6 / 12-month outlook — tap to expand'
+          : 'Pro — tap to expand',
+      body: (
+        <ProjectionsPane
+          isPro={isPro}
+          isMobile={isMobile}
+          forecastBusy={forecastBusy}
+          forecastErr={forecastErr}
+          forecastData={forecastData}
+          businessDocs={businessDocs}
+          cardSoftStyle={cardSoftStyle}
+          onGoPlan={onGoPlan}
+        />
+      ),
+    },
     checkupResult?.improvementRoadmap
       ? {
           key: 'roadmap',
@@ -204,9 +266,9 @@ export default function OverviewDashboard({
       {insightPanels.length ? (
         <div style={{ display: 'grid', gap: 14 }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Score & roadmap</div>
+            <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Your financial plan</div>
             <p style={{ margin: '6px 0 0', fontSize: 14, color: '#94a3b8', lineHeight: 1.45 }}>
-              Improvement tracks and dimension scores. Priorities & projections are on Tools.
+              Priorities, timeline, projections, and score details — open any card to dive in.
             </p>
           </div>
           <div
