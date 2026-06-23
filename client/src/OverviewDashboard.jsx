@@ -150,15 +150,15 @@ export default function OverviewDashboard({
 
   const sideColumn = (
     <div style={{ display: 'grid', gap: 12, minWidth: 0, alignContent: 'start' }}>
-      {userXp != null ? (
-        <BadgeRewardsPanel userXp={userXp} cardSoftStyle={cardSoftStyle} />
-      ) : null}
-
       <GoalCard primaryGoal={primaryGoal} cardSoftStyle={cardSoftStyle} />
 
       <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
 
       {profileSummary ? <ProfileSnapshot summary={profileSummary} cardSoftStyle={cardSoftStyle} /> : null}
+
+      {userXp != null ? (
+        <BadgeRewardsPanel userXp={userXp} cardSoftStyle={cardSoftStyle} />
+      ) : null}
 
       <LeaderboardSnapshot
         rankData={rankData}
