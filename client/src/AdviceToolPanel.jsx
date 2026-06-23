@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from './api';
 import ExpandablePanel from './ExpandablePanel';
+import { FieldSummary } from './panelPrimitives';
 import { useGenerationTimer } from './useGenerationTimer';
 
 function formatReportDate(iso) {
@@ -22,6 +23,7 @@ export default function AdviceToolPanel({
   area,
   title,
   hint,
+  expectation,
   preview,
   token,
   isPro,
@@ -112,8 +114,14 @@ export default function AdviceToolPanel({
     <div id={`advice-tool-${area}`}>
       <ExpandablePanel title={title} hint={hint} cardSoftStyle={cardSoftStyle}>
         <div style={{ display: 'grid', gap: 12 }}>
+          {expectation ? (
+            <FieldSummary hasValue>{expectation}</FieldSummary>
+          ) : null}
           {preview ? (
-            <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.5 }}>{preview}</div>
+            <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.5 }}>
+              <span style={{ fontWeight: 600, color: '#cbd5e1' }}>Based on your checkup: </span>
+              {preview}
+            </div>
           ) : null}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
             <button

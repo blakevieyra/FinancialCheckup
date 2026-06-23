@@ -1,6 +1,7 @@
 import { MORE_TOOL_SECTIONS, RESOURCE_LINKS } from './planConstants';
 import SpecialistReportsGrid from './SpecialistReportsGrid';
 import AdviceToolsGrid from './AdviceToolsGrid';
+import { SectionHeader } from './panelPrimitives';
 import { TOOL_ETA_SECONDS, useGenerationTimer } from './useGenerationTimer';
 
 function ProBadge() {
@@ -264,12 +265,10 @@ export default function MoreToolsPanel({
               />
 
               <div style={{ display: 'grid', gap: 10, paddingTop: 8, borderTop: '1px solid rgba(148,163,184,0.15)' }}>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>Dimension AI reports</div>
-                  <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.85, lineHeight: 1.45 }}>
-                    Deep-dive reports for each checkup category — budget, debt, insurance, investments, savings, and retirement.
-                  </p>
-                </div>
+                <SectionHeader
+                  title="Dimension AI reports"
+                  subtitle="One focused report per checkup category — each explains what you'll get before you generate."
+                />
                 {checkupResult ? (
                   <SpecialistReportsGrid
                     result={checkupResult}

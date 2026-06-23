@@ -1,18 +1,37 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from './api';
 import ExpandablePanel from './ExpandablePanel';
+import { FieldSummary } from './panelPrimitives';
 import { strategyForArea, goalLabel } from './goalResources';
 import { printReport, mailtoReport } from './reportActions';
 
 const GOAL_AREAS = new Set(['savings', 'investments', 'retirement']);
 
 const AREA_META = {
-  budget: { title: 'Budget gaps', hint: 'Spending concentration & cuts — tap for AI report' },
-  debt: { title: 'Debt payoff plan', hint: 'Avalanche vs snowball — tap for AI report' },
-  retirement: { title: 'Retirement trajectory', hint: 'Contributions & benchmarks — tap for AI report' },
-  insurance: { title: 'Insurance gap analysis', hint: 'Life, disability & liability — tap for AI report' },
-  investments: { title: 'Investment portfolio', hint: 'Allocation, fees & diversification — tap for AI report' },
-  savings: { title: 'Savings & emergency fund', hint: 'Fund target & savings rate — tap for AI report' },
+  budget: {
+    title: 'Budget gaps',
+    hint: 'Where spending is concentrated, suggested cuts, and a realistic monthly rebalance plan.',
+  },
+  debt: {
+    title: 'Debt payoff plan',
+    hint: 'Avalanche vs snowball paths, interest savings, and monthly payment targets.',
+  },
+  retirement: {
+    title: 'Retirement trajectory',
+    hint: 'Contribution shortfall vs age benchmark and a catch-up plan to stay on track.',
+  },
+  insurance: {
+    title: 'Insurance gap analysis',
+    hint: 'Life, disability, and liability gaps with estimated monthly coverage costs.',
+  },
+  investments: {
+    title: 'Investment portfolio',
+    hint: 'Allocation vs age targets, fee analysis, and diversification fixes.',
+  },
+  savings: {
+    title: 'Savings & emergency fund',
+    hint: 'Emergency fund target, savings-rate gap, and timeline to reach 3–6 months covered.',
+  },
 };
 
 function formatReportDate(iso) {
@@ -268,6 +287,7 @@ export default function SpecialistInsightPanel({
     <div id={`specialist-${area}`}>
     <ExpandablePanel title={meta.title} hint={meta.hint} cardSoftStyle={cardSoftStyle}>
       <div style={{ display: 'grid', gap: 12 }}>
+        <FieldSummary hasValue>{meta.hint}</FieldSummary>
         {primaryGoal && goalStrategy ? (
           <div style={{ padding: '0.75rem 0.85rem', borderRadius: 10, background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(77,166,255,0.25)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -293,7 +313,10 @@ export default function SpecialistInsightPanel({
             ) : null}
           </div>
         ) : null}
-        <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.5 }}>{preview}</div>
+        <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 600, color: '#cbd5e1' }}>Your data snapshot: </span>
+          {preview}
+        </div>
         {gaps?.length ? (
           <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: 13, lineHeight: 1.5 }}>
             {gaps.slice(0, 4).map((g, i) => (

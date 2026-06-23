@@ -8,21 +8,21 @@ const TOOLS = [
   {
     area: 'ai-insights',
     title: 'AI insights & plan',
-    hint: 'Category scores, optimized plans & sources — tap to generate',
+    hint: 'Per-category scores, ranked actions, and trusted sources tailored to your profile.',
     busyLabel: 'Generating insights…',
     generateLabel: 'Generate insights & plan',
   },
   {
     area: 'expert',
     title: 'Expert briefing',
-    hint: 'Executive strategy, benchmarks & risk watchouts — tap to generate',
+    hint: 'Executive summary, risk watchouts, and benchmark comparisons for quick decisions.',
     busyLabel: 'Building briefing…',
     generateLabel: 'Generate expert briefing',
   },
   {
     area: 'comprehensive',
     title: 'Comprehensive report',
-    hint: 'Full analysis, 90-day roadmap & primary resources — tap to generate',
+    hint: 'Full financial picture with a 30–90 day roadmap and curated primary resources.',
     busyLabel: 'Building report…',
     generateLabel: 'Generate comprehensive report',
     fullWidth: true,
@@ -174,6 +174,7 @@ export default function AdviceToolsGrid({
             area={tool.area}
             title={tool.title}
             hint={tool.hint}
+            expectation={tool.hint}
             preview={preview}
             token={token}
             isPro={isPro}
