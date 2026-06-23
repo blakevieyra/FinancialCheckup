@@ -5,6 +5,42 @@ function dimScore(checkupResult, key) {
   return d ? Math.round(d.score) : null;
 }
 
+function fmtMoney(n) {
+  return `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function categoryTotalsNextToSurplus(goal, summary) {
+  const debt = Number(summary.totalDebt) || 0;
+  const emergencyFund = Number(summary.emergencyFund) || 0;
+  const retirement = Number(summary.retirementBalance) || 0;
+  const investments = Number(summary.investmentTotal) || 0;
+
+  switch (goal) {
+    case 'debt_free':
+      return [{ label: 'Emergency fund', value: fmtMoney(emergencyFund), variant: 'income' }];
+    case 'invest':
+      return [{ label: 'Retirement saved', value: fmtMoney(retirement), variant: 'income' }];
+    case 'retirement':
+      return [{ label: 'Investments', value: fmtMoney(investments), variant: 'income' }];
+    case 'emergency_fund':
+      return [{ label: 'Total debt', value: fmtMoney(debt), variant: 'expense' }];
+    case 'wealth_building':
+      return [
+        { label: 'Emergency fund', value: fmtMoney(emergencyFund), variant: 'income' },
+        { label: 'Total debt', value: fmtMoney(debt), variant: 'expense' },
+      ];
+    default:
+      return [
+        { label: 'Emergency fund', value: fmtMoney(emergencyFund), variant: 'income' },
+        { label: 'Total debt', value: fmtMoney(debt), variant: 'expense' },
+      ];
+  }
+}
+
+function metricsIncludeSurplus(metrics) {
+  return (metrics || []).some((m) => String(m.label).toLowerCase() === 'surplus');
+}
+
 function dimSummary(checkupResult, key) {
   return checkupResult?.dimensions?.find((x) => x.key === key)?.summary || null;
 }
@@ -23,7 +59,7 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
     statusLabel: 'Getting started',
     headline: 'Add your financial data on Finances to measure progress toward your goal.',
     metrics: [],
-    focusScores: [],
+    categoryTotals: [],
   };
 
   if (!checkupResult?.dimensions?.length && !inc && !exp) {
@@ -50,7 +86,7 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
           { label: 'Target', value: target > 0 ? `$${Math.round(target).toLocaleString()}` : '—', detail: '3 months of expenses' },
           { label: 'Savings score', value: dimScore(checkupResult, 'savings') ?? '—', detail: 'Checkup dimension' },
         ],
-        focusScores: [{ key: 'savings', label: 'Savings', score: dimScore(checkupResult, 'savings') }],
+        categoryTotals: [],
       };
     }
     case 'debt_free': {
@@ -71,7 +107,7 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
           { label: 'Debt score', value: dimScore(checkupResult, 'debt') ?? '—', detail: 'Checkup dimension' },
           { label: 'Surplus', value: `$${Math.max(0, inc - exp).toLocaleString()}`, detail: 'Room for extra payments' },
         ],
-        focusScores: [{ key: 'debt', label: 'Debt', score: dimScore(checkupResult, 'debt') }],
+        categoryTotals: categoryTotalsNextToSurplus('debt_free', summary),
       };
     }
     case 'wealth_building': {
@@ -89,11 +125,7 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
           { label: 'Investments', value: `$${Number(summary.investmentTotal || 0).toLocaleString()}`, detail: 'Portfolio total' },
           { label: 'Retirement', value: `$${Number(summary.retirementBalance || 0).toLocaleString()}`, detail: 'Accounts saved' },
         ],
-        focusScores: ['savings', 'investments', 'retirement'].map((k) => ({
-          key: k,
-          label: k.charAt(0).toUpperCase() + k.slice(1),
-          score: dimScore(checkupResult, k),
-        })),
+        categoryTotals: [],
       };
     }
     case 'retirement': {
@@ -113,7 +145,7 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
           { label: 'Score', value: score || '—', detail: 'Retirement dimension' },
           { label: 'Gap', value: gap ? `+$${Number(gap).toLocaleString()}/mo` : '—', detail: 'Suggested catch-up' },
         ],
-        focusScores: [{ key: 'retirement', label: 'Retirement', score: score }],
+        categoryTotals: [],
       };
     }
     case 'invest': {
@@ -132,7 +164,7 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
           { label: 'Score', value: score || '—', detail: 'Investments dimension' },
           { label: 'Surplus', value: `$${Math.max(0, inc - exp).toLocaleString()}`, detail: 'Available to invest' },
         ],
-        focusScores: [{ key: 'investments', label: 'Investments', score: score }],
+        categoryTotals: categoryTotalsNextToSurplus('invest', summary),
       };
     }
     case 'insurance': {
@@ -152,11 +184,16 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
           { label: 'Score', value: score || '—', detail: 'Insurance dimension' },
           { label: 'Income', value: `$${inc.toLocaleString()}`, detail: 'Basis for coverage needs' },
         ],
-        focusScores: [{ key: 'insurance', label: 'Insurance', score: score }],
+        categoryTotals: [],
       };
     }
     default: {
       const overall = Math.round(checkupResult?.overallScore ?? 0);
+      const metrics = [
+        { label: 'Overall score', value: overall || '—', detail: 'Financial checkup' },
+        { label: 'Savings rate', value: `${Number(savingsRate || 0).toFixed(1)}%`, detail: 'Of income this month' },
+        { label: 'Surplus', value: `$${Math.max(0, inc - exp).toLocaleString()}`, detail: 'Income minus expenses' },
+      ];
       return {
         ...base,
         label: goalLabel(''),
@@ -164,16 +201,10 @@ export function assessPrimaryGoalProgress(primaryGoal, { checkupResult, profileS
         status: overall >= 75 ? 'on_track' : overall >= 50 ? 'in_progress' : 'needs_attention',
         statusLabel: overall >= 75 ? 'On track' : overall >= 50 ? 'In progress' : 'Needs attention',
         headline: checkupResult?.headline || 'Complete your profile to track progress toward financial wellness.',
-        metrics: [
-          { label: 'Overall score', value: overall || '—', detail: 'Financial checkup' },
-          { label: 'Savings rate', value: `${Number(savingsRate || 0).toFixed(1)}%`, detail: 'This month' },
-          { label: 'Surplus', value: `$${Math.max(0, inc - exp).toLocaleString()}`, detail: 'Income minus expenses' },
-        ],
-        focusScores: (checkupResult?.dimensions || []).slice(0, 3).map((d) => ({
-          key: d.key,
-          label: d.label,
-          score: Math.round(d.score),
-        })),
+        metrics,
+        categoryTotals: metricsIncludeSurplus(metrics)
+          ? categoryTotalsNextToSurplus('general', summary)
+          : [],
       };
     }
   }

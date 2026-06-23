@@ -5,7 +5,6 @@ import RecommendationTimeline from './RecommendationTimeline';
 const TABS = [
   { id: 'priorities', label: 'Priorities', needsCheckup: true },
   { id: 'timeline', label: 'Timeline', needsCheckup: true },
-  { id: 'outlook', label: 'Projections', pro: true },
 ];
 
 /** Shared projections / long-term health content for Tools and Overview. */
@@ -106,62 +105,54 @@ export function ProjectionsPane({
   );
 }
 
-/** Tabbed priorities, timeline, and projections — used inside Overview expandable card. */
+/** Tabbed priorities and timeline — used inside Overview expandable card. */
 export function PlanOutlookContent({
   checkupResult,
-  isPro,
   isMobile,
   cardSoftStyle,
   btnNeutral,
   onGoFinances,
-  onGoPlan,
-  forecastBusy,
-  forecastErr,
-  forecastData,
-  businessDocs,
-  onRefreshProjections,
 }) {
   const hasPriorities = Boolean(checkupResult?.actionPlan?.length);
   const hasTimeline = Boolean(checkupResult?.recommendationTimeline?.some((p) => p.items?.length));
 
-  const defaultTab = hasPriorities ? 'priorities' : hasTimeline ? 'timeline' : 'outlook';
+  const defaultTab = hasPriorities ? 'priorities' : 'timeline';
   const [tab, setTab] = useState(defaultTab);
 
   useEffect(() => {
-    if (isPro) onRefreshProjections?.();
-  }, [isPro, onRefreshProjections]);
-
-  useEffect(() => {
-    function onFocusOutlook(e) {
-      setTab('outlook');
-      const map = {
-        outcomes: 'projections-outcomes',
-        longterm: 'longterm-health',
-        bizdocs: 'biz-docs',
-      };
-      const id = map[e.detail];
-      if (id) {
-        setTimeout(() => {
-          document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 200);
-      }
+    function onFocusOutlook() {
+      setTab(hasPriorities ? 'priorities' : 'timeline');
     }
     window.addEventListener('fc-focus-outlook', onFocusOutlook);
     return () => window.removeEventListener('fc-focus-outlook', onFocusOutlook);
-  }, []);
+  }, [hasPriorities]);
 
   useEffect(() => {
-    if (tab === 'priorities' && !hasPriorities) setTab(hasTimeline ? 'timeline' : 'outlook');
-    if (tab === 'timeline' && !hasTimeline) setTab(hasPriorities ? 'priorities' : 'outlook');
+    if (tab === 'priorities' && !hasPriorities) setTab('timeline');
+    if (tab === 'timeline' && !hasTimeline) setTab('priorities');
   }, [hasPriorities, hasTimeline, tab]);
 
   const visibleTabs = TABS.filter((t) => {
     if (t.id === 'priorities') return hasPriorities;
     if (t.id === 'timeline') return hasTimeline;
-    return true;
+    return false;
   });
 
-  if (!visibleTabs.length) return null;
+  if (!visibleTabs.length) {
+    return (
+      <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>
+        Complete your checkup on Finances to unlock personalized priorities and timeline.
+        {onGoFinances ? (
+          <>
+            {' '}
+            <button type="button" onClick={onGoFinances} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontSize: 13 }}>
+              Go to Finances →
+            </button>
+          </>
+        ) : null}
+      </p>
+    );
+  }
 
   return (
     <div id="plan-outlook-content" style={{ display: 'grid', gap: 14 }}>
@@ -202,9 +193,6 @@ export function PlanOutlookContent({
               }}
             >
               {t.label}
-              {t.pro && !isPro ? (
-                <span style={{ marginLeft: 6, fontSize: 9, opacity: 0.85 }}>PRO</span>
-              ) : null}
             </button>
           );
         })}
@@ -229,34 +217,7 @@ export function PlanOutlookContent({
             bare
           />
         ) : null}
-
-        {tab === 'outlook' ? (
-          <ProjectionsPane
-            isPro={isPro}
-            isMobile={isMobile}
-            forecastBusy={forecastBusy}
-            forecastErr={forecastErr}
-            forecastData={forecastData}
-            businessDocs={businessDocs}
-            cardSoftStyle={cardSoftStyle}
-            onGoPlan={onGoPlan}
-          />
-        ) : null}
       </div>
-
-      {!hasPriorities && !hasTimeline ? (
-        <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>
-          Complete your checkup on Finances to unlock personalized priorities and timeline.
-          {onGoFinances ? (
-            <>
-              {' '}
-              <button type="button" onClick={onGoFinances} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontSize: 13 }}>
-                Go to Finances →
-              </button>
-            </>
-          ) : null}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -278,7 +239,7 @@ export default function PlanOutlookCard(props) {
       <div>
         <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Your plan & outlook</div>
         <p style={{ margin: '6px 0 0', fontSize: 14, color: '#94a3b8', lineHeight: 1.45 }}>
-          Top priorities, action timeline, and long-term projections — all in one place.
+          Top priorities and action timeline from your checkup.
         </p>
       </div>
       <PlanOutlookContent {...props} />

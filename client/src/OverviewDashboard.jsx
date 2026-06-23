@@ -75,14 +75,11 @@ function ProfileSnapshot({ summary, cardSoftStyle }) {
   );
 }
 
-function planOutlookHint(checkupResult, forecastData, isPro) {
+function planOutlookHint(checkupResult) {
   const parts = [];
   if (checkupResult?.actionPlan?.length) parts.push(`${checkupResult.actionPlan.length} priorities`);
   if (checkupResult?.recommendationTimeline?.some((p) => p.items?.length)) parts.push('timeline');
-  if (forecastData?.longTermHealth) parts.push(forecastData.longTermHealth.status);
-  else if (isPro) parts.push('projections');
-  else parts.push('projections (Pro)');
-  return `${parts.join(' · ')} — tap to expand`;
+  return parts.length ? `${parts.join(' · ')} — tap to expand` : 'Priorities & timeline — tap to expand';
 }
 
 export default function OverviewDashboard({
@@ -177,17 +174,10 @@ export default function OverviewDashboard({
   const planOutlookBody = (
     <PlanOutlookContent
       checkupResult={checkupResult}
-      isPro={isPro}
       isMobile={isMobile}
       cardSoftStyle={cardSoftStyle}
       btnNeutral={btnNeutral}
       onGoFinances={onGoFinances}
-      onGoPlan={onGoPlan}
-      forecastBusy={forecastBusy}
-      forecastErr={forecastErr}
-      forecastData={forecastData}
-      businessDocs={businessDocs}
-      onRefreshProjections={onRefreshProjections}
     />
   );
 
@@ -196,7 +186,7 @@ export default function OverviewDashboard({
       key: 'plan-outlook',
       accent: 'outlook',
       title: 'Plan & outlook',
-      hint: planOutlookHint(checkupResult, forecastData, isPro),
+      hint: planOutlookHint(checkupResult),
       panelId: 'plan-outlook-card',
       controlledOpen: planOutlookOpen,
       onOpenChange: setPlanOutlookOpen,

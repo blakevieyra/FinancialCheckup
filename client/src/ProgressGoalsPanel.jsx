@@ -1,6 +1,19 @@
 import ExpandablePanel from './ExpandablePanel';
 import { assessPrimaryGoalProgress, statusColor } from './goalProgress';
-import { scoreBarColor } from './theme';
+import { TotalBar } from './panelPrimitives';
+
+function CategoryTotalsCard({ totals, cardSoftStyle }) {
+  const rows = (totals || []).filter((t) => t.value != null);
+  if (!rows.length) return null;
+
+  return (
+    <div style={{ ...cardSoftStyle, padding: '0.75rem', display: 'grid', gap: 8, alignContent: 'start' }}>
+      {rows.map((t) => (
+        <TotalBar key={t.label} label={t.label} value={t.value} variant={t.variant || 'neutral'} compact />
+      ))}
+    </div>
+  );
+}
 
 export function AdditionalTargetsPanel({
   goals,
@@ -108,6 +121,10 @@ export default function ProgressGoalsPanel({
   });
 
   const progressColor = statusColor(assessment.status);
+  const showCategoryTotals =
+    assessment.categoryTotals?.length > 0
+    && assessment.metrics.some((m) => String(m.label).toLowerCase() === 'surplus');
+  const metricCols = isMobile ? '1fr' : showCategoryTotals ? 'repeat(4, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))';
 
   return (
     <div
@@ -163,8 +180,8 @@ export default function ProgressGoalsPanel({
         </div>
       </div>
 
-      {assessment.metrics.length ? (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+      {assessment.metrics.length || showCategoryTotals ? (
+        <div style={{ display: 'grid', gridTemplateColumns: metricCols, gap: 10 }}>
           {assessment.metrics.map((m) => (
             <div key={m.label} style={{ ...cardSoftStyle, padding: '0.75rem' }}>
               <div style={{ fontSize: 11, opacity: 0.65, textTransform: 'uppercase' }}>{m.label}</div>
@@ -172,32 +189,9 @@ export default function ProgressGoalsPanel({
               <div style={{ fontSize: 12, opacity: 0.72, marginTop: 4 }}>{m.detail}</div>
             </div>
           ))}
-        </div>
-      ) : null}
-
-      {assessment.focusScores?.length ? (
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Related checkup scores
-          </div>
-          {assessment.focusScores.map((d) =>
-            d.score != null ? (
-              <div key={d.key} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 40px', gap: 10, alignItems: 'center' }}>
-                <span style={{ fontSize: 13, opacity: 0.85 }}>{d.label}</span>
-                <div style={{ height: 8, borderRadius: 99, background: 'rgba(15,23,42,0.45)', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      width: `${d.score}%`,
-                      height: '100%',
-                      background: scoreBarColor(d.score),
-                      borderRadius: 99,
-                    }}
-                  />
-                </div>
-                <span style={{ fontWeight: 700, fontSize: 13, textAlign: 'right', color: scoreBarColor(d.score) }}>{d.score}</span>
-              </div>
-            ) : null,
-          )}
+          {showCategoryTotals ? (
+            <CategoryTotalsCard totals={assessment.categoryTotals} cardSoftStyle={cardSoftStyle} />
+          ) : null}
         </div>
       ) : null}
     </div>
