@@ -1,65 +1,50 @@
 import { useEffect, useState } from 'react';
 import ScoreHero from './ScoreHero';
-import ImprovementRoadmap from './ImprovementRoadmap';
 import ScoreExplainer from './ScoreExplainer';
 import GuidePanel from './GuidePanel';
-import PrioritiesPanel from './PrioritiesPanel';
-import RecommendationTimeline from './RecommendationTimeline';
-import { ProjectionsPane, PlanOutlookContent } from './PlanOutlookCard';
+import { PlanOutlookContent } from './PlanOutlookCard';
 import ExpandablePanel from './ExpandablePanel';
 import BadgeRewardsPanel from './BadgeRewardsPanel';
 import LeaderboardSnapshot from './LeaderboardSnapshot';
 import { goalLabel } from './goalResources';
+import { formatMoney, NetSummaryBar, SectionHeader, SnapshotCard, TotalBar } from './panelPrimitives';
 
 function LedgerSnapshot({ income, totalExpenses, cardSoftStyle }) {
   const inc = Number(income) || 0;
   const exp = Number(totalExpenses) || 0;
-  const net = inc - exp;
-  const isDeficit = net < 0;
-  const fmt = (n) => `$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   return (
-    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', display: 'grid', gap: 10 }}>
-      <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>This month</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 11, opacity: 0.65 }}>Income</div>
-          <div style={{ fontWeight: 800, fontSize: 20, marginTop: 4, color: '#86efac' }}>{fmt(inc)}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, opacity: 0.65 }}>Expenses</div>
-          <div style={{ fontWeight: 800, fontSize: 20, marginTop: 4, color: '#fca5a5' }}>{fmt(exp)}</div>
-        </div>
+    <SnapshotCard
+      title="This month"
+      subtitle="Income vs spending — updated from your Finances ledger."
+      cardSoftStyle={cardSoftStyle}
+      accent="#3b82f6"
+    >
+      <div style={{ display: 'grid', gap: 8 }}>
+        <TotalBar label="Income" value={formatMoney(inc, { decimals: 0 })} variant="income" compact />
+        <TotalBar label="Expenses" value={formatMoney(exp, { decimals: 0 })} variant="expense" compact />
+        <NetSummaryBar income={inc} expenses={exp} />
       </div>
-      <div style={{ paddingTop: 8, borderTop: '1px solid rgba(148,163,184,0.15)' }}>
-        <div style={{ fontSize: 11, opacity: 0.65 }}>{isDeficit ? 'Deficit' : net > 0 ? 'Surplus' : 'Even'}</div>
-        <div
-          style={{
-            fontWeight: 800,
-            fontSize: 24,
-            marginTop: 4,
-            color: isDeficit ? '#fca5a5' : net > 0 ? '#86efac' : '#94a3b8',
-          }}
-        >
-          {isDeficit ? `−${fmt(net)}` : fmt(net)}
-        </div>
-      </div>
-    </div>
+    </SnapshotCard>
   );
 }
 
 function GoalCard({ primaryGoal, cardSoftStyle }) {
   if (!primaryGoal) return null;
   return (
-    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem' }}>
-      <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Your goal</div>
-      <div style={{ fontWeight: 800, fontSize: 18, marginTop: 6, lineHeight: 1.3 }}>{goalLabel(primaryGoal)}</div>
-    </div>
+    <SnapshotCard
+      title="Your goal"
+      subtitle="Guides recommendations across the app."
+      cardSoftStyle={cardSoftStyle}
+      accent="#8b5cf6"
+    >
+      <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.35 }}>{goalLabel(primaryGoal)}</div>
+    </SnapshotCard>
   );
 }
 
 function ProfileSnapshot({ summary, cardSoftStyle }) {
-  const fmt = (n) => `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const fmt = (n) => formatMoney(n, { decimals: 0 });
   const insuranceLabel =
     summary.insuranceCount >= 6 ? 'Full coverage' : summary.insuranceCount > 0 ? `${summary.insuranceCount}/6 types` : 'None set';
 
@@ -72,15 +57,21 @@ function ProfileSnapshot({ summary, cardSoftStyle }) {
   ];
 
   return (
-    <div style={{ ...cardSoftStyle, padding: '1rem 1.1rem', display: 'grid', gap: 8 }}>
-      <div style={{ fontSize: 12, opacity: 0.68, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Profile snapshot</div>
-      {rows.map((row) => (
-        <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-          <span style={{ fontSize: 13, opacity: 0.75 }}>{row.label}</span>
-          <span style={{ fontWeight: 800, fontSize: 15, color: row.color, textAlign: 'right' }}>{row.value}</span>
-        </div>
-      ))}
-    </div>
+    <SnapshotCard
+      title="Profile snapshot"
+      subtitle="Key balances from your profile — tap Finances to update."
+      cardSoftStyle={cardSoftStyle}
+      accent="#06b6d4"
+    >
+      <div style={{ display: 'grid', gap: 8 }}>
+        {rows.map((row) => (
+          <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+            <span style={{ fontSize: 13, color: '#94a3b8' }}>{row.label}</span>
+            <span style={{ fontWeight: 800, fontSize: 15, color: row.color, textAlign: 'right' }}>{row.value}</span>
+          </div>
+        ))}
+      </div>
+    </SnapshotCard>
   );
 }
 
@@ -212,79 +203,6 @@ export default function OverviewDashboard({
       onOpenChange: setPlanOutlookOpen,
       body: planOutlookBody,
     },
-    checkupResult?.actionPlan?.length
-      ? {
-          key: 'priorities',
-          accent: 'priorities',
-          title: 'Top priorities',
-          hint: `${checkupResult.actionPlan.length} actions — tap to expand`,
-          body: (
-            <PrioritiesPanel
-              actionPlan={checkupResult.actionPlan}
-              cardSoftStyle={cardSoftStyle}
-              onGoFinances={onGoFinances}
-              btnNeutral={btnNeutral}
-              bare
-            />
-          ),
-        }
-      : null,
-    checkupResult?.recommendationTimeline?.length
-      ? {
-          key: 'timeline',
-          accent: 'timeline',
-          title: 'Action timeline',
-          hint: 'Now, this month, and long-term — tap to expand',
-          body: (
-            <RecommendationTimeline
-              timeline={checkupResult.recommendationTimeline}
-              cardSoftStyle={cardSoftStyle}
-              isMobile={isMobile}
-              bare
-            />
-          ),
-        }
-      : null,
-    {
-      key: 'projections',
-      accent: 'projections',
-      title: 'Projections & long-term health',
-      hint: forecastData?.longTermHealth
-        ? `${forecastData.longTermHealth.status} — tap to expand`
-        : isPro
-          ? '3 / 6 / 12-month outlook — tap to expand'
-          : 'Pro — tap to expand',
-      body: (
-        <ProjectionsPane
-          isPro={isPro}
-          isMobile={isMobile}
-          forecastBusy={forecastBusy}
-          forecastErr={forecastErr}
-          forecastData={forecastData}
-          businessDocs={businessDocs}
-          cardSoftStyle={cardSoftStyle}
-          onGoPlan={onGoPlan}
-        />
-      ),
-    },
-    checkupResult?.improvementRoadmap
-      ? {
-          key: 'roadmap',
-          accent: 'roadmap',
-          title: 'Improvement roadmap',
-          hint: 'Security vs wealth tracks — tap to expand',
-          body: (
-            <ImprovementRoadmap
-              roadmap={checkupResult.improvementRoadmap}
-              compact
-              cardSoftStyle={cardSoftStyle}
-              onGoTab={onGoTab}
-              btnNeutral={btnNeutral}
-              bare
-            />
-          ),
-        }
-      : null,
     checkupResult?.scoreExplanation
       ? {
           key: 'score',
@@ -318,7 +236,7 @@ export default function OverviewDashboard({
           <div>
             <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em' }}>Your financial plan</div>
             <p style={{ margin: '6px 0 0', fontSize: 14, color: '#94a3b8', lineHeight: 1.45 }}>
-              Six quick views — priorities, timeline, projections, roadmap, and scores. Open any card to dive in.
+              Your unified plan, projections, and score details — open any card to dive in.
             </p>
           </div>
           <div

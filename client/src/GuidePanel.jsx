@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { buildGuideSteps } from './guideEngine';
 import { scoreBarColor } from './theme';
 import { goalLabel } from './goalResources';
+import { PANEL_GROUP_SHELL, PANEL_SUMMARY, SectionHeader } from './panelPrimitives';
 
 export default function GuidePanel({
   checkupResult,
@@ -27,19 +28,12 @@ export default function GuidePanel({
         gap: 12,
       }}
     >
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#93c5fd' }}>
-          Your guide
-        </div>
-        <div style={{ fontWeight: 800, fontSize: 17, marginTop: 4 }}>What to do next</div>
-        <div style={{ fontSize: 13, opacity: 0.82, marginTop: 4, lineHeight: 1.45 }}>
-          {primaryGoal ? (
-            <>Personalized for your goal: <strong>{goalLabel(primaryGoal)}</strong> — tap a card title to expand.</>
-          ) : (
-            <>Tap any card title to reveal details — you control what to read next.</>
-          )}
-        </div>
-      </div>
+      <SectionHeader
+        title="What to do next"
+        subtitle={primaryGoal
+          ? `Personalized for your goal: ${goalLabel(primaryGoal)} — tap a step to expand.`
+          : 'Tap any step to reveal details and actions.'}
+      />
 
       <div style={{ display: 'grid', gap: 8 }}>
         {steps.map((step, i) => {
@@ -48,10 +42,8 @@ export default function GuidePanel({
             <div
               key={step.id}
               style={{
-                borderRadius: 10,
-                border: open ? '1px solid rgba(77,166,255,0.45)' : '1px solid rgba(148,163,184,0.2)',
-                background: open ? 'rgba(37,99,235,0.1)' : 'rgba(15,23,42,0.35)',
-                overflow: 'hidden',
+                ...PANEL_GROUP_SHELL,
+                border: open ? '1px solid rgba(77,166,255,0.35)' : PANEL_GROUP_SHELL.border,
               }}
             >
               <button

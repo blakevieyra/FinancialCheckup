@@ -26,6 +26,7 @@ import {
 import { awardXp, loadXp, saveXp, xpProgressLabel } from './progression';
 import { buildCardStyles, buildShellStyle } from './theme';
 import { buildIncomePayload, ensureIncomeSources, sumIncomeSources } from './incomeSources';
+import { serializeExpensesForSave } from './expenseCategories';
 import { validateRegisterForm } from './authValidation';
 import {
   printReport,
@@ -466,10 +467,6 @@ export default function App() {
   const [incomeHistory, setIncomeHistory] = useState([]);
   const [checkupHistory, setCheckupHistory] = useState([]);
   const [historyError, setHistoryError] = useState('');
-
-  const [newCategory, setNewCategory] = useState('');
-  const [catError, setCatError] = useState('');
-  const [catBusy, setCatBusy] = useState(false);
 
   /** Weekly digest (email / SMS) */
   const [digestEnabled, setDigestEnabled] = useState(false);
@@ -1081,10 +1078,7 @@ export default function App() {
     if (!token || showOnboarding) return;
     try {
       await api.setIncome(token, buildIncomePayload(month, incomeSources));
-      const payloadExpenses = expenses.map((e) => ({
-        category: e.category,
-        amount: Number(e.amount) || 0,
-      }));
+      const payloadExpenses = serializeExpensesForSave(expenses);
       await api.updateExpenses(token, { month, expenses: payloadExpenses });
       awardXpThrottled('saveData', 60000);
       await refreshCheckupScore(true);
@@ -1254,10 +1248,7 @@ export default function App() {
     try {
       await api.setIncome(token, buildIncomePayload(month, incomeSources));
 
-      const payloadExpenses = expenses.map((e) => ({
-        category: e.category,
-        amount: Number(e.amount) || 0,
-      }));
+      const payloadExpenses = serializeExpensesForSave(expenses);
       await api.updateExpenses(token, { month, expenses: payloadExpenses });
 
       // Refresh to reflect any server-side normalization/defaults
@@ -1293,10 +1284,7 @@ export default function App() {
     setError('');
     setBusy(true);
     try {
-      const payloadExpenses = expenses.map((e) => ({
-        category: e.category,
-        amount: Number(e.amount) || 0,
-      }));
+      const payloadExpenses = serializeExpensesForSave(expenses);
       await api.updateExpenses(token, { month, expenses: payloadExpenses });
       await loadMonthData();
       await loadHistory();
@@ -1483,10 +1471,7 @@ export default function App() {
     setAiBusy(true);
     setAiPlan(null);
     try {
-      const payloadExpenses = expenses.map((e) => ({
-        category: e.category,
-        amount: Number(e.amount) || 0,
-      }));
+      const payloadExpenses = serializeExpensesForSave(expenses);
 
       const res = await api.getAiInsights(token, {
         income: Number(income) || 0,
@@ -1587,10 +1572,7 @@ export default function App() {
     setComprehensiveData(null);
     setComprehensiveBusy(true);
     try {
-      const payloadExpenses = expenses.map((e) => ({
-        category: e.category,
-        amount: Number(e.amount) || 0,
-      }));
+      const payloadExpenses = serializeExpensesForSave(expenses);
       const res = await api.getComprehensiveReport(token, {
         income: Number(income) || 0,
         expenses: payloadExpenses,
@@ -1784,38 +1766,6 @@ export default function App() {
     }
     const ok = await copyToClipboard(shareText);
     if (!ok) setError('Could not copy share text. Please copy manually.');
-  }
-
-  async function addCategory() {
-    setCatError('');
-    const trimmed = newCategory.trim();
-    if (!trimmed) return;
-
-    setCatBusy(true);
-    try {
-      await api.addExpenseCategory(token, { category: trimmed, month });
-      setNewCategory('');
-      await loadMonthData();
-      await loadHistory();
-    } catch (e) {
-      setCatError(e.message);
-    } finally {
-      setCatBusy(false);
-    }
-  }
-
-  async function removeCategory(category) {
-    setCatError('');
-    setCatBusy(true);
-    try {
-      await api.deleteExpenseCategory(token, { category, month });
-      await loadMonthData();
-      await loadHistory();
-    } catch (e) {
-      setCatError(e.message);
-    } finally {
-      setCatBusy(false);
-    }
   }
 
   async function handleTipsSignup() {
@@ -2084,13 +2034,14 @@ export default function App() {
             onIncomeSourcesChange={handleIncomeSourcesChange}
             expenses={expenses}
             onExpenseChange={(category, val) => {
-              setExpenses((prev) => prev.map((row) => (row.category === category ? { ...row, amount: val } : row)));
+              setExpenses((prev) => {
+                const idx = prev.findIndex((row) => row.category === category);
+                if (idx >= 0) {
+                  return prev.map((row) => (row.category === category ? { ...row, amount: val } : row));
+                }
+                return [...prev, { category, amount: val }];
+              });
             }}
-            newCategory={newCategory}
-            onNewCategoryChange={setNewCategory}
-            onAddCategory={addCategory}
-            onDeleteCategory={removeCategory}
-            catBusy={catBusy}
             busy={busy}
             month={month}
             token={token}

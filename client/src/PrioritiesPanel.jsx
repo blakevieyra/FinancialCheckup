@@ -1,3 +1,5 @@
+import { InnerItemCard, SectionHeader } from './panelPrimitives';
+
 const PRIORITY_STYLE = {
   HIGH: { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.4)', color: '#fca5a5' },
   MED: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', color: '#fcd34d' },
@@ -7,10 +9,7 @@ const PRIORITY_STYLE = {
 function SectionShell({ title, subtitle, children, cardSoftStyle }) {
   return (
     <div style={{ ...cardSoftStyle, padding: '1rem 1.15rem', display: 'grid', gap: 14 }}>
-      <div>
-        <div style={{ fontWeight: 800, fontSize: 17 }}>{title}</div>
-        {subtitle ? <div style={{ fontSize: 13, opacity: 0.78, marginTop: 4, lineHeight: 1.45 }}>{subtitle}</div> : null}
-      </div>
+      <SectionHeader title={title} subtitle={subtitle} />
       {children}
     </div>
   );
@@ -26,15 +25,12 @@ export default function PrioritiesPanel({ actionPlan, cardSoftStyle, onGoFinance
         {items.map((item, i) => {
           const style = PRIORITY_STYLE[item.priority] || PRIORITY_STYLE.MED;
           return (
-            <div
+            <InnerItemCard
               key={`${item.title}-${i}`}
+              cardSoftStyle={cardSoftStyle}
               style={{
-                padding: '0.9rem 1rem',
-                borderRadius: 12,
                 border: `1px solid ${style.border}`,
                 background: style.bg,
-                display: 'grid',
-                gap: 6,
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -52,8 +48,8 @@ export default function PrioritiesPanel({ actionPlan, cardSoftStyle, onGoFinance
                   <strong>First step:</strong> {item.steps[0]}
                 </div>
               ) : null}
-              {item.timeline ? <div style={{ fontSize: 12, opacity: 0.7 }}>{item.timeline}</div> : null}
-            </div>
+              {item.timeline ? <div style={{ fontSize: 12, color: '#94a3b8' }}>{item.timeline}</div> : null}
+            </InnerItemCard>
           );
         })}
       </div>

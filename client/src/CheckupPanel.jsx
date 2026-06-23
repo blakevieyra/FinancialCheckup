@@ -3,7 +3,6 @@ import * as api from './api';
 import { DEFAULT_SNAPSHOT, DIMENSION_LABELS, DIMENSION_IMPORTANCE, DIMENSION_BASICS, DEBT_STARTER_TEMPLATES, INSURANCE_COVERAGE_TYPES, BLANK_SNAPSHOT } from './checkupConstants';
 import {
   DEBT_TYPES,
-  EXPENSE_CATEGORY_GROUPS,
   EXPENSE_CATEGORIES,
   LEGACY_DEBT_LABELS,
   INVESTMENT_ACCOUNT_TYPES,
@@ -13,7 +12,9 @@ import {
 } from './categoryOptions';
 import CategorySelect from './CategorySelect';
 import IncomeSourcesEditor from './IncomeSourcesEditor';
+import ExpenseCategoriesEditor from './ExpenseCategoriesEditor';
 import { sumIncomeSources, ensureIncomeSources } from './incomeSources';
+import { NetSummaryBar, SectionHeader, TotalBar, formatMoney } from './panelPrimitives';
 import {
   loadExtendedProfile,
   saveExtendedProfile,
@@ -29,7 +30,7 @@ const fieldGrid = (isMobile) => ({
 function dimScoreLine(result, key) {
   const d = result?.dimensions?.find((x) => x.key === key);
   if (!d) return null;
-  return `${Math.round(d.score)}/100 · Grade ${d.grade}`;
+  return `${Math.round(d.score)}/100`;
 }
 
 function DimensionCard({
@@ -61,8 +62,7 @@ function DimensionCard({
     <div style={{ ...cardStyle, display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 180 }}>
-          <h3 style={{ margin: 0, fontSize: 17 }}>{title}</h3>
-          {!scoreAtBottom && scoreLine ? <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>{scoreLine}</div> : null}
+          <SectionHeader title={title} subtitle={!scoreAtBottom && scoreLine ? scoreLine : undefined} />
           {basics ? (
             <div style={{ fontSize: 13, opacity: 0.82, lineHeight: 1.5, marginTop: 8, padding: '0.55rem 0.65rem', borderRadius: 8, background: 'rgba(148,163,184,0.08)' }}>
               <strong style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', opacity: 0.75 }}>Basics</strong>
@@ -128,20 +128,15 @@ function BudgetLedgerEditor({
   isMobile,
   isTablet,
 }) {
-  const expenseGrid = isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, minmax(0, 1fr))';
   const {
     profile,
     onProfileChange,
     month,
     incomeSources,
     onIncomeSourcesChange,
+    income,
     expenses,
     onExpenseChange,
-    newCategory,
-    onNewCategoryChange,
-    onAddCategory,
-    onDeleteCategory,
-    catBusy,
     busy,
   } = editor;
 
@@ -180,55 +175,15 @@ function BudgetLedgerEditor({
         disabled={busy}
       />
 
-      <div>
-        <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>Expenses by category</div>
-        <p style={{ margin: '0 0 10px', fontSize: 12, opacity: 0.72, lineHeight: 1.45 }}>
-          Pick a category from the list, or choose Custom to type your own.
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12, alignItems: 'flex-end' }}>
-          <div style={{ flex: '1 1 220px', minWidth: 180 }}>
-            <CategorySelect
-              optionGroups={EXPENSE_CATEGORY_GROUPS}
-              value={newCategory}
-              onChange={onNewCategoryChange}
-              inputStyle={inputStyle}
-              placeholder="Choose expense category"
-              customPlaceholder="Custom category name"
-              disabled={catBusy}
-            />
-          </div>
-          <button type="button" onClick={onAddCategory} disabled={catBusy || !newCategory.trim()} style={btnNeutral}>
-            Add
-          </button>
-        </div>
-        {expenses?.length ? (
-          <div style={{ display: 'grid', gridTemplateColumns: expenseGrid, gap: 10 }}>
-            {(expenses || []).map((e) => (
-              <div key={e.category} style={{ ...cardSoftStyle, padding: '0.75rem', display: 'grid', gap: 8 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{e.category}</div>
-                <input
-                  type="number"
-                  value={e.amount}
-                  step="0.01"
-                  onChange={(ev) => onExpenseChange(e.category, ev.target.value)}
-                  style={{ ...inputStyle, width: '100%', padding: 8 }}
-                  aria-label={`${e.category} amount`}
-                />
-                <button
-                  type="button"
-                  onClick={() => onDeleteCategory(e.category)}
-                  disabled={busy}
-                  style={{ ...btnNeutral, fontSize: 12, padding: '0.35rem 0.5rem', justifySelf: 'start' }}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ opacity: 0.75, fontSize: 13 }}>Add a category to start tracking spending.</div>
-        )}
-      </div>
+      <ExpenseCategoriesEditor
+        expenses={expenses}
+        onExpenseChange={onExpenseChange}
+        income={income}
+        inputStyle={inputStyle}
+        isMobile={isMobile}
+        isTablet={isTablet}
+        disabled={busy}
+      />
     </div>
   );
 }
@@ -774,24 +729,12 @@ export default function CheckupPanel({
   const isDimIncluded = (key) => !(extended.excludedFromScore || []).includes(key);
   const inc = Number(income) || 0;
   const exp = Number(expenses) || 0;
-  const budgetNet = inc - exp;
-  const budgetRatio = inc > 0 ? ((exp / inc) * 100).toFixed(1) : null;
 
   const budgetFooter = ledgerEditor ? (
-    <div style={{ display: 'grid', gap: 6, lineHeight: 1.5 }}>
-      <div>
-        This month: <strong>${inc.toLocaleString()}</strong> income · <strong>${exp.toLocaleString()}</strong> expenses
-      </div>
-      <div>
-        {budgetNet < 0 ? (
-          <>Deficit: <strong style={{ color: '#fca5a5' }}>${Math.abs(budgetNet).toLocaleString()}</strong></>
-        ) : budgetNet > 0 ? (
-          <>Surplus: <strong style={{ color: '#86efac' }}>${budgetNet.toLocaleString()}</strong></>
-        ) : (
-          <>Even — no surplus or deficit</>
-        )}
-        {budgetRatio != null ? <> · Expense ratio <strong>{budgetRatio}%</strong></> : null}
-      </div>
+    <div style={{ display: 'grid', gap: 8 }}>
+      <TotalBar label="Income" value={formatMoney(inc, { decimals: 0 })} variant="income" compact />
+      <TotalBar label="Expenses" value={formatMoney(exp, { decimals: 0 })} variant="expense" compact />
+      <NetSummaryBar income={inc} expenses={exp} />
     </div>
   ) : null;
 

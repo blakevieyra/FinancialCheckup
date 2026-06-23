@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PANEL_SUMMARY } from './panelPrimitives';
 
 const ACCENT = {
   default: '#3b82f6',
@@ -69,7 +70,7 @@ export default function ExpandablePanel({
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: gridCard ? 15 : 15, letterSpacing: '-0.01em' }}>{title}</div>
           {hint && !open ? (
-            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 6, lineHeight: 1.45 }}>{hint}</div>
+            <div style={{ fontSize: 12, color: PANEL_SUMMARY.meta, marginTop: 6, lineHeight: 1.45 }}>{hint}</div>
           ) : null}
         </div>
         <span
@@ -100,7 +101,7 @@ export default function ExpandablePanel({
           transition: 'max-height 420ms ease, opacity 320ms ease',
         }}
       >
-        <div style={{ padding: open ? '0 1.05rem 1.05rem' : 0, borderTop: open ? '1px solid rgba(148,163,184,0.12)' : 'none' }}>
+        <div style={{ padding: open ? '0 0.9rem 0.9rem' : 0, borderTop: open ? '1px solid rgba(148,163,184,0.12)' : 'none' }}>
           {open ? (
             <div className="fc-fade-in" style={{ paddingTop: 12 }}>
               {children}

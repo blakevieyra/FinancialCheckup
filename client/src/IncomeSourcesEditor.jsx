@@ -3,6 +3,13 @@ import {
   newIncomeSource,
   sumIncomeSources,
 } from './incomeSources';
+import {
+  FieldSummary,
+  formatMoney,
+  InnerItemCard,
+  SectionHeader,
+  TotalBar,
+} from './panelPrimitives';
 
 export default function IncomeSourcesEditor({
   sources,
@@ -39,12 +46,10 @@ export default function IncomeSourcesEditor({
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>Monthly income sources</div>
-        <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.72, lineHeight: 1.45 }}>
-          Add each paycheck or income stream — your monthly total updates automatically.
-        </p>
-      </div>
+      <SectionHeader
+        title="Monthly income sources"
+        subtitle="Add each paycheck or income stream — your monthly total updates automatically."
+      />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         <select
@@ -67,7 +72,7 @@ export default function IncomeSourcesEditor({
 
       <div style={{ display: 'grid', gridTemplateColumns: grid, gap: 10 }}>
         {rows.map((row) => (
-          <div key={row.id} style={{ ...cardSoftStyle, padding: '0.75rem', display: 'grid', gap: 8 }}>
+          <InnerItemCard key={row.id} cardSoftStyle={cardSoftStyle}>
             <input
               type="text"
               value={row.label}
@@ -88,6 +93,11 @@ export default function IncomeSourcesEditor({
               style={{ ...inputStyle, width: '100%', padding: 8 }}
               aria-label={`${row.label || 'Income'} amount`}
             />
+            <FieldSummary hasValue={Number(row.amount) > 0}>
+              {Number(row.amount) > 0 && total > 0
+                ? `${formatMoney(row.amount)} · ${((Number(row.amount) / total) * 100).toFixed(0)}% of income`
+                : 'Not entered this month'}
+            </FieldSummary>
             <button
               type="button"
               onClick={() => removeRow(row.id)}
@@ -96,28 +106,11 @@ export default function IncomeSourcesEditor({
             >
               Remove
             </button>
-          </div>
+          </InnerItemCard>
         ))}
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
-          gap: 8,
-          padding: '0.85rem 1rem',
-          borderRadius: 12,
-          background: 'rgba(16, 185, 129, 0.1)',
-          border: '1px solid rgba(52, 211, 153, 0.28)',
-        }}
-      >
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#cbd5e1' }}>Monthly income total</span>
-        <span style={{ fontSize: 22, fontWeight: 800, color: '#86efac', letterSpacing: '-0.02em' }}>
-          ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
-      </div>
+      <TotalBar label="Monthly income total" value={formatMoney(total, { decimals: 2 })} variant="income" />
     </div>
   );
 }

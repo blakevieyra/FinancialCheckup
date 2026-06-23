@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PANEL_GROUP_SHELL, PANEL_SUMMARY, SectionHeader } from './panelPrimitives';
 
 const HORIZON_LABEL = { security: 'Security', wealth: 'Long-term' };
 const PRIORITY_COLOR = { HIGH: '#f87171', MED: '#fbbf24', LOW: '#94a3b8' };
@@ -8,10 +9,9 @@ function TimelineCard({ item, expanded, onToggle, cardSoftStyle }) {
   return (
     <div
       style={{
-        ...cardSoftStyle,
+        ...PANEL_GROUP_SHELL,
         padding: 0,
-        overflow: 'hidden',
-        border: expanded ? `1px solid ${color}44` : undefined,
+        border: expanded ? `1px solid ${color}44` : PANEL_GROUP_SHELL.border,
       }}
     >
       <button
@@ -31,7 +31,7 @@ function TimelineCard({ item, expanded, onToggle, cardSoftStyle }) {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
           <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.35 }}>{item.title}</div>
-          <span style={{ fontSize: 18, opacity: 0.5, flexShrink: 0 }}>{expanded ? '−' : '+'}</span>
+          <span style={{ fontSize: 18, color: PANEL_SUMMARY.meta, flexShrink: 0 }}>{expanded ? '−' : '+'}</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 11 }}>
           <span style={{ padding: '2px 8px', borderRadius: 99, background: `${color}22`, color, fontWeight: 700 }}>
@@ -72,12 +72,10 @@ export default function RecommendationTimeline({ timeline, cardSoftStyle, compac
   const body = (
     <>
       {!bare ? (
-        <div>
-          <div style={{ fontWeight: 800, fontSize: 17 }}>Action timeline</div>
-          <div style={{ fontSize: 13, opacity: 0.78, marginTop: 4, lineHeight: 1.45 }}>
-            What to do now, this month, and long-term — tap any card for step-by-step instructions.
-          </div>
-        </div>
+        <SectionHeader
+          title="Action timeline"
+          subtitle="What to do now, this month, and long-term — tap any item for step-by-step instructions."
+        />
       ) : null}
       {phases.map((phase) => (
         <div key={phase.timeframe}>
