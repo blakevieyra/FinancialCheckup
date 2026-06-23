@@ -1,4 +1,5 @@
 import ExpandablePanel from './ExpandablePanel';
+import GoalPicker from './GoalPicker';
 import { assessPrimaryGoalProgress, statusColor } from './goalProgress';
 import { TotalBar } from './panelPrimitives';
 
@@ -103,6 +104,8 @@ export function AdditionalTargetsPanel({
 
 export default function ProgressGoalsPanel({
   primaryGoal,
+  onPrimaryGoalChange,
+  primaryGoalBusy,
   checkupResult,
   profileSummary,
   income,
@@ -112,6 +115,7 @@ export default function ProgressGoalsPanel({
   isTablet,
   cardStyle,
   cardSoftStyle,
+  inputStyle,
 }) {
   const assessment = assessPrimaryGoalProgress(primaryGoal, {
     checkupResult,
@@ -146,29 +150,43 @@ export default function ProgressGoalsPanel({
         gap: 14,
       }}
     >
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#93c5fd' }}>
-          Your main goal
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#93c5fd' }}>
+            Your main goal
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'baseline', marginTop: 6 }}>
+            <h2 style={{ margin: 0, fontSize: isMobile ? '1.35rem' : '1.55rem' }}>{assessment.label}</h2>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: '3px 10px',
+                borderRadius: 99,
+                background: `${progressColor}22`,
+                color: progressColor,
+                border: `1px solid ${progressColor}55`,
+              }}
+            >
+              {assessment.statusLabel}
+            </span>
+          </div>
+          <p style={{ margin: '10px 0 0', fontSize: 14, opacity: 0.88, lineHeight: 1.55, maxWidth: 720 }}>
+            {assessment.headline}
+          </p>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'baseline', marginTop: 6 }}>
-          <h2 style={{ margin: 0, fontSize: isMobile ? '1.35rem' : '1.55rem' }}>{assessment.label}</h2>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              padding: '3px 10px',
-              borderRadius: 99,
-              background: `${progressColor}22`,
-              color: progressColor,
-              border: `1px solid ${progressColor}55`,
-            }}
-          >
-            {assessment.statusLabel}
-          </span>
-        </div>
-        <p style={{ margin: '10px 0 0', fontSize: 14, opacity: 0.88, lineHeight: 1.55, maxWidth: 720 }}>
-          {assessment.headline}
-        </p>
+        {onPrimaryGoalChange ? (
+          <div style={{ flex: '0 1 280px', minWidth: isMobile ? '100%' : 220, maxWidth: 320 }}>
+            <GoalPicker
+              value={primaryGoal}
+              onChange={onPrimaryGoalChange}
+              disabled={primaryGoalBusy}
+              inputStyle={inputStyle}
+              showHint={false}
+              label="Change goal"
+            />
+          </div>
+        ) : null}
       </div>
 
       <div>

@@ -493,6 +493,7 @@ export default function App() {
   const [digestPreview, setDigestPreview] = useState(null);
   const [accountEmail, setAccountEmail] = useState('');
   const [primaryGoal, setPrimaryGoal] = useState('');
+  const [primaryGoalBusy, setPrimaryGoalBusy] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [appLoading, setAppLoading] = useState('');
   const [goals, setGoals] = useState([]);
@@ -514,6 +515,21 @@ export default function App() {
       }
     } catch {
       /** best-effort */
+    }
+  }
+
+  async function updatePrimaryGoal(nextGoal) {
+    const normalized = nextGoal || '';
+    if (normalized === primaryGoal) return;
+    const previous = primaryGoal;
+    setPrimaryGoal(normalized);
+    setPrimaryGoalBusy(true);
+    try {
+      await api.setOnboarding(token, { primaryGoal: normalized });
+    } catch {
+      setPrimaryGoal(previous);
+    } finally {
+      setPrimaryGoalBusy(false);
     }
   }
 
@@ -2190,6 +2206,8 @@ export default function App() {
           <>
         <ProgressGoalsPanel
           primaryGoal={primaryGoal}
+          onPrimaryGoalChange={updatePrimaryGoal}
+          primaryGoalBusy={primaryGoalBusy}
           checkupResult={checkupResult}
           profileSummary={profileSummary}
           income={income}
@@ -2199,6 +2217,7 @@ export default function App() {
           isTablet={isTablet}
           cardStyle={cardStyle}
           cardSoftStyle={cardSoftStyle}
+          inputStyle={inputStyle}
         />
 
         <div id="summary-panel" style={{ ...cardStyle, display: 'grid', gap: 12 }}>
@@ -2589,6 +2608,9 @@ export default function App() {
             onGoProgress={() => setActiveSection('progress')}
             onGuideNavigate={handleGuideNavigate}
             primaryGoal={primaryGoal}
+            onPrimaryGoalChange={updatePrimaryGoal}
+            primaryGoalBusy={primaryGoalBusy}
+            inputStyle={inputStyle}
             profileSummary={profileSummary}
             userXp={userXp}
             rankData={rankData}

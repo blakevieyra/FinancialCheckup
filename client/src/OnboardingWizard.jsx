@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as api from './api';
 import { BLANK_SNAPSHOT } from './checkupConstants';
 import { PLAN_PRICING } from './planConstants';
+import { GOAL_OPTIONS } from './goalResources';
 import LoadingOverlay from './LoadingOverlay';
 import {
   finishOnboardingWithCheckup,
@@ -10,14 +11,7 @@ import {
   clearOnboardingPending,
 } from './onboardingFinish';
 
-const GOALS = [
-  { id: 'emergency_fund', label: 'Build emergency fund', desc: 'Focus on savings & cash reserves' },
-  { id: 'debt_free', label: 'Pay off debt', desc: 'Avalanche/snowball payoff plan' },
-  { id: 'wealth_building', label: 'Wealth building', desc: 'Grow net worth across savings, investments & retirement' },
-  { id: 'retirement', label: 'Retire on track', desc: '401k/IRA contributions & trajectory' },
-  { id: 'invest', label: 'Grow investments', desc: 'Portfolio allocation & diversification' },
-  { id: 'insurance', label: 'Fix insurance gaps', desc: 'Life, disability & liability coverage' },
-];
+const GOALS = GOAL_OPTIONS;
 
 const STEPS = ['Your goal', 'Income & spending', 'Savings', 'Investments', 'Insurance', 'Choose your plan'];
 

@@ -6,6 +6,7 @@ import { PlanOutlookContent } from './PlanOutlookCard';
 import ExpandablePanel from './ExpandablePanel';
 import BadgeRewardsPanel from './BadgeRewardsPanel';
 import LeaderboardSnapshot from './LeaderboardSnapshot';
+import GoalPicker from './GoalPicker';
 import { goalLabel } from './goalResources';
 import { formatMoney, NetSummaryBar, SectionHeader, SnapshotCard, TotalBar } from './panelPrimitives';
 
@@ -29,16 +30,35 @@ function LedgerSnapshot({ income, totalExpenses, cardSoftStyle }) {
   );
 }
 
-function GoalCard({ primaryGoal, cardSoftStyle }) {
-  if (!primaryGoal) return null;
+function GoalCard({ primaryGoal, cardSoftStyle, inputStyle, onPrimaryGoalChange, primaryGoalBusy }) {
   return (
     <SnapshotCard
       title="Your goal"
-      subtitle="Guides recommendations across the app."
+      subtitle="Guides Progress metrics, Guide steps, Finances cards, and AI reports."
       cardSoftStyle={cardSoftStyle}
       accent="#8b5cf6"
     >
-      <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.35 }}>{goalLabel(primaryGoal)}</div>
+      {primaryGoal ? (
+        <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.35, marginBottom: onPrimaryGoalChange ? 10 : 0 }}>
+          {goalLabel(primaryGoal)}
+        </div>
+      ) : (
+        <p style={{ margin: '0 0 10px', fontSize: 13, opacity: 0.82, lineHeight: 1.45 }}>
+          Pick a focus to personalize recommendations across the app.
+        </p>
+      )}
+      {onPrimaryGoalChange ? (
+        <GoalPicker
+          value={primaryGoal}
+          onChange={onPrimaryGoalChange}
+          disabled={primaryGoalBusy}
+          inputStyle={inputStyle}
+          showHint={Boolean(primaryGoal)}
+          label={primaryGoal ? 'Switch goal' : 'Set your goal'}
+        />
+      ) : primaryGoal ? (
+        <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.35 }}>{goalLabel(primaryGoal)}</div>
+      ) : null}
     </SnapshotCard>
   );
 }
@@ -97,6 +117,9 @@ export default function OverviewDashboard({
   onGoProgress,
   onGuideNavigate,
   primaryGoal,
+  onPrimaryGoalChange,
+  primaryGoalBusy,
+  inputStyle,
   profileSummary,
   userXp,
   rankData,
@@ -150,7 +173,13 @@ export default function OverviewDashboard({
 
   const sideColumn = (
     <div style={{ display: 'grid', gap: 12, minWidth: 0, alignContent: 'start' }}>
-      <GoalCard primaryGoal={primaryGoal} cardSoftStyle={cardSoftStyle} />
+      <GoalCard
+        primaryGoal={primaryGoal}
+        cardSoftStyle={cardSoftStyle}
+        inputStyle={inputStyle}
+        onPrimaryGoalChange={onPrimaryGoalChange}
+        primaryGoalBusy={primaryGoalBusy}
+      />
 
       <LedgerSnapshot income={income} totalExpenses={totalExpenses} cardSoftStyle={cardSoftStyle} />
 

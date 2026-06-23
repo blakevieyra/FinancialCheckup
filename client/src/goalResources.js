@@ -1,13 +1,15 @@
 /** Goal-directed strategy copy & resources for savings, portfolio, and retirement cards. */
 
-const GOAL_NAMES = {
-  emergency_fund: 'Build emergency fund',
-  debt_free: 'Pay off debt',
-  wealth_building: 'Wealth building',
-  retirement: 'Retire on track',
-  invest: 'Grow investments',
-  insurance: 'Fix insurance gaps',
-};
+export const GOAL_OPTIONS = [
+  { id: 'emergency_fund', label: 'Build emergency fund', desc: 'Focus on savings & cash reserves' },
+  { id: 'debt_free', label: 'Pay off debt', desc: 'Avalanche/snowball payoff plan' },
+  { id: 'wealth_building', label: 'Wealth building', desc: 'Grow net worth across savings, investments & retirement' },
+  { id: 'retirement', label: 'Retire on track', desc: '401k/IRA contributions & trajectory' },
+  { id: 'invest', label: 'Grow investments', desc: 'Portfolio allocation & diversification' },
+  { id: 'insurance', label: 'Fix insurance gaps', desc: 'Life, disability & liability coverage' },
+];
+
+const GOAL_NAMES = Object.fromEntries(GOAL_OPTIONS.map((g) => [g.id, g.label]));
 
 const AREA_STRATEGIES = {
   savings: {
@@ -166,6 +168,10 @@ const AREA_STRATEGIES = {
 
 export function goalLabel(primaryGoal) {
   return GOAL_NAMES[primaryGoal] || 'General financial wellness';
+}
+
+export function goalDescription(primaryGoal) {
+  return GOAL_OPTIONS.find((g) => g.id === primaryGoal)?.desc || 'Holistic score across all six dimensions.';
 }
 
 export function strategyForArea(area, primaryGoal) {
